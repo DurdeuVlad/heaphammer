@@ -28,9 +28,21 @@ public class EntityScenarioPlanner {
         Objects.requireNonNull(id, "ExperimentId must not be null");
         Objects.requireNonNull(spec, "ExperimentSpec must not be null");
 
-        List<String> pool = (availableEntityTypes == null || availableEntityTypes.isEmpty())
+        List<String> rawPool = (availableEntityTypes == null || availableEntityTypes.isEmpty())
                 ? new ArrayList<>(DEFAULT_FALLBACK_TYPES)
                 : new ArrayList<>(availableEntityTypes);
+
+        // Apply mod filtering and coverage sampling
+        com.dwurdy.heaphammer.scenario.targeting.ModFilter filter =
+                new com.dwurdy.heaphammer.scenario.targeting.ModFilter(spec.includeMods(), spec.excludeMods());
+        com.dwurdy.heaphammer.scenario.targeting.RegistrySampler sampler =
+                new com.dwurdy.heaphammer.scenario.targeting.RegistrySampler();
+        com.dwurdy.heaphammer.scenario.targeting.TargetPartition partition =
+                sampler.sample("minecraft:entity_type", rawPool, filter, spec.coverage(), spec.seed());
+
+        List<String> pool = partition.sampledEntries().isEmpty()
+                ? new ArrayList<>(DEFAULT_FALLBACK_TYPES)
+                : new ArrayList<>(partition.sampledEntries());
 
         // Sort pool for cross-platform determinism regardless of input order
         Collections.sort(pool);
@@ -91,6 +103,7 @@ public class EntityScenarioPlanner {
                 System.currentTimeMillis(),
                 spec,
                 operations,
+                partition,
                 estimatedDurationTicks
         );
     }
