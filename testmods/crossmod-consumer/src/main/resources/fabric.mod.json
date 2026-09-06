@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "testmod-crossmod-consumer",
+  "version": "1.0.0",
+  "name": "TestMod CrossMod Consumer",
+  "description": "Consumer mod for cross-mod collision testing. Clean alone, leaks when paired with testmod-crossmod-core.",
+  "authors": [
+    "dwurdy"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.dwurdy.testmod.crossmod.consumer.CrossModConsumerMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}

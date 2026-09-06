@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "testmod-crossmod-core",
+  "version": "1.0.0",
+  "name": "TestMod CrossMod Core",
+  "description": "Core API and EventBus provider for cross-mod collision testing",
+  "authors": [
+    "dwurdy"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.dwurdy.testmod.crossmod.core.CrossModCoreMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}

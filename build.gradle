@@ -41,6 +41,67 @@ test {
 	useJUnitPlatform()
 }
 
+sourceSets {
+	testmodChunkcache {
+		java.srcDirs = ['testmods/leak-chunkcache/src/main/java']
+		resources.srcDirs = ['testmods/leak-chunkcache/src/main/resources']
+		compileClasspath += sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.runtimeClasspath
+	}
+	testmodOmnitrack {
+		java.srcDirs = ['testmods/leak-omnitrack/src/main/java']
+		resources.srcDirs = ['testmods/leak-omnitrack/src/main/resources']
+		compileClasspath += sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.runtimeClasspath
+	}
+	testmodCrossmodCore {
+		java.srcDirs = ['testmods/crossmod-core/src/main/java']
+		resources.srcDirs = ['testmods/crossmod-core/src/main/resources']
+		compileClasspath += sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.runtimeClasspath
+	}
+	testmodCrossmodConsumer {
+		java.srcDirs = ['testmods/crossmod-consumer/src/main/java']
+		resources.srcDirs = ['testmods/crossmod-consumer/src/main/resources']
+		compileClasspath += sourceSets.main.compileClasspath + sourceSets.testmodCrossmodCore.output
+		runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.testmodCrossmodCore.output
+	}
+}
+
+task jarChunkcache(type: Jar) {
+	archiveBaseName = 'testmod-leak-chunkcache'
+	archiveVersion = '1.0.0'
+	destinationDirectory = file("build/testmods")
+	from sourceSets.testmodChunkcache.output
+}
+
+task jarOmnitrack(type: Jar) {
+	archiveBaseName = 'testmod-leak-omnitrack'
+	archiveVersion = '1.0.0'
+	destinationDirectory = file("build/testmods")
+	from sourceSets.testmodOmnitrack.output
+}
+
+task jarCrossmodCore(type: Jar) {
+	archiveBaseName = 'testmod-crossmod-core'
+	archiveVersion = '1.0.0'
+	destinationDirectory = file("build/testmods")
+	from sourceSets.testmodCrossmodCore.output
+}
+
+task jarCrossmodConsumer(type: Jar) {
+	archiveBaseName = 'testmod-crossmod-consumer'
+	archiveVersion = '1.0.0'
+	destinationDirectory = file("build/testmods")
+	from sourceSets.testmodCrossmodConsumer.output
+}
+
+task buildTestmods(dependsOn: [jarChunkcache, jarOmnitrack, jarCrossmodCore, jarCrossmodConsumer]) {
+	group = "build"
+	description = "Compiles and packages all synthetic testmod jars for empirical verification"
+}
+
+
 processResources {
 	def currentVersion = project.version
 	inputs.property "version", currentVersion
