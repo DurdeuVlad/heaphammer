@@ -19,6 +19,7 @@ jobs:
         branch:
           - ver/1.21.1
           - ver/1.20.1
+          - ver/1.18.2
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -60,20 +61,34 @@ jobs:
             exit 0
           fi
 
+          # Backup branch properties
+          cp gradle.properties gradle.properties.bak
+
           # Attempt merge from master
           if git merge origin/master -m "chore(sync): automated merge master into $TARGET_BRANCH"; then
-            echo "Merge succeeded cleanly. Verifying test suite..."
-            if ./gradlew test --no-daemon; then
-              echo "Verification passed! Pushing to $TARGET_BRANCH..."
-              git push origin "$TARGET_BRANCH"
-            else
-              echo "Tests failed on $TARGET_BRANCH after merge."
-              git reset --hard HEAD~1
-              echo "status=needs_pr" >> $GITHUB_OUTPUT
-            fi
+            echo "Merge succeeded cleanly."
           else
-            echo "Merge conflict detected."
-            git merge --abort || true
+            CONFLICTS=$(git diff --name-only --diff-filter=U)
+            if [ "$CONFLICTS" = "gradle.properties" ]; then
+              echo "Preserving branch-specific gradle.properties..."
+              mv gradle.properties.bak gradle.properties
+              git add gradle.properties
+              git commit -m "chore(sync): preserve version-specific gradle.properties for $TARGET_BRANCH"
+            else
+              echo "Merge conflict detected across files: $CONFLICTS"
+              git merge --abort || true
+              echo "status=needs_pr" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+
+          echo "Verifying test suite on $TARGET_BRANCH..."
+          if ./gradlew test --no-daemon; then
+            echo "Verification passed! Pushing to $TARGET_BRANCH..."
+            git push origin "$TARGET_BRANCH"
+          else
+            echo "Tests failed on $TARGET_BRANCH after merge."
+            git reset --hard HEAD~1
             echo "status=needs_pr" >> $GITHUB_OUTPUT
           fi
 

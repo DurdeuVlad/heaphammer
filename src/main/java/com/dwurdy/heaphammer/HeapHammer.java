@@ -83,6 +83,16 @@ public class HeapHammer implements ModInitializer {
 	}
 
 	public static ResourceLocation id(String path) {
-		return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
+		try {
+			java.lang.reflect.Method m = ResourceLocation.class.getMethod("fromNamespaceAndPath", String.class, String.class);
+			return (ResourceLocation) m.invoke(null, MOD_ID, path);
+		} catch (ReflectiveOperationException ignored) {
+			try {
+				java.lang.reflect.Constructor<ResourceLocation> c = ResourceLocation.class.getConstructor(String.class, String.class);
+				return c.newInstance(MOD_ID, path);
+			} catch (ReflectiveOperationException e) {
+				throw new RuntimeException("Cannot create ResourceLocation for " + MOD_ID + ":" + path, e);
+			}
+		}
 	}
 }
