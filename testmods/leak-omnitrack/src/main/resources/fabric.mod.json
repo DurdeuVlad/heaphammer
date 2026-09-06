@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "testmod-leak-omnitrack",
+  "version": "1.0.0",
+  "name": "TestMod Leak OmniTrack",
+  "description": "Synthetic multi-subsystem memory leak test fixture (chunks, entities, tick buffer)",
+  "authors": [
+    "dwurdy"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.dwurdy.testmod.omnitrack.OmniTrackLeakMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}

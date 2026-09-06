@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "testmod-leak-chunkcache",
+  "version": "1.0.0",
+  "name": "TestMod Leak ChunkCache",
+  "description": "Synthetic single-subsystem chunk cache leak test fixture",
+  "authors": [
+    "dwurdy"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.dwurdy.testmod.chunkcache.ChunkCacheLeakMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}
