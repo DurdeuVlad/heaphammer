@@ -1,0 +1,37 @@
+{
+	"schemaVersion": 1,
+	"id": "heaphammer",
+	"version": "${version}",
+	"name": "HeapHammer",
+	"description": "HeapHammer Minecraft Mod by dwurdy.com",
+	"authors": [
+		"dwurdy"
+	],
+	"contact": {
+		"homepage": "https://dwurdy.com"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/heaphammer/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.dwurdy.heaphammer.HeapHammer"
+		],
+		"client": [
+			"com.dwurdy.heaphammer.client.HeapHammerClient"
+		]
+	},
+	"mixins": [
+		"heaphammer.mixins.json",
+		{
+			"config": "heaphammer.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
