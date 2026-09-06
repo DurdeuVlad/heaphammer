@@ -322,6 +322,12 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 ./gradlew runServer
 ```
 
+### Contributing & Multi-Version Development
+- [CONTRIBUTING.md](CONTRIBUTING.md): Code style, hexagonal architecture rules, determinism invariants, and PR guidelines.
+- [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md): Multi-version Minecraft branching strategy, platform accommodation, and automated synchronization.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Contributor Covenant v2.1 community guidelines.
+- [SECURITY.md](SECURITY.md): Vulnerability reporting policy and supported release matrix.
+
 ### Artifact Locations
 - Compiled mod jar: `build/libs/heaphammer-1.0.0-alpha.1.jar`
 - Synthetic test mod jars: `build/testmods/`

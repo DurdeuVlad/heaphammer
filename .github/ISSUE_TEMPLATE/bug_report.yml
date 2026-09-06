@@ -1,0 +1,64 @@
+name: "Bug Report"
+description: "Report an issue, unexpected crash, incorrect retention verdict, or ticket leak"
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug in HeapHammer! Please ensure you test on a staging or test world before running benchmarks.
+  - type: input
+    id: version
+    attributes:
+      label: "HeapHammer Version"
+      description: "Which version of HeapHammer are you running? (e.g. 1.0.0-alpha.1)"
+      placeholder: "1.0.0-alpha.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: mc_version
+    attributes:
+      label: "Minecraft Version"
+      options:
+        - "1.21.1"
+        - "1.21.0"
+        - "1.20.4"
+        - "Other"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: "Environment Details"
+      description: "Fabric Loader version, Java version, and server type (Dedicated vs Integrated/Singleplayer)"
+      placeholder: "Fabric Loader 0.19.5, OpenJDK 21, Dedicated Linux Server"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction_command
+    attributes:
+      label: "Reproduction Command / Plan Spec"
+      description: "What exact command or plan spec triggered the bug? (e.g. /hh run chunks --iterations=5 --batch=10 --seed=1234)"
+      placeholder: "/hh run chunks --iterations=5 --batch=10 --seed=1234"
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: "Expected Behavior"
+      description: "A concise description of what you expected to happen."
+    validations:
+      required: true
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: "Actual Behavior"
+      description: "A clear description of what actually happened, including error messages, incorrect verdicts, or crashes."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Relevant Server Logs or Report JSON"
+      description: "Attach the generated report JSON (from run/heaphammer/reports/) or crash stack trace."
+      render: text

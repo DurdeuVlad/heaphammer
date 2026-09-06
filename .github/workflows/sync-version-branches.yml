@@ -1,0 +1,97 @@
+name: Sync Version Branches
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync to ${{ matrix.branch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - ver/1.21.1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Attempt Automatic Merge & Verification
+        id: merge_attempt
+        run: |
+          TARGET_BRANCH="${{ matrix.branch }}"
+          echo "Syncing master into $TARGET_BRANCH..."
+
+          # Check if remote branch exists
+          if git ls-remote --heads origin "$TARGET_BRANCH" | grep -q "$TARGET_BRANCH"; then
+            git checkout "$TARGET_BRANCH"
+            git pull origin "$TARGET_BRANCH"
+          else
+            echo "Branch $TARGET_BRANCH does not exist on remote. Creating from master..."
+            git checkout -b "$TARGET_BRANCH" master
+            git push origin "$TARGET_BRANCH"
+            exit 0
+          fi
+
+          # Attempt merge from master
+          if git merge origin/master -m "chore(sync): automated merge master into $TARGET_BRANCH"; then
+            echo "Merge succeeded cleanly. Verifying test suite..."
+            if ./gradlew test --no-daemon; then
+              echo "Verification passed! Pushing to $TARGET_BRANCH..."
+              git push origin "$TARGET_BRANCH"
+            else
+              echo "Tests failed on $TARGET_BRANCH after merge."
+              git reset --hard HEAD~1
+              echo "status=needs_pr" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Merge conflict detected."
+            git merge --abort || true
+            echo "status=needs_pr" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Adaptation Pull Request (if conflict/failure)
+        if: steps.merge_attempt.outputs.status == 'needs_pr'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TARGET_BRANCH="${{ matrix.branch }}"
+          SYNC_BRANCH="sync/master-to-${TARGET_BRANCH#ver/}"
+          
+          git checkout -b "$SYNC_BRANCH" "origin/$TARGET_BRANCH"
+          git merge origin/master || true
+          
+          git push origin "$SYNC_BRANCH" --force
+          
+          gh pr create \
+            --base "$TARGET_BRANCH" \
+            --head "$SYNC_BRANCH" \
+            --title "[Auto-Sync] Merge master into $TARGET_BRANCH" \
+            --body "Automated branch sync encountered merge conflicts or version-specific adaptation requirements. Please review, adapt the version platform bridges, and merge." \
+            --label "needs-version-adaptation" || true

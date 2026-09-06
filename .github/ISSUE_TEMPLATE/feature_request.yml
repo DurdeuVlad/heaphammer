@@ -1,0 +1,37 @@
+name: "Feature Request / Scenario Proposal"
+description: "Suggest an idea, new stress scenario, adapter integration, or diagnostic capability"
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We welcome proposals for new deterministic stress scenarios, workload adapters, or detection mathematics!
+  - type: textarea
+    id: strategic_intent
+    attributes:
+      label: "Strategic Intent & Problem"
+      description: "What server-side problem or memory leak pattern does this feature address? Why can't existing scenarios catch it?"
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: "Proposed Solution & CLI Design"
+      description: "How should this feature work? Include proposed command syntax (e.g. `/hh run <new-scenario> [flags]`)."
+    validations:
+      required: true
+  - type: textarea
+    id: architectural_boundaries
+    attributes:
+      label: "Architectural & Safety Boundaries"
+      description: "How will this feature maintain tick-budget safety, ticket isolation, and domain/platform separation?"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: "Measurable Acceptance Criteria"
+      description: "How can we empirically prove that this feature works and produces reproducible verdicts?"
+    validations:
+      required: true
