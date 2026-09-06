@@ -52,7 +52,24 @@ public class ExperimentService {
                 plan.id(), plan.spec().scenarioId(), plan.spec().iterations(), plan.spec().batchSize(), plan.spec().radius());
 
         ScenarioExecutor executor;
-        if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
+        Optional<com.dwurdy.heaphammer.adapter.WorkloadAdapter> customAdapter =
+                com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance()
+                        .findAdapterForScenario(plan.spec().scenarioId().value());
+
+        if (customAdapter.isPresent()) {
+            Optional<ScenarioExecutor> customExecutor = customAdapter.get().createExecutor(
+                    plan,
+                    platform,
+                    (phase, iter) -> checkpointListener.accept(phase, iter),
+                    state -> onExecutorFinished(state)
+            );
+            if (customExecutor.isPresent()) {
+                executor = customExecutor.get();
+            } else {
+                throw new IllegalStateException("Adapter " + customAdapter.get().adapterId() +
+                        " failed to create executor for scenario " + plan.spec().scenarioId());
+            }
+        } else if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
             executor = new EntityScenarioExecutor(
                     plan,
                     platform,

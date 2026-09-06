@@ -90,6 +90,9 @@ public class HeapHammerCommands {
         experimentService.setCompletionListener(executor -> {
             onExperimentFinished(executor);
         });
+
+        // Discover external workload adapters
+        com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance().loadFromFabricEntrypoints(platform);
     }
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -198,7 +201,29 @@ public class HeapHammerCommands {
                         .executes(ctx -> cmdFixture(ctx, StringArgumentType.getString(ctx, "mode"), com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "sizeMb")))));
         root.then(fixture);
 
+        // Adapters (operator only)
+        var adapters = Commands.literal("adapters").requires(s -> s.hasPermission(2));
+        adapters.then(Commands.literal("list").executes(this::cmdAdaptersList));
+        root.then(adapters);
+
         dispatcher.register(root);
+    }
+
+    private int cmdAdaptersList(CommandContext<CommandSourceStack> ctx) {
+        List<com.dwurdy.heaphammer.adapter.WorkloadAdapter> list =
+                com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance().getAllAdapters();
+        if (list.isEmpty()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No external workload adapters registered.").withStyle(ChatFormatting.GRAY), false);
+            return 1;
+        }
+
+        StringBuilder sb = new StringBuilder("Registered Workload Adapters (" + list.size() + "):\n");
+        for (com.dwurdy.heaphammer.adapter.WorkloadAdapter adapter : list) {
+            sb.append("- ").append(adapter.displayName()).append(" (ID: ").append(adapter.adapterId())
+              .append("): Scenarios: [").append(String.join(", ", adapter.supportedScenarios())).append("]\n");
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal(sb.toString().trim()).withStyle(ChatFormatting.AQUA), false);
+        return 1;
     }
 
     private int cmdFixtureReset(CommandContext<CommandSourceStack> ctx) {
