@@ -55,19 +55,23 @@ HeapHammer prevents this through **Hexagonal Architecture (Ports & Adapters)**:
 We maintain a dedicated release branch for each active Minecraft version line alongside `master`:
 
 ```text
-master (Trunk: Active Development & Future Versions)
+master (Trunk: Active Development & Cutting Edge — 1.21.1)
   │
-  ├──> ver/1.21.1   (Primary Production Target — 1.21.1)
-  ├──> ver/1.21.0   (Patch Line Target — 1.21.0)
-  └──> ver/1.20.4   (Legacy LTS Target — 1.20.4)
+  ├──> ver/1.21.1        (Modern Cutting Edge — Fabric, Java 21)
+  ├──> ver/1.20.1        (Modern LTS Gold Standard — Fabric, Java 17)
+  ├──> ver/1.18.2        (World-Gen Overhaul Era — Fabric, Java 17)
+  ├──> ver/1.16.5        (Nether Legacy Era — Fabric, Java 17/8)
+  └──> ver/1.12.2-forge  (Classic Titan Era — MinecraftForge, Java 8)
 ```
 
-| Branch | Target Minecraft | Loom Version | Fabric Loader | Purpose |
+| Branch | Target Minecraft | Build Tooling | Mod Loader | Purpose & JVM Target |
 |---|---|---|---|---|
-| **`master`** | Latest (`1.21.1`) | `1.17-SNAPSHOT` | `0.19.5+` | Primary development trunk. All PRs target `master`. |
-| **`ver/1.21.1`** | `1.21.1` | `1.17-SNAPSHOT` | `0.19.5+` | Production release line for Minecraft 1.21.1. |
-| **`ver/1.21.0`** | `1.21.0` | `1.17-SNAPSHOT` | `0.19.5+` | Production release line for Minecraft 1.21.0. |
-| **`ver/1.20.4`** | `1.20.4` | `1.17-SNAPSHOT` | `0.15.x+` | Legacy LTS line for Minecraft 1.20.4. |
+| **`master`** | Latest (`1.21.1`) | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Primary development trunk. Java 21. |
+| **`ver/1.21.1`** | `1.21.1` | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Cutting Edge production line. Java 21. |
+| **`ver/1.20.1`** | `1.20.1` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | Modern LTS Gold Standard line. Java 17. |
+| **`ver/1.18.2`** | `1.18.2` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | World-gen overhaul LTS line. Java 17. |
+| **`ver/1.16.5`** | `1.16.5` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | Nether legacy LTS line. Java 17/8. |
+| **`ver/1.12.2-forge`** | `1.12.2` | `Java Library / Forge` | `MinecraftForge` | Classic Titan modpack era line. Java 8. |
 
 ---
 

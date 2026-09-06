@@ -2,6 +2,14 @@
 
 This document contains the executable issue specifications for extending HeapHammer across Minecraft modding eras from 1.21.1 down to 1.12.2. Every issue adheres to the Flux Milestone and Production Handoff Directives.
 
+## Multi-Version Milestone Status Summary
+
+| Milestone | Issues | Target Versions | Branch / Commit | PR & Review Status | Real Verification Result |
+|---|---|---|---|---|---|
+| **M1: CI/CD & Build Automation** | M1.1 | All Versions | `Jenkinsfile`, `ci.yml` | **MERGED into master** | Dynamic JDK tool auto-selection verified (`JDK21`, `JDK17`, `JDK8`) |
+| **M2: Modern LTS Expansion** | M2.1, M2.2 | 1.20.1, 1.18.2 | `ver/1.20.1`, `ver/1.18.2` | **MERGED into master** (`41dcd9b`) | `./gradlew test` passes 100% on 1.20.1 (28s) & 1.18.2 (17s) |
+| **M3: Legacy Bridge & Classic Titan** | M3.1, M3.2 | 1.16.5, 1.12.2 Forge | `ver/1.16.5`, `ver/1.12.2-forge` | **MERGED into master** (`aaeca2e`) | `./gradlew test` passes 100% on 1.16.5 (11s) & 1.12.2 (8s) |
+
 ---
 
 ## Milestone M1: Multi-Version Build Automation & Jenkins CI/CD
