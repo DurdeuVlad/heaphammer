@@ -3,10 +3,13 @@
 > **Deterministic stress testing and retained-memory regression framework for modded Minecraft.**
 >
 > *Take a problem that appears after hours or days under production activity, compress the relevant activity into a repeatable staging workload, and produce a replayable test case with objective evidence.*
+>
+> 📄 **Research Paper Available**: For our empirical methodology, mathematical retention models, live server regression data, and cross-mod collision analysis, see [docs/PAPER.md](docs/PAPER.md) (*Empirical Detection of Accidental Retained-Memory Regressions and Cross-Mod Collisions in Modded Minecraft*).
 
 ---
 
 ## 1. Executive Summary
+
 
 In modern modpacks with 200–300+ mods, server-side memory leaks and retained-object regressions are notoriously difficult to diagnose. They often take days of continuous player traffic to manifest, making staging reproduction painfully slow.
 
