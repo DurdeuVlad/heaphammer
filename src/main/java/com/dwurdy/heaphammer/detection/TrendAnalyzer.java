@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Retained-heap trend analysis and leak heuristic engine (BR-004, Section 6).
+ * Retained-heap trend analysis, plateau detection, and leak heuristic engine (BR-004, Section 6, Section 27).
  */
 public class TrendAnalyzer {
     // Default threshold: 5 MB/cycle persistent retained growth
@@ -31,7 +31,7 @@ public class TrendAnalyzer {
         if (checkpoints == null || checkpoints.isEmpty()) {
             return new DetectionResult(
                     DetectionClassification.INCONCLUSIVE,
-                    0.0, 0.0, 0.0, 0L,
+                    0.0, 0.0, 0.0, 0L, false,
                     "No checkpoints available for trend analysis."
             );
         }
@@ -60,7 +60,7 @@ public class TrendAnalyzer {
         if (evalPoints.size() < 2) {
             return new DetectionResult(
                     DetectionClassification.INCONCLUSIVE,
-                    0.0, 0.0, 0.0, 0L,
+                    0.0, 0.0, 0.0, 0L, false,
                     "Insufficient post-warmup evaluation checkpoints (found " + evalPoints.size() + ", requires >= 2)."
             );
         }
@@ -70,7 +70,7 @@ public class TrendAnalyzer {
             if (!cp.cleanupValid()) {
                 return new DetectionResult(
                         DetectionClassification.CLEANUP_FAILED,
-                        1.0, 0.0, 0.0, 0L,
+                        1.0, 0.0, 0.0, 0L, false,
                         "Cleanup validation failed on iteration " + cp.iteration() + "; cannot measure retained heap reliably."
                 );
             }
@@ -94,15 +94,35 @@ public class TrendAnalyzer {
         double slopeMb = slope / (1024.0 * 1024.0);
         double netDeltaMb = netDeltaBytes / (1024.0 * 1024.0);
 
-        // 5. Evaluate thresholds and classify
+        // 5. Check for Plateau Behavior (Bounded warming cache)
+        boolean plateau = detectPlateau(x, y, slopeThresholdBytes);
+        if (plateau) {
+            double confidence = 0.92;
+            String rationale = String.format(Locale.ROOT,
+                    "PASS (PLATEAU): Bounded warming pattern detected; early growth plateaued into stable retention (net delta = +%.2f MB).",
+                    netDeltaMb);
+            return new DetectionResult(
+                    DetectionClassification.PASS,
+                    confidence, slope, rSquared, netDeltaBytes, true, rationale
+            );
+        }
+
+        // 6. Evaluate thresholds and classify
         if (slope > slopeThresholdBytes && rSquared >= minRSquared && netDeltaBytes > 0) {
-            double confidence = Math.min(0.99, Math.max(0.70, rSquared));
+            // Statistical confidence scoring
+            double confidence;
+            if (rSquared >= 0.85 && n >= 4) {
+                confidence = Math.min(0.99, rSquared);
+            } else {
+                confidence = Math.max(0.65, Math.min(0.85, rSquared));
+            }
+
             String rationale = String.format(Locale.ROOT,
                     "SUSPICIOUS: Monotonic retained heap growth detected (+%.2f MB/cycle, R² = %.2f, net delta = +%.2f MB).",
                     slopeMb, rSquared, netDeltaMb);
             return new DetectionResult(
                     DetectionClassification.SUSPICIOUS,
-                    confidence, slope, rSquared, netDeltaBytes, rationale
+                    confidence, slope, rSquared, netDeltaBytes, false, rationale
             );
         }
 
@@ -113,17 +133,42 @@ public class TrendAnalyzer {
                     slopeMb, netDeltaMb);
             return new DetectionResult(
                     DetectionClassification.PASS,
-                    confidence, slope, rSquared, netDeltaBytes, rationale
+                    confidence, slope, rSquared, netDeltaBytes, false, rationale
             );
         }
 
         // Intermediate / noisy variance without clear trend
         return new DetectionResult(
                 DetectionClassification.INCONCLUSIVE,
-                0.50, slope, rSquared, netDeltaBytes,
+                0.50, slope, rSquared, netDeltaBytes, false,
                 String.format(Locale.ROOT,
                         "INCONCLUSIVE: Heap variance observed (slope = %.2f MB/cycle, R² = %.2f, net delta = %.2f MB) without definitive linear trend.",
                         slopeMb, rSquared, netDeltaMb)
         );
+    }
+
+    private boolean detectPlateau(double[] x, double[] y, double threshold) {
+        int n = x.length;
+        if (n < 4) {
+            return false;
+        }
+
+        int mid = n / 2;
+        double[] xFirst = new double[mid];
+        double[] yFirst = new double[mid];
+        System.arraycopy(x, 0, xFirst, 0, mid);
+        System.arraycopy(y, 0, yFirst, 0, mid);
+
+        int secondLen = n - mid;
+        double[] xSecond = new double[secondLen];
+        double[] ySecond = new double[secondLen];
+        System.arraycopy(x, mid, xSecond, 0, secondLen);
+        System.arraycopy(y, mid, ySecond, 0, secondLen);
+
+        LinearRegression regFirst = LinearRegression.compute(xFirst, yFirst);
+        LinearRegression regSecond = LinearRegression.compute(xSecond, ySecond);
+
+        // Early half has positive warming slope, second half levels off to near zero / below 25% threshold
+        return regFirst.slope() > threshold * 0.4 && regSecond.slope() <= threshold * 0.25;
     }
 }

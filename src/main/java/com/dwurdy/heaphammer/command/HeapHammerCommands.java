@@ -7,7 +7,10 @@ import com.dwurdy.heaphammer.detection.TrendAnalyzer;
 import com.dwurdy.heaphammer.domain.*;
 import com.dwurdy.heaphammer.metrics.CheckpointService;
 import com.dwurdy.heaphammer.platform.PlatformAdapter;
+import com.dwurdy.heaphammer.diagnostics.*;
 import com.dwurdy.heaphammer.report.PlanStorage;
+import com.dwurdy.heaphammer.report.ReportDiff;
+import com.dwurdy.heaphammer.report.ReportDiffer;
 import com.dwurdy.heaphammer.report.ReportService;
 import com.dwurdy.heaphammer.scenario.chunks.ChunkScenarioExecutor;
 import com.dwurdy.heaphammer.scenario.chunks.ChunkWorkloadPlanner;
@@ -42,6 +45,10 @@ public class HeapHammerCommands {
     private final ChunkWorkloadPlanner planner;
     private final TrendAnalyzer trendAnalyzer;
 
+    private final ClassHistogramCollector histogramCollector;
+    private final JfrTrigger jfrTrigger;
+    private final HeapDumpService heapDumpService;
+
     public HeapHammerCommands(
             PlatformAdapter platform,
             ExperimentService experimentService,
@@ -58,6 +65,9 @@ public class HeapHammerCommands {
         this.replayService = replayService;
         this.planner = new ChunkWorkloadPlanner();
         this.trendAnalyzer = new TrendAnalyzer();
+        this.histogramCollector = new ClassHistogramCollector();
+        this.jfrTrigger = new JfrTrigger();
+        this.heapDumpService = new HeapDumpService();
 
         // Wire experiment service callbacks
         experimentService.setCheckpointListener((phase, iter) -> {
@@ -92,7 +102,9 @@ public class HeapHammerCommands {
         // Operator commands (requires level 2)
         root.then(Commands.literal("stop").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
         root.then(Commands.literal("cleanup").requires(s -> s.hasPermission(2)).executes(this::cmdCleanup));
-        root.then(Commands.literal("checkpoint").requires(s -> s.hasPermission(2)).executes(this::cmdCheckpoint));
+        root.then(Commands.literal("checkpoint").requires(s -> s.hasPermission(2))
+                .executes(this::cmdCheckpoint)
+                .then(Commands.literal("--diagnostics").executes(this::cmdCheckpointDiagnostics)));
 
         // Scenario command branch
         var scenario = Commands.literal("scenario");
@@ -134,7 +146,22 @@ public class HeapHammerCommands {
         report.then(Commands.literal("export")
                 .then(Commands.argument("target", StringArgumentType.string())
                         .executes(ctx -> cmdReportExport(ctx, StringArgumentType.getString(ctx, "target")))));
+        report.then(Commands.literal("diff")
+                .then(Commands.argument("runA", StringArgumentType.string())
+                        .then(Commands.argument("runB", StringArgumentType.string())
+                                .executes(this::cmdReportDiff))));
         root.then(report);
+
+        // Diagnostics
+        var diagnostics = Commands.literal("diagnostics").requires(s -> s.hasPermission(2));
+        diagnostics.then(Commands.literal("histogram").executes(this::cmdDiagnosticsHistogram));
+        diagnostics.then(Commands.literal("heapdump").executes(this::cmdDiagnosticsHeapdump));
+        var jfr = Commands.literal("jfr");
+        jfr.then(Commands.literal("start").executes(this::cmdDiagnosticsJfrStart));
+        jfr.then(Commands.literal("stop").executes(this::cmdDiagnosticsJfrStop));
+        jfr.then(Commands.literal("dump").executes(this::cmdDiagnosticsJfrDump));
+        diagnostics.then(jfr);
+        root.then(diagnostics);
 
         // Fixtures (operator only)
         var fixture = Commands.literal("fixture").requires(s -> s.hasPermission(2));
@@ -396,6 +423,145 @@ public class HeapHammerCommands {
 
     private int cmdReportExport(CommandContext<CommandSourceStack> ctx, String target) {
         cmdReportShow(ctx, target);
+        return 1;
+    }
+
+    private int cmdReportDiff(CommandContext<CommandSourceStack> ctx) {
+        String targetA = StringArgumentType.getString(ctx, "runA");
+        String targetB = StringArgumentType.getString(ctx, "runB");
+        try {
+            Optional<ExperimentReport> repA = "last".equalsIgnoreCase(targetA) ?
+                    reportService.loadLatestReport() : reportService.loadReport(ExperimentId.of(targetA));
+            Optional<ExperimentReport> repB = "last".equalsIgnoreCase(targetB) ?
+                    reportService.loadLatestReport() : reportService.loadReport(ExperimentId.of(targetB));
+
+            if (repA.isEmpty()) {
+                ctx.getSource().sendFailure(Component.literal("Report A not found: " + targetA));
+                return 0;
+            }
+            if (repB.isEmpty()) {
+                ctx.getSource().sendFailure(Component.literal("Report B not found: " + targetB));
+                return 0;
+            }
+
+            ReportDiff diff = ReportDiffer.diff(repA.get(), repB.get());
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "--- Report Diff (" + diff.runA().value() + " vs " + diff.runB().value() + ") ---\n" +
+                    "Environment: " + diff.environmentComparison() + "\n" +
+                    String.format(Locale.ROOT, "Initial Heap: %.2f MB -> %.2f MB\n",
+                            diff.initialHeapA() / (1024.0 * 1024.0), diff.initialHeapB() / (1024.0 * 1024.0)) +
+                    String.format(Locale.ROOT, "Final Heap:   %.2f MB -> %.2f MB\n",
+                            diff.finalHeapA() / (1024.0 * 1024.0), diff.finalHeapB() / (1024.0 * 1024.0)) +
+                    String.format(Locale.ROOT, "Net Delta:    %+.2f MB vs %+.2f MB (Diff: %+.2f MB)\n",
+                            diff.netDeltaA() / (1024.0 * 1024.0), diff.netDeltaB() / (1024.0 * 1024.0), diff.netDeltaDiffMb()) +
+                    String.format(Locale.ROOT, "Retained Slope: %+.2f MB/cyc vs %+.2f MB/cyc (Diff: %+.2f MB/cyc)\n",
+                            diff.slopeA() / (1024.0 * 1024.0), diff.slopeB() / (1024.0 * 1024.0), diff.slopeDiffMb()) +
+                    "Classification: " + diff.classificationA() + " -> " + diff.classificationB() +
+                    (diff.classificationChanged() ? " (CHANGED)" : "") +
+                    (diff.warnings().isEmpty() ? "" : "\nWarnings: " + String.join("; ", diff.warnings()))
+            ).withStyle(ChatFormatting.AQUA), false);
+        } catch (IOException e) {
+            ctx.getSource().sendFailure(Component.literal("Error reading reports: " + e.getMessage()));
+        }
+        return 1;
+    }
+
+    private int cmdCheckpointDiagnostics(CommandContext<CommandSourceStack> ctx) {
+        cmdCheckpoint(ctx);
+        if (!histogramCollector.isSupported()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("Diagnostics: Histogram capture unsupported on this JVM.")
+                    .withStyle(ChatFormatting.GRAY), false);
+            return 1;
+        }
+        Optional<ClassHistogram> hist = histogramCollector.capture(5);
+        if (hist.isPresent() && !hist.get().entries().isEmpty()) {
+            StringBuilder sb = new StringBuilder("Top 5 Classes:\n");
+            for (ClassHistogramEntry e : hist.get().entries()) {
+                sb.append(String.format(Locale.ROOT, "- #%d %s: %d (%.2f MB)\n",
+                        e.rank(), e.className(), e.instances(), e.bytesMb()));
+            }
+            ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD), false);
+        }
+        return 1;
+    }
+
+    private int cmdDiagnosticsHistogram(CommandContext<CommandSourceStack> ctx) {
+        if (!histogramCollector.isSupported()) {
+            ctx.getSource().sendFailure(Component.literal("Class histogram capture is not supported on this JVM."));
+            return 0;
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("Capturing JVM class histogram...").withStyle(ChatFormatting.GRAY), false);
+        Optional<ClassHistogram> histOpt = histogramCollector.capture(10);
+        if (histOpt.isEmpty() || histOpt.get().entries().isEmpty()) {
+            ctx.getSource().sendFailure(Component.literal("Failed to capture class histogram."));
+            return 0;
+        }
+        ClassHistogram hist = histOpt.get();
+        StringBuilder sb = new StringBuilder("--- JVM Class Histogram Top 10 ---\n");
+        for (ClassHistogramEntry entry : hist.entries()) {
+            sb.append(String.format(Locale.ROOT, "#%d %s: %d instances (%.2f MB)\n",
+                    entry.rank(), entry.className(), entry.instances(), entry.bytesMb()));
+        }
+        sb.append(String.format(Locale.ROOT, "Total: %d instances, %.2f MB",
+                hist.totalInstances(), hist.totalBytes() / (1024.0 * 1024.0)));
+        ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD), false);
+        return 1;
+    }
+
+    private int cmdDiagnosticsHeapdump(CommandContext<CommandSourceStack> ctx) {
+        if (!heapDumpService.isSupported()) {
+            ctx.getSource().sendFailure(Component.literal("Heap dumping is not supported on this JVM (HotSpotDiagnosticMXBean missing)."));
+            return 0;
+        }
+        Path dumpDir = Path.of("heaphammer", "reports", "heapdumps");
+        String filename = "manual-" + System.currentTimeMillis() + ".hprof";
+        ctx.getSource().sendSuccess(() -> Component.literal("Triggering async heap dump to " + filename + " (Warning: temporary STW pause possible)...")
+                .withStyle(ChatFormatting.RED), true);
+        heapDumpService.dumpHeapAsync(dumpDir, filename, true)
+                .thenAccept(path -> LOGGER.info("Manual heap dump written to {}", path))
+                .exceptionally(ex -> {
+                    LOGGER.error("Manual heap dump failed", ex);
+                    return null;
+                });
+        return 1;
+    }
+
+    private int cmdDiagnosticsJfrStart(CommandContext<CommandSourceStack> ctx) {
+        if (!JfrTrigger.isAvailable()) {
+            ctx.getSource().sendFailure(Component.literal("Java Flight Recorder is not available on this JVM."));
+            return 0;
+        }
+        boolean started = jfrTrigger.start("HeapHammer-Manual-" + System.currentTimeMillis());
+        if (started) {
+            ctx.getSource().sendSuccess(() -> Component.literal("JFR recording started.").withStyle(ChatFormatting.GREEN), true);
+        } else {
+            ctx.getSource().sendFailure(Component.literal("Failed to start JFR recording (may already be active)."));
+        }
+        return 1;
+    }
+
+    private int cmdDiagnosticsJfrStop(CommandContext<CommandSourceStack> ctx) {
+        if (!jfrTrigger.isRecording()) {
+            ctx.getSource().sendFailure(Component.literal("No active JFR recording."));
+            return 0;
+        }
+        jfrTrigger.stop();
+        ctx.getSource().sendSuccess(() -> Component.literal("JFR recording stopped.").withStyle(ChatFormatting.YELLOW), true);
+        return 1;
+    }
+
+    private int cmdDiagnosticsJfrDump(CommandContext<CommandSourceStack> ctx) {
+        if (!jfrTrigger.isRecording()) {
+            ctx.getSource().sendFailure(Component.literal("No active JFR recording to dump."));
+            return 0;
+        }
+        Path dir = Path.of("heaphammer", "reports", "jfr");
+        Path dumped = jfrTrigger.dump(dir, "manual-" + System.currentTimeMillis());
+        if (dumped != null) {
+            ctx.getSource().sendSuccess(() -> Component.literal("Dumped JFR to: " + dumped).withStyle(ChatFormatting.GOLD), true);
+        } else {
+            ctx.getSource().sendFailure(Component.literal("Failed to dump JFR recording."));
+        }
         return 1;
     }
 

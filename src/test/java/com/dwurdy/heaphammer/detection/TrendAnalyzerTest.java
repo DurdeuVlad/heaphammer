@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TrendAnalyzerTest {
 
     @Test
-    @DisplayName("LinearRegression accurately computes slope and r-squared")
+    @DisplayName("LinearRegression accurately computes slope, r-squared, standard error, and prediction")
     void testLinearRegression() {
         double[] x = {1, 2, 3, 4, 5};
         double[] y = {10, 20, 30, 40, 50}; // Perfect line slope 10, r^2 = 1.0
@@ -21,10 +21,12 @@ class TrendAnalyzerTest {
         assertEquals(10.0, reg.slope(), 1e-6);
         assertEquals(0.0, reg.intercept(), 1e-6);
         assertEquals(1.0, reg.rSquared(), 1e-6);
+        assertEquals(0.0, reg.standardError(), 1e-6);
+        assertEquals(60.0, reg.predict(6), 1e-6);
     }
 
     @Test
-    @DisplayName("TrendAnalyzer detects monotonic synthetic leak as SUSPICIOUS")
+    @DisplayName("TrendAnalyzer detects monotonic synthetic leak as SUSPICIOUS with high confidence")
     void testLeakingClassification() {
         ExperimentSpec spec = ExperimentSpec.builder().warmupIterations(1).iterations(5).build();
         List<Checkpoint> checkpoints = new ArrayList<>();
@@ -45,6 +47,7 @@ class TrendAnalyzerTest {
         assertTrue(result.confidence() >= 0.90);
         assertTrue(result.rSquared() > 0.95);
         assertTrue(result.slopeBytesPerCycle() > 8 * 1024 * 1024);
+        assertFalse(result.plateauDetected());
     }
 
     @Test
@@ -65,6 +68,7 @@ class TrendAnalyzerTest {
         DetectionResult result = analyzer.analyze(spec, checkpoints);
 
         assertEquals(DetectionClassification.PASS, result.classification());
+        assertFalse(result.plateauDetected());
     }
 
     @Test
@@ -90,6 +94,34 @@ class TrendAnalyzerTest {
         DetectionResult result = analyzer.analyze(spec, checkpoints);
 
         assertEquals(DetectionClassification.PASS, result.classification(), "Warm cache should not be classified as suspicious when warmup is excluded");
+    }
+
+    @Test
+    @DisplayName("TrendAnalyzer detects bounded warming plateau even without warmup exclusion")
+    void testPlateauDetection() {
+        ExperimentSpec spec = ExperimentSpec.builder().warmupIterations(0).iterations(6).build();
+        List<Checkpoint> checkpoints = new ArrayList<>();
+
+        long baseHeap = 100L * 1024 * 1024;
+        checkpoints.add(createCheckpoint(CheckpointPhase.BASELINE, 0, baseHeap, true));
+
+        // Cycles 0, 1, 2 warm up steeply (+15 MB each)
+        checkpoints.add(createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 0, baseHeap + 15 * 1024 * 1024, true));
+        checkpoints.add(createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 1, baseHeap + 30 * 1024 * 1024, true));
+        checkpoints.add(createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 2, baseHeap + 45 * 1024 * 1024, true));
+
+        // Cycles 3, 4, 5 plateau and remain completely flat
+        long plateauHeap = baseHeap + 45 * 1024 * 1024;
+        checkpoints.add(createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 3, plateauHeap, true));
+        checkpoints.add(createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 4, plateauHeap, true));
+        checkpoints.add(createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 5, plateauHeap, true));
+
+        TrendAnalyzer analyzer = new TrendAnalyzer();
+        DetectionResult result = analyzer.analyze(spec, checkpoints);
+
+        assertEquals(DetectionClassification.PASS, result.classification());
+        assertTrue(result.plateauDetected(), "Plateau should be detected when early growth levels off");
+        assertTrue(result.rationale().contains("PLATEAU"));
     }
 
     @Test

@@ -8,6 +8,10 @@ import java.util.Objects;
 public record ScenarioId(String value) {
     public static final ScenarioId CHUNKS = new ScenarioId("chunks");
 
+    public static ScenarioId of(String value) {
+        return new ScenarioId(value);
+    }
+
     public ScenarioId {
         Objects.requireNonNull(value, "ScenarioId value must not be null");
         if (value.isBlank()) {
