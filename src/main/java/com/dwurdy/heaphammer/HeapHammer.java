@@ -11,7 +11,7 @@ import com.dwurdy.heaphammer.platform.fabric.FabricPlatformAdapter;
 import com.dwurdy.heaphammer.report.PlanStorage;
 import com.dwurdy.heaphammer.report.ReportService;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -75,7 +75,7 @@ public class HeapHammer implements ModInitializer {
 				replayService
 		);
 
-		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+		CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
 			commands.register(dispatcher);
 		});
 
