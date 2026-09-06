@@ -111,15 +111,17 @@ processResources {
 	}
 }
 
+def targetJavaVersion = project.hasProperty('java_version') ? Integer.parseInt(project.property('java_version').toString()) : 21
+
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 21
+	it.options.release = targetJavaVersion
 	it.options.encoding = "UTF-8"
 }
 
 java {
 	withSourcesJar()
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.toVersion(targetJavaVersion)
+	targetCompatibility = JavaVersion.toVersion(targetJavaVersion)
 }
 
 jar {
