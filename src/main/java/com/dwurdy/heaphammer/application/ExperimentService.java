@@ -54,12 +54,18 @@ public class ExperimentService {
                 state -> onExecutorFinished(state)
         );
 
+        boolean isWarmup = plan.spec().warmupIterations() > 0;
+        executor.getStateMachine().transitionTo(
+                isWarmup ? ExperimentState.WARMING_UP : ExperimentState.RUNNING,
+                "Experiment started"
+        );
+
         this.activeExecutor = executor;
         return executor;
     }
 
     public synchronized boolean stop(String reason) {
-        if (activeExecutor != null && activeExecutor.getStateMachine().getState().isActive()) {
+        if (activeExecutor != null && !activeExecutor.getStateMachine().getState().isTerminal()) {
             LOGGER.warn("Stopping experiment {}: {}", activeExecutor.getPlan().id(), reason);
             activeExecutor.stop(reason);
             return true;
@@ -68,7 +74,7 @@ public class ExperimentService {
     }
 
     public boolean isExperimentActive() {
-        return activeExecutor != null && activeExecutor.getStateMachine().getState().isActive();
+        return activeExecutor != null && !activeExecutor.getStateMachine().getState().isTerminal();
     }
 
     public Optional<ChunkScenarioExecutor> getActiveExecutor() {
@@ -77,7 +83,7 @@ public class ExperimentService {
 
     private void onServerTick(long tick) {
         ChunkScenarioExecutor executor = this.activeExecutor;
-        if (executor != null && executor.getStateMachine().getState().isActive()) {
+        if (executor != null && !executor.getStateMachine().getState().isTerminal()) {
             try {
                 executor.tick();
             } catch (Exception e) {
@@ -90,6 +96,7 @@ public class ExperimentService {
     private void onExecutorFinished(ExperimentState finalState) {
         LOGGER.info("Experiment finished with state: {}", finalState);
         ChunkScenarioExecutor finished = this.activeExecutor;
+        this.activeExecutor = null;
         if (finished != null) {
             completionListener.accept(finished);
         }
