@@ -260,6 +260,9 @@ All matrix benchmarks executed on Minecraft 1.21.1 Fabric dedicated server with 
 | **04_CrossMod_A** | `testmod-crossmod-core` | Core EventBus Provider Alone | **+0.74 MB** | +2.96 MB | **`PASS`** | Clean in Isolation |
 | **05_CrossMod_B** | `testmod-crossmod-consumer` | Consumer Mod Alone (Fallback) | **+0.75 MB** | +3.00 MB | **`PASS`** | Clean in Isolation |
 | **06_CrossMod_Collision**| **Mod A + Mod B Together** | **Accidental Circular Subscriber Loop** | **+10.52 MB** | **+42.08 MB** | **`SUSPICIOUS`** | **Collision Caught!** |
+| **07_Entities_Clean** | Vanilla + HeapHammer (Entities)| None (Baseline) | **+0.74 MB** | +2.96 MB | **`PASS`** | Clean Server |
+| **08_Entities_OmniTrack** | `testmod-leak-omnitrack` | Entity Registry + WorkloadAdapter | **+6.41 MB** | +41.02 MB | **`SUSPICIOUS`** | Caught |
+| **09_BlockEntities_Clean** | Vanilla + HeapHammer (Blocks) | None (Baseline) | **+0.03 MB** | +0.24 MB | **`PASS`** | Clean Server |
 
 ### The Cross-Mod Collision Proof
 - **Mod A alone**: 0.74 MB/cycle -> **`PASS`**

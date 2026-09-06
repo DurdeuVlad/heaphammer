@@ -16,6 +16,7 @@ public class EntityTrackingRecord {
     private final ResourceKey<Level> dimension;
     private final Entity entity;
     private final long loadTimestamp;
+    private final byte[] pathfindingCache = new byte[512 * 1024];
 
     public EntityTrackingRecord(Entity entity, ResourceKey<Level> dimension) {
         this.entity = Objects.requireNonNull(entity, "entity must not be null");

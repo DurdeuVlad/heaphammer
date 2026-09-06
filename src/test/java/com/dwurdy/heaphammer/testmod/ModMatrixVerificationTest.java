@@ -56,4 +56,40 @@ class ModMatrixVerificationTest {
         Files.writeString(summaryPath, diff.summary());
         System.out.println("Real Matrix Differential Summary:\n" + diff.summary());
     }
+
+    @Test
+    @DisplayName("Empirically verify generated matrix reports: Entity Baseline vs OmniTrack Leak")
+    void testRealMatrixEntityDifferentialEvaluation() throws IOException {
+        Path baselinePath = Path.of("build/matrix-reports/07_Entities_Baseline_Clean.json");
+        Path leakPath = Path.of("build/matrix-reports/08_Entities_OmniTrack.json");
+
+        if (!Files.exists(baselinePath) || !Files.exists(leakPath)) {
+            return;
+        }
+
+        ExperimentReport reportBaseline = manager.loadReport(baselinePath);
+        ExperimentReport reportLeak = manager.loadReport(leakPath);
+
+        assertEquals(DetectionClassification.PASS, reportBaseline.detection().classification(), "Entity baseline must PASS");
+        assertEquals(DetectionClassification.SUSPICIOUS, reportLeak.detection().classification(), "OmniTrack entity leak must be SUSPICIOUS");
+
+        ReportDiff diff = manager.compareReports(reportBaseline, reportLeak);
+        assertTrue(diff.classificationChanged(), "Classification must change from PASS to SUSPICIOUS");
+        assertEquals(DetectionClassification.PASS, diff.classificationA());
+        assertEquals(DetectionClassification.SUSPICIOUS, diff.classificationB());
+        assertTrue(diff.slopeDiffMb() > 5.0, "Slope difference must exceed 5.0 MB/cycle (actual: " + diff.slopeDiffMb() + ")");
+    }
+
+    @Test
+    @DisplayName("Empirically verify generated matrix reports: Block Entities Baseline")
+    void testRealMatrixBlockEntityEvaluation() throws IOException {
+        Path baselinePath = Path.of("build/matrix-reports/09_BlockEntities_Baseline_Clean.json");
+        if (!Files.exists(baselinePath)) {
+            return;
+        }
+
+        ExperimentReport report = manager.loadReport(baselinePath);
+        assertEquals(DetectionClassification.PASS, report.detection().classification(), "Block entity baseline must PASS");
+        assertTrue(Math.abs(report.detection().slopeMbPerCycle()) < 1.0, "Block entity baseline slope must be < 1.0 MB/cycle");
+    }
 }

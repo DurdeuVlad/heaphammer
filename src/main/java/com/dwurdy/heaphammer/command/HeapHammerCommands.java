@@ -210,6 +210,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdAdaptersList(CommandContext<CommandSourceStack> ctx) {
+        com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance().loadFromFabricEntrypoints(platform);
         List<com.dwurdy.heaphammer.adapter.WorkloadAdapter> list =
                 com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance().getAllAdapters();
         if (list.isEmpty()) {

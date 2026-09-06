@@ -65,9 +65,27 @@ public class ExperimentService {
             );
             if (customExecutor.isPresent()) {
                 executor = customExecutor.get();
+            } else if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
+                executor = new EntityScenarioExecutor(
+                        plan,
+                        platform,
+                        (phase, iter) -> checkpointListener.accept(phase, iter),
+                        state -> onExecutorFinished(state)
+                );
+            } else if (plan.spec().scenarioId() == ScenarioId.BLOCK_ENTITIES) {
+                executor = new BlockEntityScenarioExecutor(
+                        plan,
+                        platform,
+                        (phase, iter) -> checkpointListener.accept(phase, iter),
+                        state -> onExecutorFinished(state)
+                );
             } else {
-                throw new IllegalStateException("Adapter " + customAdapter.get().adapterId() +
-                        " failed to create executor for scenario " + plan.spec().scenarioId());
+                executor = new ChunkScenarioExecutor(
+                        plan,
+                        platform.getChunkTicketManager(),
+                        (phase, iter) -> checkpointListener.accept(phase, iter),
+                        state -> onExecutorFinished(state)
+                );
             }
         } else if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
             executor = new EntityScenarioExecutor(

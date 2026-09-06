@@ -51,8 +51,8 @@ sourceSets {
 	testmodOmnitrack {
 		java.srcDirs = ['testmods/leak-omnitrack/src/main/java']
 		resources.srcDirs = ['testmods/leak-omnitrack/src/main/resources']
-		compileClasspath += sourceSets.main.compileClasspath
-		runtimeClasspath += sourceSets.main.runtimeClasspath
+		compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+		runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
 	}
 	testmodCrossmodCore {
 		java.srcDirs = ['testmods/crossmod-core/src/main/java']

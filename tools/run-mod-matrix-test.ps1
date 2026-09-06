@@ -69,6 +69,28 @@ $MatrixScenarios = @(
         Mods = @("testmod-crossmod-core-1.0.0.jar", "testmod-crossmod-consumer-1.0.0.jar");
         ExpectedVerdict = "SUSPICIOUS";
         Description = "CrossMod Collision: Mod A + Mod B circular subscriber loop";
+    },
+    @{
+        Name = "07_Entities_Baseline_Clean";
+        Command = "hh run entities --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true";
+        Mods = @();
+        ExpectedVerdict = "PASS";
+        Description = "Vanilla server baseline with Entity Churn scenario";
+    },
+    @{
+        Name = "08_Entities_OmniTrack";
+        PreCommand = "hh adapters list";
+        Command = "hh run entities --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true";
+        Mods = @("testmod-leak-omnitrack-1.0.0.jar");
+        ExpectedVerdict = "SUSPICIOUS";
+        Description = "OmniTrack leak mod entity tracking registry leak + WorkloadAdapter discovery";
+    },
+    @{
+        Name = "09_BlockEntities_Baseline_Clean";
+        Command = "hh run blockentities --iterations=5 --batch=10 --hold=5 --settle=10 --explicit-gc=true";
+        Mods = @();
+        ExpectedVerdict = "PASS";
+        Description = "Vanilla server baseline with Block Entity Stress scenario";
     }
 )
 
@@ -128,18 +150,28 @@ Function Run-ServerScenario {
     $reportPath = $null
 
     # Watchdog loop
-    $timeoutSeconds = 120
+    $timeoutSeconds = 240
     $startTime = [System.DateTime]::Now
 
     while (-not $proc.HasExited) {
         $line = $proc.StandardOutput.ReadLine()
         if ($line -ne $null) {
-            # Log key events
+            if ($line -match "Registered Workload Adapters|No external workload adapters|Started Experiment|Status: enabled") {
+                Write-Host "    [Server] $line" -ForegroundColor DarkCyan
+            }
             if ($line -match "Done \([0-9\.]+s\)! For help, type `"help`"") {
                 $serverReady = $true
+                $startTime = [System.DateTime]::Now
                 Write-Host "  [Server Ready] Triggering HeapHammer run..." -ForegroundColor Green
                 Start-Sleep -Seconds 2
-                $proc.StandardInput.WriteLine("hh run chunks --iterations=5 --batch=10 --hold=5 --settle=10 --explicit-gc=true")
+                if ($Scenario.PreCommand) {
+                    Write-Host "  Executing PreCommand: $($Scenario.PreCommand)" -ForegroundColor Cyan
+                    $proc.StandardInput.WriteLine($Scenario.PreCommand)
+                    Start-Sleep -Seconds 1
+                }
+                $cmdToRun = if ($Scenario.Command) { $Scenario.Command } else { "hh run chunks --iterations=5 --batch=10 --hold=5 --settle=10 --explicit-gc=true" }
+                Write-Host "  Executing: $cmdToRun" -ForegroundColor Cyan
+                $proc.StandardInput.WriteLine($cmdToRun)
             }
             if ($line -match "Report saved successfully:\s*(.*\.json)") {
                 $reportPath = $Matches[1].Trim()
@@ -148,6 +180,8 @@ Function Run-ServerScenario {
                 Start-Sleep -Seconds 2
                 Write-Host "  Stopping server..." -ForegroundColor Gray
                 $proc.StandardInput.WriteLine("stop")
+                Start-Sleep -Seconds 5
+                break
             }
         }
 

@@ -11,6 +11,9 @@
   "entrypoints": {
     "main": [
       "com.dwurdy.testmod.omnitrack.OmniTrackLeakMod"
+    ],
+    "heaphammer:adapter": [
+      "com.dwurdy.testmod.omnitrack.OmniTrackWorkloadAdapter"
     ]
   },
   "depends": {
