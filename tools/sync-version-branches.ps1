@@ -2,7 +2,7 @@
 # Local companion script to synchronize master into version branches and verify tests
 
 param (
-    [string[]]$TargetBranches = @("ver/1.21.1", "ver/1.20.1"),
+    [string[]]$TargetBranches = @("ver/1.21.1", "ver/1.20.1", "ver/1.18.2"),
     [switch]$Push,
     [switch]$DryRun
 )
@@ -53,14 +53,29 @@ try {
             continue
         }
 
+        # Backup branch-specific version configuration if present
+        $propsFile = "$WorkspaceRoot/gradle.properties"
+        $propsBackup = $null
+        if (Test-Path $propsFile) {
+            $propsBackup = Get-Content -Path $propsFile -Raw
+        }
+
         # Attempt merge from master
         Write-Host "  Merging master into $branch..." -ForegroundColor Cyan
         $mergeOutput = git merge master -m "chore(sync): automated merge from master into $branch" 2>&1
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "  Merge conflict detected while merging master into $branch!"
-            git merge --abort
-            Write-Warning "  Merge aborted. Manual version adaptation required on $branch."
-            continue
+            $conflicts = git diff --name-only --diff-filter=U
+            if ($conflicts -eq "gradle.properties" -and $propsBackup) {
+                Write-Host "  Preserving version-specific gradle.properties for $branch..." -ForegroundColor Cyan
+                Set-Content -Path $propsFile -Value $propsBackup -NoNewline
+                git add gradle.properties
+                git commit -m "chore(sync): preserve version-specific gradle.properties for $branch" | Out-Null
+            } else {
+                Write-Warning "  Merge conflict detected while merging master into $branch!"
+                git merge --abort
+                Write-Warning "  Merge aborted. Manual version adaptation required on $branch."
+                continue
+            }
         }
 
         # Run verification tests
