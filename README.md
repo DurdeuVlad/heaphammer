@@ -81,12 +81,20 @@ All commands are prefixed with `/hh` (or `hh` from console):
 |---|---|---|
 | `/hh doctor` | All | Inspects server readiness, loaded chunks, and ticket safety. |
 | `/hh metrics` | All | Instant snapshot of JVM heap, max memory, and chunk counts. |
-| `/hh plan chunks <iter> <batch> [seed]` | All | Computes and saves a deterministic chunk operation plan. |
-| `/hh run chunks <iter> <batch> [seed]` | OP (Level 2) | Executes deterministic chunk churn with tick-budget pacing. |
-| `/hh status` | All | Displays active iteration, state, and active chunk tickets. |
-| `/hh stop` | OP (Level 2) | Aborts the current experiment and releases all tickets safely. |
-| `/hh replay <run-id\|last>` | OP (Level 2) | Replays the exact resolved operation sequence from a saved plan. |
-| `/hh rerun <run-id\|last>` | OP (Level 2) | Rebuilds and reruns the scenario from the original spec & seed. |
+| `/hh scenario list` | All | Lists all available built-in and external scenario engines. |
+| `/hh scenario describe <scenario>` | All | Describes mechanics and options for a scenario family. |
+| `/hh plan chunks [flags]` | All | Computes and saves a deterministic chunk operation plan. |
+| `/hh run chunks [flags]` | OP (Level 2) | Executes deterministic chunk churn with tick-budget pacing. |
+| `/hh plan entities [flags]` | All | Computes and saves a deterministic entity lifecycle churn plan. |
+| `/hh run entities [flags]` | OP (Level 2) | Spawns, exercises, and removes deterministic entity batches. |
+| `/hh plan blockentities [flags]` | All | Plans deterministic block entity placement and cleanup. |
+| `/hh run blockentities [flags]` | OP (Level 2) | Stresses block entity lifecycle, tick loops, and destruction. |
+| `/hh adapters list` | OP (Level 2) | Lists registered external workload adapters and scenarios. |
+| `/hh status` | All | Displays active scenario, iteration, state, and tickets. |
+| `/hh stop` | OP (Level 2) | Aborts active experiment and purges all test tickets/entities. |
+| `/hh cleanup` | OP (Level 2) | Forcibly purges all HeapHammer tickets, entities, and blocks. |
+| `/hh replay <run-id\|last>` | OP (Level 2) | Replays exact resolved operations from a saved plan. |
+| `/hh rerun <run-id\|last>` | OP (Level 2) | Rebuilds and reruns scenario from original spec & seed. |
 | `/hh report list` | All | Lists all saved JSON experiment reports. |
 | `/hh report show <run-id\|last>` | All | Displays formatted summary, slope, and classification. |
 | `/hh report diff <runA> <runB>` | All | Compares two reports for memory delta and slope changes. |
@@ -94,6 +102,18 @@ All commands are prefixed with `/hh` (or `hh` from console):
 | `/hh diagnostics heapdump` | OP (Level 2) | Triggers an asynchronous `.hprof` heap dump to disk. |
 | `/hh diagnostics jfr start\|dump\|stop` | OP (Level 2) | Programmatic control over Java Flight Recorder captures. |
 | `/hh fixture <LEAK\|CLEAN\|BOUNDED\|OFF>` | OP (Level 2) | Controls synthetic retention fixtures for calibration testing. |
+
+### Supported Command Flags
+Workload generation commands (`/hh plan` and `/hh run`) support the following optional flags:
+- `--iterations=<int>` (default `5`): Number of stress cycles.
+- `--batch=<int>` (default `9`): Units (chunks, entities, blocks) processed per cycle.
+- `--radius=<int>` (default `6`): Coordinate radius around the player or center.
+- `--seed=<long>` (default `42`): Random seed for reproducible generation.
+- `--strategy=<STRATEGY>`: Generation pattern (`SPIRAL`, `RING`, `RANDOM_WALK`, `HOTSPOT`, `GRID`, `KILL`, `DISCARD`).
+- `--coverage=<float>`: Registry sampling coverage between `0.0` and `1.0` (e.g. `--coverage 0.25`).
+- `--include-mod=<id,id,...>`: Restrict sampled entities or blocks to specific mod namespaces.
+- `--exclude-mod=<id,id,...>`: Exclude specific mod namespaces from sampling.
+- `--explicit-gc=<true|false>`: Force System.gc() at each checkpoint to isolate true uncollected retention.
 
 ---
 
