@@ -11,11 +11,23 @@ public record DetectionResult(
         double slopeBytesPerCycle,
         double rSquared,
         long netDeltaBytes,
+        boolean plateauDetected,
         String rationale
 ) {
     public DetectionResult {
         Objects.requireNonNull(classification, "classification must not be null");
         Objects.requireNonNull(rationale, "rationale must not be null");
+    }
+
+    public DetectionResult(
+            DetectionClassification classification,
+            double confidence,
+            double slopeBytesPerCycle,
+            double rSquared,
+            long netDeltaBytes,
+            String rationale
+    ) {
+        this(classification, confidence, slopeBytesPerCycle, rSquared, netDeltaBytes, false, rationale);
     }
 
     public double slopeMbPerCycle() {
