@@ -1,6 +1,6 @@
 plugins {
-	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
-	id 'maven-publish'
+    id 'java-library'
+    id 'maven-publish'
 }
 
 version = project.mod_version
@@ -8,140 +8,49 @@ group = project.maven_group
 base.archivesName = project.archives_base_name
 
 repositories {
-	// Essential repositories are automatically handled by Fabric Loom.
-	// Additional dependency repositories can be declared here if needed.
-	mavenCentral()
-}
-
-loom {
-	splitEnvironmentSourceSets()
-
-	mods {
-		"heaphammer" {
-			sourceSet sourceSets.main
-			sourceSet sourceSets.client
-		}
-	}
-}
-
-dependencies {
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings loom.officialMojangMappings()
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-
-	// Fabric API
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-
-	implementation "com.google.code.gson:gson:2.11.0"
-
-	testImplementation platform("org.junit:junit-bom:5.10.2")
-	testImplementation "org.junit.jupiter:junit-jupiter"
-	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-}
-
-test {
-	useJUnitPlatform()
-}
-
-sourceSets {
-	testmodChunkcache {
-		java.srcDirs = ['testmods/leak-chunkcache/src/main/java']
-		resources.srcDirs = ['testmods/leak-chunkcache/src/main/resources']
-		compileClasspath += sourceSets.main.compileClasspath
-		runtimeClasspath += sourceSets.main.runtimeClasspath
-	}
-	testmodOmnitrack {
-		java.srcDirs = ['testmods/leak-omnitrack/src/main/java']
-		resources.srcDirs = ['testmods/leak-omnitrack/src/main/resources']
-		compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
-		runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
-	}
-	testmodCrossmodCore {
-		java.srcDirs = ['testmods/crossmod-core/src/main/java']
-		resources.srcDirs = ['testmods/crossmod-core/src/main/resources']
-		compileClasspath += sourceSets.main.compileClasspath
-		runtimeClasspath += sourceSets.main.runtimeClasspath
-	}
-	testmodCrossmodConsumer {
-		java.srcDirs = ['testmods/crossmod-consumer/src/main/java']
-		resources.srcDirs = ['testmods/crossmod-consumer/src/main/resources']
-		compileClasspath += sourceSets.main.compileClasspath + sourceSets.testmodCrossmodCore.output
-		runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.testmodCrossmodCore.output
-	}
-}
-
-task jarChunkcache(type: Jar) {
-	archiveBaseName = 'testmod-leak-chunkcache'
-	archiveVersion = '1.0.0'
-	destinationDirectory = file("build/testmods")
-	from sourceSets.testmodChunkcache.output
-}
-
-task jarOmnitrack(type: Jar) {
-	archiveBaseName = 'testmod-leak-omnitrack'
-	archiveVersion = '1.0.0'
-	destinationDirectory = file("build/testmods")
-	from sourceSets.testmodOmnitrack.output
-}
-
-task jarCrossmodCore(type: Jar) {
-	archiveBaseName = 'testmod-crossmod-core'
-	archiveVersion = '1.0.0'
-	destinationDirectory = file("build/testmods")
-	from sourceSets.testmodCrossmodCore.output
-}
-
-task jarCrossmodConsumer(type: Jar) {
-	archiveBaseName = 'testmod-crossmod-consumer'
-	archiveVersion = '1.0.0'
-	destinationDirectory = file("build/testmods")
-	from sourceSets.testmodCrossmodConsumer.output
-}
-
-task buildTestmods(dependsOn: [jarChunkcache, jarOmnitrack, jarCrossmodCore, jarCrossmodConsumer]) {
-	group = "build"
-	description = "Compiles and packages all synthetic testmod jars for empirical verification"
-}
-
-
-processResources {
-	def currentVersion = project.version
-	inputs.property "version", currentVersion
-
-	filesMatching("fabric.mod.json") {
-		expand "version": currentVersion
-	}
-}
-
-def targetJavaVersion = project.hasProperty('java_version') ? Integer.parseInt(project.property('java_version').toString()) : 21
-
-tasks.withType(JavaCompile).configureEach {
-	it.options.release = targetJavaVersion
-	it.options.encoding = "UTF-8"
+    mavenCentral()
 }
 
 java {
-	withSourcesJar()
-	sourceCompatibility = JavaVersion.toVersion(targetJavaVersion)
-	targetCompatibility = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
-jar {
-	def projectName = project.name
-	inputs.property "projectName", projectName
-
-	from("LICENSE") {
-		rename { "${it}_$projectName" }
-	}
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+            // Exclude modern Fabric-specific classes on Forge 1.12.2 branch
+            exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+            exclude 'com/dwurdy/heaphammer/HeapHammer.java'
+            exclude 'com/dwurdy/heaphammer/command/HeapHammerCommands.java'
+            exclude 'com/dwurdy/heaphammer/mixin/**'
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/test/java']
+            // Exclude Fabric-specific tests
+            exclude 'com/dwurdy/heaphammer/ModMatrixVerificationTest.java'
+        }
+        resources {
+            srcDirs = ['src/test/resources']
+        }
+    }
 }
 
-publishing {
-	publications {
-		create("mavenJava", MavenPublication) {
-			from components.java
-		}
-	}
-	repositories {
-		// Target publishing repositories can be configured here
-	}
+dependencies {
+    implementation "com.google.code.gson:gson:2.11.0"
+    implementation "org.slf4j:slf4j-api:2.0.13"
+
+    testImplementation platform("org.junit:junit-bom:5.10.2")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
 }
