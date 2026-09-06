@@ -66,6 +66,65 @@ public class MockPlatformAdapter implements PlatformAdapter {
         }
     }
 
+    private final Map<String, Set<UUID>> testEntities = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> testBlockEntities = new ConcurrentHashMap<>();
+
+    @Override
+    public List<String> getAvailableEntityTypes() {
+        return List.of("minecraft:cow", "minecraft:pig", "minecraft:sheep", "minecraft:zombie", "minecraft:skeleton");
+    }
+
+    @Override
+    public UUID spawnEntity(String dimension, String entityTypeId, double x, double y, double z) {
+        UUID uuid = UUID.randomUUID();
+        testEntities.computeIfAbsent(dimension, k -> ConcurrentHashMap.newKeySet()).add(uuid);
+        entities++;
+        return uuid;
+    }
+
+    @Override
+    public boolean removeEntity(String dimension, UUID entityUuid, String removeMode) {
+        Set<UUID> set = testEntities.get(dimension);
+        if (set != null && set.remove(entityUuid)) {
+            entities = Math.max(0, entities - 1);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public int removeAllTestEntities(String dimension) {
+        Set<UUID> set = testEntities.remove(dimension);
+        if (set == null) return 0;
+        int count = set.size();
+        entities = Math.max(0, entities - count);
+        return count;
+    }
+
+    @Override
+    public List<String> getAvailableBlockEntityTypes() {
+        return List.of("minecraft:chest", "minecraft:furnace", "minecraft:hopper", "minecraft:barrel");
+    }
+
+    @Override
+    public boolean placeBlockEntity(String dimension, String blockEntityTypeId, int x, int y, int z) {
+        String key = x + "," + y + "," + z;
+        return testBlockEntities.computeIfAbsent(dimension, k -> ConcurrentHashMap.newKeySet()).add(key);
+    }
+
+    @Override
+    public boolean removeBlockEntity(String dimension, int x, int y, int z) {
+        String key = x + "," + y + "," + z;
+        Set<String> set = testBlockEntities.get(dimension);
+        return set != null && set.remove(key);
+    }
+
+    @Override
+    public int removeAllTestBlockEntities(String dimension) {
+        Set<String> set = testBlockEntities.remove(dimension);
+        return set == null ? 0 : set.size();
+    }
+
     public static class MockChunkTicketManager implements ChunkTicketManager {
         private final Map<String, Set<Long>> tickets = new ConcurrentHashMap<>();
 

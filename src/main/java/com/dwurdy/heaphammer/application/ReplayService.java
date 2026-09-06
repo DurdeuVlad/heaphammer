@@ -35,7 +35,7 @@ public class ReplayService {
     /**
      * Replay executes the exact resolved operations from a saved plan.
      */
-    public ChunkScenarioExecutor replay(String planOrRunId) throws IOException {
+    public com.dwurdy.heaphammer.scenario.ScenarioExecutor replay(String planOrRunId) throws IOException {
         Optional<ExperimentPlan> planOpt;
         if ("last".equalsIgnoreCase(planOrRunId)) {
             planOpt = planStorage.loadLatestPlan();
@@ -60,6 +60,8 @@ public class ReplayService {
                 System.currentTimeMillis(),
                 plan.spec(),
                 plan.operations(),
+                plan.entityOperations(),
+                plan.blockEntityOperations(),
                 plan.estimatedDurationTicks(),
                 plan.uniqueChunksCount()
         );
@@ -70,7 +72,7 @@ public class ReplayService {
     /**
      * Rerun regenerates a plan from the original configuration and seed through the current planner.
      */
-    public ChunkScenarioExecutor rerun(String runId) throws IOException {
+    public com.dwurdy.heaphammer.scenario.ScenarioExecutor rerun(String runId) throws IOException {
         Optional<ExperimentReport> reportOpt;
         if ("last".equalsIgnoreCase(runId)) {
             reportOpt = reportService.loadLatestReport();

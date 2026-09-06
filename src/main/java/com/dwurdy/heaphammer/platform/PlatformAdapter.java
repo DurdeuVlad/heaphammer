@@ -2,6 +2,8 @@ package com.dwurdy.heaphammer.platform;
 
 import com.dwurdy.heaphammer.domain.EnvironmentFingerprint;
 
+import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -24,4 +26,22 @@ public interface PlatformAdapter {
     void registerServerTickHook(Consumer<Long> tickConsumer);
 
     boolean isServerReady();
+
+    // Entity lifecycle operations (Phase 3, Issue #16)
+    List<String> getAvailableEntityTypes();
+
+    UUID spawnEntity(String dimension, String entityTypeId, double x, double y, double z);
+
+    boolean removeEntity(String dimension, UUID entityUuid, String removeMode);
+
+    int removeAllTestEntities(String dimension);
+
+    // Block entity lifecycle operations (Phase 3, Issue #17)
+    List<String> getAvailableBlockEntityTypes();
+
+    boolean placeBlockEntity(String dimension, String blockEntityTypeId, int x, int y, int z);
+
+    boolean removeBlockEntity(String dimension, int x, int y, int z);
+
+    int removeAllTestBlockEntities(String dimension);
 }

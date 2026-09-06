@@ -1,4 +1,4 @@
-package com.dwurdy.heaphammer.scenario.chunks;
+package com.dwurdy.heaphammer.scenario.entities;
 
 import com.dwurdy.heaphammer.application.ExecutionBudget;
 import com.dwurdy.heaphammer.application.ExperimentStateMachine;
@@ -6,24 +6,25 @@ import com.dwurdy.heaphammer.domain.CheckpointPhase;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
 import com.dwurdy.heaphammer.domain.ExperimentState;
-import com.dwurdy.heaphammer.domain.ResolvedChunkOperation;
-import com.dwurdy.heaphammer.platform.ChunkTicketManager;
+import com.dwurdy.heaphammer.platform.PlatformAdapter;
+import com.dwurdy.heaphammer.scenario.ScenarioExecutor;
 
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
- * Tick-driven executor for Chunk Churn experiments (Section 18.2).
+ * Tick-driven executor for Entity Churn experiments (Section 11.2, Issue #16).
  */
-public class ChunkScenarioExecutor implements com.dwurdy.heaphammer.scenario.ScenarioExecutor {
+public class EntityScenarioExecutor implements ScenarioExecutor {
     private final ExperimentPlan plan;
-    private final ChunkTicketManager ticketManager;
+    private final PlatformAdapter adapter;
     private final ExperimentStateMachine stateMachine;
     private final ExecutionBudget budget;
     private final BiConsumer<CheckpointPhase, Integer> checkpointTrigger;
     private final Consumer<ExperimentState> completionCallback;
 
+    private final Queue<UUID> activeEntityUuids = new ArrayDeque<>();
     private int currentIteration = 0;
     private int currentOperationIndex = 0;
     private int holdTicksRemaining = 0;
@@ -32,14 +33,14 @@ public class ChunkScenarioExecutor implements com.dwurdy.heaphammer.scenario.Sce
     private boolean waitingForSettle = false;
     private boolean baselineRecorded = false;
 
-    public ChunkScenarioExecutor(
+    public EntityScenarioExecutor(
             ExperimentPlan plan,
-            ChunkTicketManager ticketManager,
+            PlatformAdapter adapter,
             BiConsumer<CheckpointPhase, Integer> checkpointTrigger,
             Consumer<ExperimentState> completionCallback
     ) {
         this.plan = Objects.requireNonNull(plan, "plan must not be null");
-        this.ticketManager = Objects.requireNonNull(ticketManager, "ticketManager must not be null");
+        this.adapter = Objects.requireNonNull(adapter, "adapter must not be null");
         this.checkpointTrigger = Objects.requireNonNull(checkpointTrigger, "checkpointTrigger must not be null");
         this.completionCallback = Objects.requireNonNull(completionCallback, "completionCallback must not be null");
 
@@ -48,18 +49,22 @@ public class ChunkScenarioExecutor implements com.dwurdy.heaphammer.scenario.Sce
         this.budget = new ExecutionBudget(spec.maxOperationsPerTick(), spec.maxMillisPerTick());
     }
 
+    @Override
     public ExperimentStateMachine getStateMachine() {
         return stateMachine;
     }
 
+    @Override
     public ExperimentPlan getPlan() {
         return plan;
     }
 
+    @Override
     public int getCurrentIteration() {
         return currentIteration;
     }
 
+    @Override
     public synchronized void tick() {
         ExperimentState state = stateMachine.getState();
         if (state.isTerminal() || state == ExperimentState.PAUSED) {
@@ -73,7 +78,7 @@ public class ChunkScenarioExecutor implements com.dwurdy.heaphammer.scenario.Sce
             checkpointTrigger.accept(CheckpointPhase.BASELINE, 0);
             baselineRecorded = true;
             boolean isWarmup = currentIteration < plan.spec().warmupIterations();
-            stateMachine.transitionTo(isWarmup ? ExperimentState.WARMING_UP : ExperimentState.RUNNING, "Starting iteration " + currentIteration);
+            stateMachine.transitionTo(isWarmup ? ExperimentState.WARMING_UP : ExperimentState.RUNNING, "Starting entity iteration " + currentIteration);
         }
 
         // 2. Handle hold delay countdown
@@ -83,7 +88,7 @@ public class ChunkScenarioExecutor implements com.dwurdy.heaphammer.scenario.Sce
                 return;
             } else {
                 waitingForHold = false;
-                stateMachine.transitionTo(ExperimentState.CLEANING_UP, "Releasing chunks for iteration " + currentIteration);
+                stateMachine.transitionTo(ExperimentState.CLEANING_UP, "Removing entities for iteration " + currentIteration);
             }
         }
 
@@ -94,7 +99,7 @@ public class ChunkScenarioExecutor implements com.dwurdy.heaphammer.scenario.Sce
                 return;
             } else {
                 waitingForSettle = false;
-                stateMachine.transitionTo(ExperimentState.MEASURING, "Measuring iteration " + currentIteration);
+                stateMachine.transitionTo(ExperimentState.MEASURING, "Measuring entity iteration " + currentIteration);
 
                 boolean isWarmup = currentIteration < plan.spec().warmupIterations();
                 checkpointTrigger.accept(isWarmup ? CheckpointPhase.WARMUP : CheckpointPhase.ITERATION_CLEANUP, currentIteration);
@@ -105,65 +110,74 @@ public class ChunkScenarioExecutor implements com.dwurdy.heaphammer.scenario.Sce
                     return;
                 } else {
                     boolean nextIsWarmup = currentIteration < plan.spec().warmupIterations();
-                    stateMachine.transitionTo(nextIsWarmup ? ExperimentState.WARMING_UP : ExperimentState.RUNNING, "Starting iteration " + currentIteration);
+                    stateMachine.transitionTo(nextIsWarmup ? ExperimentState.WARMING_UP : ExperimentState.RUNNING, "Starting entity iteration " + currentIteration);
                 }
             }
         }
 
         // 4. Process operations for the current iteration
-        List<ResolvedChunkOperation> ops = plan.operations();
+        List<ResolvedEntityOperation> ops = plan.entityOperations();
         while (currentOperationIndex < ops.size() && !budget.isExceeded()) {
-            ResolvedChunkOperation op = ops.get(currentOperationIndex);
+            ResolvedEntityOperation op = ops.get(currentOperationIndex);
 
             // Only process operations for the current iteration
             if (op.iteration() != currentIteration) {
                 break;
             }
 
-            if (ResolvedChunkOperation.ACTION_ACQUIRE.equals(op.action())) {
-                ticketManager.acquireTicket(op.dimension(), op.chunkX(), op.chunkZ());
-            } else if (ResolvedChunkOperation.ACTION_RELEASE.equals(op.action())) {
-                ticketManager.releaseTicket(op.dimension(), op.chunkX(), op.chunkZ());
+            if (ResolvedEntityOperation.ACTION_SPAWN.equals(op.action())) {
+                UUID uuid = adapter.spawnEntity(op.dimension(), op.entityTypeId(), op.x(), op.y(), op.z());
+                if (uuid != null) {
+                    activeEntityUuids.add(uuid);
+                }
+            } else if (ResolvedEntityOperation.ACTION_REMOVE.equals(op.action())) {
+                UUID uuid = activeEntityUuids.poll();
+                if (uuid != null) {
+                    adapter.removeEntity(op.dimension(), uuid, op.removeMode());
+                }
             }
 
             budget.recordOperation();
             currentOperationIndex++;
 
-            // If we just finished the ACQUIRE phase for this iteration, initiate HOLD
-            boolean nextIsRelease = currentOperationIndex < ops.size() &&
+            // If we just finished the SPAWN phase for this iteration, initiate HOLD
+            boolean nextIsRemove = currentOperationIndex < ops.size() &&
                     ops.get(currentOperationIndex).iteration() == currentIteration &&
-                    ResolvedChunkOperation.ACTION_RELEASE.equals(ops.get(currentOperationIndex).action());
+                    ResolvedEntityOperation.ACTION_REMOVE.equals(ops.get(currentOperationIndex).action());
 
-            if (nextIsRelease && !waitingForHold) {
+            if (nextIsRemove && !waitingForHold) {
                 waitingForHold = true;
                 holdTicksRemaining = plan.spec().holdTicks();
-                stateMachine.transitionTo(ExperimentState.HOLDING, "Holding chunks for " + holdTicksRemaining + " ticks");
+                stateMachine.transitionTo(ExperimentState.HOLDING, "Holding entities for " + holdTicksRemaining + " ticks");
                 return;
             }
         }
 
-        // Check if all operations for this iteration have been consumed (including releases)
+        // Check if all operations for this iteration have been consumed
         boolean iterationOpsFinished = currentOperationIndex >= ops.size() ||
                 ops.get(currentOperationIndex).iteration() > currentIteration;
 
         if (iterationOpsFinished && !waitingForSettle && !waitingForHold) {
             waitingForSettle = true;
             settleTicksRemaining = plan.spec().settleTicks();
-            stateMachine.transitionTo(ExperimentState.SETTLING, "Settling world for " + settleTicksRemaining + " ticks");
+            stateMachine.transitionTo(ExperimentState.SETTLING, "Settling world after entity cleanup for " + settleTicksRemaining + " ticks");
         }
     }
 
+    @Override
     public synchronized void stop(String reason) {
         stateMachine.transitionTo(ExperimentState.STOPPING, "Stopping: " + reason);
-        ticketManager.releaseAllTickets();
+        activeEntityUuids.clear();
+        adapter.removeAllTestEntities(plan.spec().dimension());
         stateMachine.transitionTo(ExperimentState.ABORTED, "Aborted: " + reason);
         completionCallback.accept(ExperimentState.ABORTED);
     }
 
     private void completeExperiment() {
-        ticketManager.releaseAllTickets();
+        activeEntityUuids.clear();
+        adapter.removeAllTestEntities(plan.spec().dimension());
         checkpointTrigger.accept(CheckpointPhase.FINAL_CLEANUP, currentIteration);
-        stateMachine.transitionTo(ExperimentState.COMPLETED, "Experiment completed successfully");
+        stateMachine.transitionTo(ExperimentState.COMPLETED, "Entity experiment completed successfully");
         completionCallback.accept(ExperimentState.COMPLETED);
     }
 }
