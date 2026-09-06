@@ -14,12 +14,16 @@ repositories {
 }
 
 loom {
-	splitEnvironmentSourceSets()
+	if (!project.minecraft_version.startsWith("1.16") && !project.minecraft_version.startsWith("1.12")) {
+		splitEnvironmentSourceSets()
+	}
 
 	mods {
 		"heaphammer" {
 			sourceSet sourceSets.main
-			sourceSet sourceSets.client
+			if (!project.minecraft_version.startsWith("1.16") && !project.minecraft_version.startsWith("1.12")) {
+				sourceSet sourceSets.client
+			}
 		}
 	}
 }
@@ -33,6 +37,7 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	implementation "com.google.code.gson:gson:2.11.0"
+	implementation "org.slf4j:slf4j-api:2.0.13"
 
 	testImplementation platform("org.junit:junit-bom:5.10.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"
