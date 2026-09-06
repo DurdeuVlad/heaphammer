@@ -20,6 +20,8 @@ jobs:
           - ver/1.21.1
           - ver/1.20.1
           - ver/1.18.2
+          - ver/1.16.5
+          - ver/1.12.2-forge
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,19 +63,28 @@ jobs:
             exit 0
           fi
 
-          # Backup branch properties
-          cp gradle.properties gradle.properties.bak
+          # Backup branch properties and build configuration
+          cp gradle.properties gradle.properties.bak || true
+          cp build.gradle build.gradle.bak || true
 
           # Attempt merge from master
           if git merge origin/master -m "chore(sync): automated merge master into $TARGET_BRANCH"; then
             echo "Merge succeeded cleanly."
           else
             CONFLICTS=$(git diff --name-only --diff-filter=U)
-            if [ "$CONFLICTS" = "gradle.properties" ]; then
-              echo "Preserving branch-specific gradle.properties..."
-              mv gradle.properties.bak gradle.properties
-              git add gradle.properties
-              git commit -m "chore(sync): preserve version-specific gradle.properties for $TARGET_BRANCH"
+            CAN_AUTORESOLVE=true
+            for FILE in $CONFLICTS; do
+              if [ "$FILE" != "gradle.properties" ] && [ "$FILE" != "build.gradle" ]; then
+                CAN_AUTORESOLVE=false
+                break
+              fi
+            done
+
+            if [ "$CAN_AUTORESOLVE" = "true" ]; then
+              echo "Preserving branch-specific configuration for $TARGET_BRANCH..."
+              [ -f gradle.properties.bak ] && mv gradle.properties.bak gradle.properties && git add gradle.properties
+              [ -f build.gradle.bak ] && mv build.gradle.bak build.gradle && git add build.gradle
+              git commit -m "chore(sync): preserve version-specific configuration for $TARGET_BRANCH"
             else
               echo "Merge conflict detected across files: $CONFLICTS"
               git merge --abort || true

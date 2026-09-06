@@ -2,7 +2,7 @@
 # Local companion script to synchronize master into version branches and verify tests
 
 param (
-    [string[]]$TargetBranches = @("ver/1.21.1", "ver/1.20.1", "ver/1.18.2"),
+    [string[]]$TargetBranches = @("ver/1.21.1", "ver/1.20.1", "ver/1.18.2", "ver/1.16.5", "ver/1.12.2-forge"),
     [switch]$Push,
     [switch]$DryRun
 )
@@ -55,9 +55,14 @@ try {
 
         # Backup branch-specific version configuration if present
         $propsFile = "$WorkspaceRoot/gradle.properties"
+        $buildFile = "$WorkspaceRoot/build.gradle"
         $propsBackup = $null
+        $buildBackup = $null
         if (Test-Path $propsFile) {
             $propsBackup = Get-Content -Path $propsFile -Raw
+        }
+        if (Test-Path $buildFile) {
+            $buildBackup = Get-Content -Path $buildFile -Raw
         }
 
         # Attempt merge from master
@@ -65,11 +70,25 @@ try {
         $mergeOutput = git merge master -m "chore(sync): automated merge from master into $branch" 2>&1
         if ($LASTEXITCODE -ne 0) {
             $conflicts = git diff --name-only --diff-filter=U
-            if ($conflicts -eq "gradle.properties" -and $propsBackup) {
-                Write-Host "  Preserving version-specific gradle.properties for $branch..." -ForegroundColor Cyan
-                Set-Content -Path $propsFile -Value $propsBackup -NoNewline
-                git add gradle.properties
-                git commit -m "chore(sync): preserve version-specific gradle.properties for $branch" | Out-Null
+            $canAutoResolve = $true
+            foreach ($conflict in $conflicts) {
+                if ($conflict -ne "gradle.properties" -and $conflict -ne "build.gradle") {
+                    $canAutoResolve = $false
+                    break
+                }
+            }
+
+            if ($canAutoResolve) {
+                Write-Host "  Preserving version-specific configuration for $branch..." -ForegroundColor Cyan
+                if ($conflicts -contains "gradle.properties" -and $propsBackup) {
+                    Set-Content -Path $propsFile -Value $propsBackup -NoNewline
+                    git add gradle.properties
+                }
+                if ($conflicts -contains "build.gradle" -and $buildBackup) {
+                    Set-Content -Path $buildFile -Value $buildBackup -NoNewline
+                    git add build.gradle
+                }
+                git commit -m "chore(sync): preserve version-specific configuration for $branch" | Out-Null
             } else {
                 Write-Warning "  Merge conflict detected while merging master into $branch!"
                 git merge --abort
