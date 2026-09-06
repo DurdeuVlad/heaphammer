@@ -2,8 +2,12 @@ package com.dwurdy.heaphammer.application;
 
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.domain.ExperimentState;
+import com.dwurdy.heaphammer.domain.ScenarioId;
 import com.dwurdy.heaphammer.platform.PlatformAdapter;
+import com.dwurdy.heaphammer.scenario.ScenarioExecutor;
+import com.dwurdy.heaphammer.scenario.blockentities.BlockEntityScenarioExecutor;
 import com.dwurdy.heaphammer.scenario.chunks.ChunkScenarioExecutor;
+import com.dwurdy.heaphammer.scenario.entities.EntityScenarioExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,9 +23,9 @@ public class ExperimentService {
     private static final Logger LOGGER = LoggerFactory.getLogger("heaphammer-service");
 
     private final PlatformAdapter platform;
-    private volatile ChunkScenarioExecutor activeExecutor = null;
+    private volatile ScenarioExecutor activeExecutor = null;
     private BiConsumer<com.dwurdy.heaphammer.domain.CheckpointPhase, Integer> checkpointListener = (p, i) -> {};
-    private Consumer<ChunkScenarioExecutor> completionListener = e -> {};
+    private Consumer<ScenarioExecutor> completionListener = e -> {};
 
     public ExperimentService(PlatformAdapter platform) {
         this.platform = Objects.requireNonNull(platform, "platform must not be null");
@@ -32,11 +36,11 @@ public class ExperimentService {
         this.checkpointListener = Objects.requireNonNull(listener, "listener must not be null");
     }
 
-    public void setCompletionListener(Consumer<ChunkScenarioExecutor> listener) {
+    public void setCompletionListener(Consumer<ScenarioExecutor> listener) {
         this.completionListener = Objects.requireNonNull(listener, "listener must not be null");
     }
 
-    public synchronized ChunkScenarioExecutor start(ExperimentPlan plan) {
+    public synchronized ScenarioExecutor start(ExperimentPlan plan) {
         Objects.requireNonNull(plan, "plan must not be null");
 
         if (isExperimentActive()) {
@@ -44,15 +48,32 @@ public class ExperimentService {
                     activeExecutor.getPlan().id() + ": " + activeExecutor.getStateMachine().getState() + ")");
         }
 
-        LOGGER.info("Starting experiment {} (iterations: {}, batch: {}, radius: {})",
-                plan.id(), plan.spec().iterations(), plan.spec().batchSize(), plan.spec().radius());
+        LOGGER.info("Starting experiment {} ({}, iterations: {}, batch: {}, radius: {})",
+                plan.id(), plan.spec().scenarioId(), plan.spec().iterations(), plan.spec().batchSize(), plan.spec().radius());
 
-        ChunkScenarioExecutor executor = new ChunkScenarioExecutor(
-                plan,
-                platform.getChunkTicketManager(),
-                (phase, iter) -> checkpointListener.accept(phase, iter),
-                state -> onExecutorFinished(state)
-        );
+        ScenarioExecutor executor;
+        if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
+            executor = new EntityScenarioExecutor(
+                    plan,
+                    platform,
+                    (phase, iter) -> checkpointListener.accept(phase, iter),
+                    state -> onExecutorFinished(state)
+            );
+        } else if (plan.spec().scenarioId() == ScenarioId.BLOCK_ENTITIES) {
+            executor = new BlockEntityScenarioExecutor(
+                    plan,
+                    platform,
+                    (phase, iter) -> checkpointListener.accept(phase, iter),
+                    state -> onExecutorFinished(state)
+            );
+        } else {
+            executor = new ChunkScenarioExecutor(
+                    plan,
+                    platform.getChunkTicketManager(),
+                    (phase, iter) -> checkpointListener.accept(phase, iter),
+                    state -> onExecutorFinished(state)
+            );
+        }
 
         boolean isWarmup = plan.spec().warmupIterations() > 0;
         executor.getStateMachine().transitionTo(
@@ -77,12 +98,12 @@ public class ExperimentService {
         return activeExecutor != null && !activeExecutor.getStateMachine().getState().isTerminal();
     }
 
-    public Optional<ChunkScenarioExecutor> getActiveExecutor() {
+    public Optional<ScenarioExecutor> getActiveExecutor() {
         return Optional.ofNullable(activeExecutor);
     }
 
     private void onServerTick(long tick) {
-        ChunkScenarioExecutor executor = this.activeExecutor;
+        ScenarioExecutor executor = this.activeExecutor;
         if (executor != null && !executor.getStateMachine().getState().isTerminal()) {
             try {
                 executor.tick();
@@ -95,7 +116,7 @@ public class ExperimentService {
 
     private void onExecutorFinished(ExperimentState finalState) {
         LOGGER.info("Experiment finished with state: {}", finalState);
-        ChunkScenarioExecutor finished = this.activeExecutor;
+        ScenarioExecutor finished = this.activeExecutor;
         this.activeExecutor = null;
         if (finished != null) {
             completionListener.accept(finished);

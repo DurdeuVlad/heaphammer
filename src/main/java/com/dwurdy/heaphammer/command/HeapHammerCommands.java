@@ -12,8 +12,11 @@ import com.dwurdy.heaphammer.report.PlanStorage;
 import com.dwurdy.heaphammer.report.ReportDiff;
 import com.dwurdy.heaphammer.report.ReportDiffer;
 import com.dwurdy.heaphammer.report.ReportService;
+import com.dwurdy.heaphammer.scenario.ScenarioExecutor;
+import com.dwurdy.heaphammer.scenario.blockentities.BlockEntityScenarioPlanner;
 import com.dwurdy.heaphammer.scenario.chunks.ChunkScenarioExecutor;
 import com.dwurdy.heaphammer.scenario.chunks.ChunkWorkloadPlanner;
+import com.dwurdy.heaphammer.scenario.entities.EntityScenarioPlanner;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -43,6 +46,8 @@ public class HeapHammerCommands {
     private final ReportService reportService;
     private final ReplayService replayService;
     private final ChunkWorkloadPlanner planner;
+    private final EntityScenarioPlanner entityPlanner;
+    private final BlockEntityScenarioPlanner blockEntityPlanner;
     private final TrendAnalyzer trendAnalyzer;
 
     private final ClassHistogramCollector histogramCollector;
@@ -64,6 +69,8 @@ public class HeapHammerCommands {
         this.reportService = reportService;
         this.replayService = replayService;
         this.planner = new ChunkWorkloadPlanner();
+        this.entityPlanner = new EntityScenarioPlanner();
+        this.blockEntityPlanner = new BlockEntityScenarioPlanner();
         this.trendAnalyzer = new TrendAnalyzer();
         this.histogramCollector = new ClassHistogramCollector();
         this.jfrTrigger = new JfrTrigger();
@@ -71,7 +78,7 @@ public class HeapHammerCommands {
 
         // Wire experiment service callbacks
         experimentService.setCheckpointListener((phase, iter) -> {
-            Optional<ChunkScenarioExecutor> active = experimentService.getActiveExecutor();
+            Optional<ScenarioExecutor> active = experimentService.getActiveExecutor();
             String dim = active.map(e -> e.getPlan().spec().dimension()).orElse("minecraft:overworld");
             boolean explicitGc = active.map(e -> e.getPlan().spec().explicitGc()).orElse(false);
             if (phase == CheckpointPhase.ITERATION_CLEANUP || phase == CheckpointPhase.WARMUP) {
@@ -109,7 +116,10 @@ public class HeapHammerCommands {
         // Scenario command branch
         var scenario = Commands.literal("scenario");
         scenario.then(Commands.literal("list").executes(this::cmdScenarioList));
-        scenario.then(Commands.literal("describe").then(Commands.literal("chunks").executes(this::cmdScenarioDescribeChunks)));
+        scenario.then(Commands.literal("describe")
+                .then(Commands.literal("chunks").executes(this::cmdScenarioDescribeChunks))
+                .then(Commands.literal("entities").executes(this::cmdScenarioDescribeEntities))
+                .then(Commands.literal("blockentities").executes(this::cmdScenarioDescribeBlockEntities)));
         root.then(scenario);
 
         // Planning
@@ -118,6 +128,14 @@ public class HeapHammerCommands {
                 .executes(ctx -> cmdPlanChunks(ctx, ""))
                 .then(Commands.argument("flags", StringArgumentType.greedyString())
                         .executes(ctx -> cmdPlanChunks(ctx, StringArgumentType.getString(ctx, "flags")))));
+        plan.then(Commands.literal("entities")
+                .executes(ctx -> cmdPlanEntities(ctx, ""))
+                .then(Commands.argument("flags", StringArgumentType.greedyString())
+                        .executes(ctx -> cmdPlanEntities(ctx, StringArgumentType.getString(ctx, "flags")))));
+        plan.then(Commands.literal("blockentities")
+                .executes(ctx -> cmdPlanBlockEntities(ctx, ""))
+                .then(Commands.argument("flags", StringArgumentType.greedyString())
+                        .executes(ctx -> cmdPlanBlockEntities(ctx, StringArgumentType.getString(ctx, "flags")))));
         root.then(plan);
 
         // Running
@@ -126,6 +144,14 @@ public class HeapHammerCommands {
                 .executes(ctx -> cmdRunChunks(ctx, ""))
                 .then(Commands.argument("flags", StringArgumentType.greedyString())
                         .executes(ctx -> cmdRunChunks(ctx, StringArgumentType.getString(ctx, "flags")))));
+        run.then(Commands.literal("entities")
+                .executes(ctx -> cmdRunEntities(ctx, ""))
+                .then(Commands.argument("flags", StringArgumentType.greedyString())
+                        .executes(ctx -> cmdRunEntities(ctx, StringArgumentType.getString(ctx, "flags")))));
+        run.then(Commands.literal("blockentities")
+                .executes(ctx -> cmdRunBlockEntities(ctx, ""))
+                .then(Commands.argument("flags", StringArgumentType.greedyString())
+                        .executes(ctx -> cmdRunBlockEntities(ctx, StringArgumentType.getString(ctx, "flags")))));
         root.then(run);
 
         // Replay & Rerun
@@ -248,18 +274,18 @@ public class HeapHammerCommands {
     }
 
     private int cmdStatus(CommandContext<CommandSourceStack> ctx) {
-        Optional<ChunkScenarioExecutor> opt = experimentService.getActiveExecutor();
+        Optional<ScenarioExecutor> opt = experimentService.getActiveExecutor();
         if (opt.isEmpty() || !opt.get().getStateMachine().getState().isActive()) {
             ctx.getSource().sendSuccess(() -> Component.literal("No experiment currently active.").withStyle(ChatFormatting.GRAY), false);
             return 1;
         }
 
-        ChunkScenarioExecutor executor = opt.get();
+        ScenarioExecutor executor = opt.get();
         ExperimentPlan plan = executor.getPlan();
         int currentIter = executor.getCurrentIteration();
         int totalIter = plan.spec().iterations();
         ctx.getSource().sendSuccess(() -> Component.literal(
-                "Active Experiment: " + plan.id() + "\n" +
+                "Active Experiment: " + plan.id() + " (" + plan.spec().scenarioId() + ")\n" +
                 "- State: " + executor.getStateMachine().getState() + " (" + executor.getStateMachine().getStatusMessage() + ")\n" +
                 "- Iteration: " + currentIter + " / " + totalIter + "\n" +
                 "- Active Tickets: " + platform.getChunkTicketManager().getActiveTicketCount()
@@ -294,7 +320,11 @@ public class HeapHammerCommands {
     private int cmdCleanup(CommandContext<CommandSourceStack> ctx) {
         int countBefore = platform.getChunkTicketManager().getActiveTicketCount();
         platform.getChunkTicketManager().releaseAllTickets();
-        ctx.getSource().sendSuccess(() -> Component.literal("Purged " + countBefore + " HeapHammer tickets.").withStyle(ChatFormatting.GREEN), true);
+        String dim = "minecraft:overworld";
+        int entitiesPurged = platform.removeAllTestEntities(dim);
+        int blockEntitiesPurged = platform.removeAllTestBlockEntities(dim);
+        ctx.getSource().sendSuccess(() -> Component.literal("Purged " + countBefore + " tickets, " +
+                entitiesPurged + " test entities, and " + blockEntitiesPurged + " test block entities.").withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 
@@ -306,7 +336,12 @@ public class HeapHammerCommands {
     }
 
     private int cmdScenarioList(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal("Available Scenarios:\n- chunks (v1.0): Deterministic chunk load/unload churn").withStyle(ChatFormatting.YELLOW), false);
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "Available Scenarios:\n" +
+                "- chunks (v1.0): Deterministic chunk load/unload churn\n" +
+                "- entities (v1.0): Deterministic entity lifecycle churn\n" +
+                "- blockentities (v1.0): Conservative block entity placement and destruction stress"
+        ).withStyle(ChatFormatting.YELLOW), false);
         return 1;
     }
 
@@ -314,6 +349,22 @@ public class HeapHammerCommands {
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "Scenario: chunks\n" +
                 "Acquires, holds, and releases chunk tickets within a specified radius using selectable strategies (SPIRAL, RING, RANDOM_WALK, HOTSPOT_CHURN, GRID_SWEEP)."
+        ).withStyle(ChatFormatting.YELLOW), false);
+        return 1;
+    }
+
+    private int cmdScenarioDescribeEntities(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "Scenario: entities\n" +
+                "Spawns deterministic entity batches, exercises them for configured lifetime ticks, then discards or kills them to verify complete cleanup."
+        ).withStyle(ChatFormatting.YELLOW), false);
+        return 1;
+    }
+
+    private int cmdScenarioDescribeBlockEntities(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "Scenario: blockentities\n" +
+                "Places deterministic block entity states in a test grid, allows conservative tick initialization, then removes blocks to verify lifecycle cleanup."
         ).withStyle(ChatFormatting.YELLOW), false);
         return 1;
     }
@@ -368,10 +419,178 @@ public class HeapHammerCommands {
         return 1;
     }
 
+    private int cmdPlanEntities(CommandContext<CommandSourceStack> ctx, String flagsString) {
+        var pos = ctx.getSource().getPosition();
+        int chunkX = ((int) Math.floor(pos.x)) >> 4;
+        int chunkZ = ((int) Math.floor(pos.z)) >> 4;
+
+        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+        ExperimentSpec spec = ExperimentSpec.builder()
+                .scenarioId(ScenarioId.ENTITIES)
+                .seed(baseSpec.seed())
+                .dimension(baseSpec.dimension())
+                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                .radius(baseSpec.radius() * 4)
+                .iterations(baseSpec.iterations())
+                .batchSize(baseSpec.batchSize())
+                .strategy(baseSpec.strategy())
+                .warmupIterations(baseSpec.warmupIterations())
+                .holdTicks(baseSpec.holdTicks())
+                .settleTicks(baseSpec.settleTicks())
+                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                .explicitGc(baseSpec.explicitGc())
+                .build();
+
+        List<String> available = platform.getAvailableEntityTypes();
+        ExperimentPlan plan = entityPlanner.plan(spec, available);
+        try {
+            Path path = planStorage.savePlan(plan);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "Entity Plan Created: " + plan.id() + "\n" +
+                    "- Operations: " + plan.totalOperations() + "\n" +
+                    "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
+                    "- Saved to: " + path.getFileName()
+            ).withStyle(ChatFormatting.GREEN), false);
+        } catch (IOException e) {
+            ctx.getSource().sendFailure(Component.literal("Failed to persist entity plan: " + e.getMessage()));
+        }
+        return 1;
+    }
+
+    private int cmdRunEntities(CommandContext<CommandSourceStack> ctx, String flagsString) {
+        if (experimentService.isExperimentActive()) {
+            ctx.getSource().sendFailure(Component.literal("An experiment is already in progress. Use /hh stop first."));
+            return 0;
+        }
+
+        var pos = ctx.getSource().getPosition();
+        int chunkX = ((int) Math.floor(pos.x)) >> 4;
+        int chunkZ = ((int) Math.floor(pos.z)) >> 4;
+
+        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+        ExperimentSpec spec = ExperimentSpec.builder()
+                .scenarioId(ScenarioId.ENTITIES)
+                .seed(baseSpec.seed())
+                .dimension(baseSpec.dimension())
+                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                .radius(baseSpec.radius() * 4)
+                .iterations(baseSpec.iterations())
+                .batchSize(baseSpec.batchSize())
+                .strategy(baseSpec.strategy())
+                .warmupIterations(baseSpec.warmupIterations())
+                .holdTicks(baseSpec.holdTicks())
+                .settleTicks(baseSpec.settleTicks())
+                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                .explicitGc(baseSpec.explicitGc())
+                .build();
+
+        checkpointService.clear();
+        List<String> available = platform.getAvailableEntityTypes();
+        ExperimentPlan plan = entityPlanner.plan(spec, available);
+        try {
+            planStorage.savePlan(plan);
+            experimentService.start(plan);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "Started Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " entities/batch)"
+            ).withStyle(ChatFormatting.GOLD), true);
+        } catch (Exception e) {
+            ctx.getSource().sendFailure(Component.literal("Failed to start entity experiment: " + e.getMessage()));
+        }
+        return 1;
+    }
+
+    private int cmdPlanBlockEntities(CommandContext<CommandSourceStack> ctx, String flagsString) {
+        var pos = ctx.getSource().getPosition();
+        int chunkX = ((int) Math.floor(pos.x)) >> 4;
+        int chunkZ = ((int) Math.floor(pos.z)) >> 4;
+
+        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+        ExperimentSpec spec = ExperimentSpec.builder()
+                .scenarioId(ScenarioId.BLOCK_ENTITIES)
+                .seed(baseSpec.seed())
+                .dimension(baseSpec.dimension())
+                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                .radius(baseSpec.radius())
+                .iterations(baseSpec.iterations())
+                .batchSize(baseSpec.batchSize())
+                .strategy(baseSpec.strategy())
+                .warmupIterations(baseSpec.warmupIterations())
+                .holdTicks(baseSpec.holdTicks())
+                .settleTicks(baseSpec.settleTicks())
+                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                .explicitGc(baseSpec.explicitGc())
+                .build();
+
+        List<String> available = platform.getAvailableBlockEntityTypes();
+        ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
+        try {
+            Path path = planStorage.savePlan(plan);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "Block Entity Plan Created: " + plan.id() + "\n" +
+                    "- Operations: " + plan.totalOperations() + "\n" +
+                    "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
+                    "- Saved to: " + path.getFileName()
+            ).withStyle(ChatFormatting.GREEN), false);
+        } catch (IOException e) {
+            ctx.getSource().sendFailure(Component.literal("Failed to persist block entity plan: " + e.getMessage()));
+        }
+        return 1;
+    }
+
+    private int cmdRunBlockEntities(CommandContext<CommandSourceStack> ctx, String flagsString) {
+        if (experimentService.isExperimentActive()) {
+            ctx.getSource().sendFailure(Component.literal("An experiment is already in progress. Use /hh stop first."));
+            return 0;
+        }
+
+        var pos = ctx.getSource().getPosition();
+        int chunkX = ((int) Math.floor(pos.x)) >> 4;
+        int chunkZ = ((int) Math.floor(pos.z)) >> 4;
+
+        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+        ExperimentSpec spec = ExperimentSpec.builder()
+                .scenarioId(ScenarioId.BLOCK_ENTITIES)
+                .seed(baseSpec.seed())
+                .dimension(baseSpec.dimension())
+                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                .radius(baseSpec.radius())
+                .iterations(baseSpec.iterations())
+                .batchSize(baseSpec.batchSize())
+                .strategy(baseSpec.strategy())
+                .warmupIterations(baseSpec.warmupIterations())
+                .holdTicks(baseSpec.holdTicks())
+                .settleTicks(baseSpec.settleTicks())
+                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                .explicitGc(baseSpec.explicitGc())
+                .build();
+
+        checkpointService.clear();
+        List<String> available = platform.getAvailableBlockEntityTypes();
+        ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
+        try {
+            planStorage.savePlan(plan);
+            experimentService.start(plan);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "Started Block Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " block entities/batch)"
+            ).withStyle(ChatFormatting.GOLD), true);
+        } catch (Exception e) {
+            ctx.getSource().sendFailure(Component.literal("Failed to start block entity experiment: " + e.getMessage()));
+        }
+        return 1;
+    }
+
     private int cmdReplay(CommandContext<CommandSourceStack> ctx, String target) {
         try {
             checkpointService.clear();
-            ChunkScenarioExecutor executor = replayService.replay(target);
+            ScenarioExecutor executor = replayService.replay(target);
             ctx.getSource().sendSuccess(() -> Component.literal("Replaying plan: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
         } catch (Exception e) {
             ctx.getSource().sendFailure(Component.literal("Replay failed: " + e.getMessage()));
@@ -382,7 +601,7 @@ public class HeapHammerCommands {
     private int cmdRerun(CommandContext<CommandSourceStack> ctx, String target) {
         try {
             checkpointService.clear();
-            ChunkScenarioExecutor executor = replayService.rerun(target);
+            ScenarioExecutor executor = replayService.rerun(target);
             ctx.getSource().sendSuccess(() -> Component.literal("Rerunning spec for: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
         } catch (Exception e) {
             ctx.getSource().sendFailure(Component.literal("Rerun failed: " + e.getMessage()));
@@ -575,7 +794,7 @@ public class HeapHammerCommands {
         return 1;
     }
 
-    private void onExperimentFinished(ChunkScenarioExecutor executor) {
+    private void onExperimentFinished(ScenarioExecutor executor) {
         ExperimentPlan plan = executor.getPlan();
         List<Checkpoint> cps = checkpointService.getCheckpoints();
         DetectionResult detection = trendAnalyzer.analyze(plan.spec(), cps);
