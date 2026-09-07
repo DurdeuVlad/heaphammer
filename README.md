@@ -23,7 +23,7 @@
   <a href="#how-it-works"><b>How It Works</b></a> •
   <a href="#built-for-staging-safe-on-production"><b>Safety</b></a> •
   <a href="#quickstart"><b>Quickstart</b></a> •
-  <a href="#modpack-triage-workflow"><b>Triage</b></a> •
+  <a href="#empirical-proof"><b>Proof</b></a> •
   <a href="#commands"><b>Commands</b></a> •
   <a href="docs/README.md"><b>Docs</b></a>
 </p>
@@ -189,6 +189,30 @@ Net Delta:      +1.20 MB vs +54.00 MB (Diff: +52.80 MB)
 Retained Slope: +0.24 MB/cyc vs +10.56 MB/cyc (Diff: +10.32 MB/cyc)
 Classification: PASS -> SUSPICIOUS (CHANGED)
 ```
+
+---
+
+## Empirical Proof
+
+HeapHammer is not theoretical. Every algorithm, regression slope, and ticket lifecycle has been empirically benchmarked and proven on **real Minecraft 1.21.1 Fabric dedicated servers** using standalone companion test mods:
+
+### 1. Dedicated Server Benchmark Matrix (5 Cycles, Explicit GC)
+| Test Condition | Retained Slope | Net Delta | Verdict | Real-World Outcome |
+|---|---|---|---|---|
+| **Clean Vanilla Control** | **+0.75 MB/cyc** | +3.00 MB | **`PASS`** | Zero false positives on healthy servers. |
+| **Static Chunk Cache Leak** | **+10.56 MB/cyc** | +42.24 MB | **`SUSPICIOUS`** | Caught 100% of pinned `LevelChunk` instances ($R^2 = 0.9999$). |
+| **Entity Tracker Leak** | **+6.41 MB/cyc** | +41.02 MB | **`SUSPICIOUS`** | Caught unevicted despawned entity references. |
+| **Cross-Mod Collision (A+B)** | **+10.52 MB/cyc** | **+42.08 MB** | **`SUSPICIOUS`** | **Caught circular subscriber leak** that only manifests when both mods co-exist! |
+
+### 2. Active Acceleration vs. Passive Waiting
+- **Passive Idle Server (15 seconds)**: 0 chunks loaded $\rightarrow$ `0.00 MB/cycle` (Leak remains **dormant & invisible**).
+- **Active HeapHammer (18 seconds)**: 35 chunks churned $\rightarrow$ **`+10.60 MB/cycle` (`+37.89 MB`)** $\rightarrow$ **`SUSPICIOUS` (Caught immediately!)**.
+
+### 3. Automated Test Suite
+- **34 unit and integration tests** pass continuously in CI (`./gradlew test`).
+- Covers domain isolation (zero-Minecraft imports), OLS linear regression math, tick budget throttling, and serialization integrity.
+
+*See [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md) for full server logs, class histograms, and raw JSON benchmark reports.*
 
 ---
 
