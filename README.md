@@ -4,7 +4,9 @@
 
 <div align="center">
 
-# 🔨 HeapHammer
+<img src="assets/heaphammer_logo.png" alt="HeapHammer Logo" width="120">
+
+# HeapHammer
 
 **Deterministic server stress testing & retained-memory regression framework for modded Minecraft**
 
@@ -16,38 +18,29 @@
 [![Tests](https://img.shields.io/badge/tests-34%20passed-success.svg?style=flat-square)](#building--contributing)
 [![Side](https://img.shields.io/badge/side-server--only-informational.svg?style=flat-square)](#quickstart-for-server-admins)
 
-[Quickstart](#quickstart-for-server-admins) •
-[Commands](#command-reference) •
-[How It Works](#how-it-works) •
-[Empirical Proof](#proven-on-live-servers) •
-[Documentation Hub](docs/README.md) •
-[Publication Guide](docs/PUBLICATION.md)
+<p align="center">
+  <a href="#quickstart-for-server-admins"><b>Quickstart</b></a> •
+  <a href="#command-reference"><b>Commands</b></a> •
+  <a href="#how-it-works"><b>How It Works</b></a> •
+  <a href="#proven-on-live-servers"><b>Empirical Proof</b></a> •
+  <a href="docs/README.md"><b>Documentation Hub</b></a> •
+  <a href="docs/PUBLICATION.md"><b>Publication Guide</b></a>
+</p>
 
 </div>
 
 ---
 
-<table>
-<tr>
-<td width="200" align="center" valign="middle">
-  <img src="assets/heaphammer_logo.png" alt="HeapHammer Logo" width="180"/>
-</td>
-<td>
+## Stop Guessing. Compress Staging Workloads.
 
-### Stop Guessing. Compress Staging Workloads.
 In modpacks with 200–300+ mods, memory leaks and retained-chunk bugs often take **days of chaotic player traffic** to manifest, making staging reproduction painfully slow.
 
-**HeapHammer automates deterministic workload compression.**
+**HeapHammer automates deterministic workload compression.**  
 It exercises chunk, entity, and block lifecycles under a strict server tick budget, releases all resources, and mathematically evaluates what stays behind—producing an objective, replayable verdict in minutes instead of days.
 
-```text
-Traditional Profilers (Spark, JFR):  "What is the server doing right now?"
-HeapHammer:                          "What exact workload breaks this server, and can I replay it?"
-```
-
-</td>
-</tr>
-</table>
+> [!NOTE]
+> **Traditional Profilers (Spark, JFR)**: *"What is the server doing right now?"*  
+> **HeapHammer**: *"What exact workload breaks this server, and can I replay it?"*
 
 ---
 
