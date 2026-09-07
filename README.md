@@ -216,9 +216,26 @@ HeapHammer is not theoretical. Every algorithm, regression slope, and ticket lif
 
 ---
 
-## Commands
+<a id="commands"></a>
+## Commands & Permissions
 
-All commands can be executed via `/hh` in-game (Level 2 OP) or `hh` from the server console:
+All commands are **operator gated (OP Level 2+)** and **permission gated**. Non-OP players without permissions cannot execute or tab-complete `/hh` commands.
+
+### Permission Nodes (Fabric Permissions API / LuckPerms)
+HeapHammer automatically integrates with Fabric Permissions API and LuckPerms if present, seamlessly falling back to vanilla OP Level 2:
+
+| Permission Node | Description | Default Access |
+|---|---|---|
+| `heaphammer.admin` | Wildcard granting full access to all HeapHammer commands. | OP Level 2 |
+| `heaphammer.use` | Root command access (`/hh`, `/hh version`, `/hh help`). | OP Level 2 |
+| `heaphammer.run` | Execute workloads (`/hh run ...`, `/hh stop`, `/hh cleanup`). | OP Level 2 |
+| `heaphammer.diagnostics` | Capture class histograms and `.hprof` heap dumps. | OP Level 2 |
+| `heaphammer.report` | View, export, and diff test reports (`/hh report ...`). | OP Level 2 |
+| `heaphammer.doctor` | View server health and JVM metrics (`/hh doctor`, `/hh metrics`). | OP Level 2 |
+| `heaphammer.plan` | Compute deterministic workload plans (`/hh plan ...`). | OP Level 2 |
+
+### Command Reference
+Execute via `/hh` in-game or `hh` directly from the dedicated server console:
 
 | Command | Description | Example |
 |---|---|---|

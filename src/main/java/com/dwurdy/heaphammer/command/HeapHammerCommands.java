@@ -96,28 +96,30 @@ public class HeapHammerCommands {
     }
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        var root = Commands.literal("hh");
+        // Root /hh command requires OP level 2 or heaphammer.use permission
+        var root = Commands.literal("hh").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_USE));
 
-        // Info commands (available to all)
-        root.then(Commands.literal("version").executes(this::cmdVersion));
-        root.then(Commands.literal("help")
+        // Info commands (requires OP / permission)
+        root.then(Commands.literal("version").requires(s -> CommandPermissions.check(s, "heaphammer.version")).executes(this::cmdVersion));
+        root.then(Commands.literal("help").requires(s -> CommandPermissions.check(s, "heaphammer.help"))
                 .executes(this::cmdHelp)
                 .then(Commands.argument("topic", StringArgumentType.string()).executes(this::cmdHelpTopic)));
-        root.then(Commands.literal("capabilities").executes(this::cmdCapabilities));
-        root.then(Commands.literal("doctor").executes(this::cmdDoctor));
-        root.then(Commands.literal("status").executes(this::cmdStatus));
-        root.then(Commands.literal("metrics").executes(this::cmdMetrics));
-        root.then(Commands.literal("inspect").then(Commands.literal("mods").executes(this::cmdInspectMods)));
+        root.then(Commands.literal("capabilities").requires(s -> CommandPermissions.check(s, "heaphammer.capabilities")).executes(this::cmdCapabilities));
+        root.then(Commands.literal("doctor").requires(s -> CommandPermissions.check(s, "heaphammer.doctor")).executes(this::cmdDoctor));
+        root.then(Commands.literal("status").requires(s -> CommandPermissions.check(s, "heaphammer.status")).executes(this::cmdStatus));
+        root.then(Commands.literal("metrics").requires(s -> CommandPermissions.check(s, "heaphammer.metrics")).executes(this::cmdMetrics));
+        root.then(Commands.literal("inspect").requires(s -> CommandPermissions.check(s, "heaphammer.inspect"))
+                .then(Commands.literal("mods").executes(this::cmdInspectMods)));
 
-        // Operator commands (requires level 2)
-        root.then(Commands.literal("stop").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
-        root.then(Commands.literal("cleanup").requires(s -> s.hasPermission(2)).executes(this::cmdCleanup));
-        root.then(Commands.literal("checkpoint").requires(s -> s.hasPermission(2))
+        // Operator control commands
+        root.then(Commands.literal("stop").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_STOP)).executes(this::cmdStop));
+        root.then(Commands.literal("cleanup").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_CLEANUP)).executes(this::cmdCleanup));
+        root.then(Commands.literal("checkpoint").requires(s -> CommandPermissions.check(s, "heaphammer.checkpoint"))
                 .executes(this::cmdCheckpoint)
                 .then(Commands.literal("--diagnostics").executes(this::cmdCheckpointDiagnostics)));
 
         // Scenario command branch
-        var scenario = Commands.literal("scenario");
+        var scenario = Commands.literal("scenario").requires(s -> CommandPermissions.check(s, "heaphammer.scenario"));
         scenario.then(Commands.literal("list").executes(this::cmdScenarioList));
         scenario.then(Commands.literal("describe")
                 .then(Commands.literal("chunks").executes(this::cmdScenarioDescribeChunks))
@@ -126,7 +128,7 @@ public class HeapHammerCommands {
         root.then(scenario);
 
         // Planning
-        var plan = Commands.literal("plan");
+        var plan = Commands.literal("plan").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_PLAN));
         plan.then(Commands.literal("chunks")
                 .executes(ctx -> cmdPlanChunks(ctx, ""))
                 .then(Commands.argument("flags", StringArgumentType.greedyString())
@@ -142,7 +144,7 @@ public class HeapHammerCommands {
         root.then(plan);
 
         // Running
-        var run = Commands.literal("run").requires(s -> s.hasPermission(2));
+        var run = Commands.literal("run").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_RUN));
         run.then(Commands.literal("chunks")
                 .executes(ctx -> cmdRunChunks(ctx, ""))
                 .then(Commands.argument("flags", StringArgumentType.greedyString())
@@ -158,16 +160,16 @@ public class HeapHammerCommands {
         root.then(run);
 
         // Replay & Rerun
-        root.then(Commands.literal("replay").requires(s -> s.hasPermission(2))
+        root.then(Commands.literal("replay").requires(s -> CommandPermissions.check(s, "heaphammer.replay"))
                 .then(Commands.argument("target", StringArgumentType.string())
                         .executes(ctx -> cmdReplay(ctx, StringArgumentType.getString(ctx, "target")))));
 
-        root.then(Commands.literal("rerun").requires(s -> s.hasPermission(2))
+        root.then(Commands.literal("rerun").requires(s -> CommandPermissions.check(s, "heaphammer.rerun"))
                 .then(Commands.argument("target", StringArgumentType.string())
                         .executes(ctx -> cmdRerun(ctx, StringArgumentType.getString(ctx, "target")))));
 
         // Reports
-        var report = Commands.literal("report");
+        var report = Commands.literal("report").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_REPORT));
         report.then(Commands.literal("list").executes(this::cmdReportList));
         report.then(Commands.literal("show")
                 .then(Commands.argument("target", StringArgumentType.string())
@@ -182,7 +184,7 @@ public class HeapHammerCommands {
         root.then(report);
 
         // Diagnostics
-        var diagnostics = Commands.literal("diagnostics").requires(s -> s.hasPermission(2));
+        var diagnostics = Commands.literal("diagnostics").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_DIAGNOSTICS));
         diagnostics.then(Commands.literal("histogram").executes(this::cmdDiagnosticsHistogram));
         diagnostics.then(Commands.literal("heapdump").executes(this::cmdDiagnosticsHeapdump));
         var jfr = Commands.literal("jfr");
@@ -193,7 +195,7 @@ public class HeapHammerCommands {
         root.then(diagnostics);
 
         // Fixtures (operator only)
-        var fixture = Commands.literal("fixture").requires(s -> s.hasPermission(2));
+        var fixture = Commands.literal("fixture").requires(s -> CommandPermissions.check(s, "heaphammer.fixture"));
         fixture.then(Commands.literal("reset").executes(this::cmdFixtureReset));
         fixture.then(Commands.argument("mode", StringArgumentType.string())
                 .executes(ctx -> cmdFixture(ctx, StringArgumentType.getString(ctx, "mode"), 10))
@@ -202,7 +204,7 @@ public class HeapHammerCommands {
         root.then(fixture);
 
         // Adapters (operator only)
-        var adapters = Commands.literal("adapters").requires(s -> s.hasPermission(2));
+        var adapters = Commands.literal("adapters").requires(s -> CommandPermissions.check(s, "heaphammer.adapters"));
         adapters.then(Commands.literal("list").executes(this::cmdAdaptersList));
         root.then(adapters);
 
