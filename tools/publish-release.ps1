@@ -129,8 +129,10 @@ $notesLines | Set-Content $notesFile -Encoding utf8
 $releaseFiles = Get-ChildItem "$prodDir/*" | Select-Object -ExpandProperty FullName
 
 # Check if release already exists
-$existing = gh release view $Tag 2>&1
-if ($LASTEXITCODE -eq 0) {
+$existingReleases = & gh release list --json tagName -q ".[].tagName" 2>$null
+$releaseExists = ($existingReleases -split '\r?\n') -contains $Tag
+
+if ($releaseExists) {
     Write-Host "Release $Tag already exists. Uploading assets..." -ForegroundColor Yellow
     gh release upload $Tag @releaseFiles --clobber
 } else {
