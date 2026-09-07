@@ -83,21 +83,27 @@ To eliminate version migration friction, HeapHammer strictly decouples core logi
 
 ## 4. Multi-Version Branching Strategy
 
+HeapHammer maintains a single source of truth for all pure-domain logic on `master` and propagates updates to supported historical Minecraft version branches:
+
 ```text
-master (Active Trunk — 1.21.1, Java 21)
+master (Active Production Trunk — 1.21.1 Fabric, Java 21)
   │
-  ├──> release/v1.0.0    (Staging branch — gathers work before official tagging)
+  ├──> release/v*        (Batched release staging — gathers work before official tagging)
   │
-  ├──> ver/1.21.1        (Cutting Edge Fabric — Java 21)
   ├──> ver/1.20.1        (Modern LTS Fabric/Forge — Java 17)
   ├──> ver/1.18.2        (World-Gen LTS Fabric/Forge — Java 17)
-  ├──> ver/1.16.5        (Legacy LTS Fabric/Forge — Java 17/8)
-  └──> ver/1.12.2-forge  (Classic Titan Forge — Java 8)
+  ├──> ver/1.16.5        (Nether Legacy LTS Fabric/Forge — Java 17/8)
+  └──> ver/1.12.2-forge  (Classic Titan LTS Forge — Java 8)
 ```
+
+### Branch Policy Rules
+1. **`master` as Production Trunk**: The `master` branch directly targets the latest production Minecraft version (`1.21.1`). To avoid duplicate builds and maintenance overhead, no separate `ver/1.21.1` branch is maintained.
+2. **Historical LTS-Only Branches**: Dedicated `ver/*` branches are maintained exclusively for historical versions that are officially designated **LTS** or actively supported. Non-LTS intermediate versions (e.g. `1.20.4`, `1.19.4`) do not receive branches.
+3. **Mod Version Line Branches**: Release staging lines (`release/v*`) gather batched releases before tagging. Only officially designated LTS mod releases receive long-term maintenance branches.
 
 ### Automated Branch Synchronization
 Every push to `master` triggers [`.github/workflows/sync-version-branches.yml`](../.github/workflows/sync-version-branches.yml):
-1. Merges `master` into each `ver/*` branch.
+1. Merges `master` into each historical `ver/*` branch (`ver/1.20.1`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`).
 2. Executes `./gradlew test` with the branch's specific JVM target.
 3. If clean $\rightarrow$ pushes automatically.
 4. If conflict/adaptation required $\rightarrow$ automatically opens a PR labeled `needs-version-adaptation`.

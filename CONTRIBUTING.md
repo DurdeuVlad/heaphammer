@@ -59,26 +59,28 @@ All code submitted to HeapHammer must adhere to our **Hexagonal Architecture (Po
 
 ## 3. Multi-Version Minecraft Branching Model
 
-HeapHammer supports multiple minor and patch versions of Minecraft through a structured branching strategy:
+HeapHammer adheres to a structured, dual-axis branching strategy covering both mod releases and Minecraft platforms:
 
 ```text
-master (Default Development Trunk — 1.21.1)
+master (Active Production Trunk — 1.21.1 Fabric, Java 21)
   │
-  ├──> ver/1.21.1        (Modern Frontier — Fabric, Java 21)
-  ├──> ver/1.20.1        (Modern LTS Gold Standard — Fabric, Java 17)
-  ├──> ver/1.18.2        (World-Gen Overhaul Era — Fabric, Java 17)
-  ├──> ver/1.16.5        (Nether Legacy Era — Fabric, Java 17/8)
-  └──> ver/1.12.2-forge  (Classic Titan Era — MinecraftForge, Java 8)
+  ├──> release/v*        (Batched release staging lines — e.g. release/v1.0.0)
+  │
+  ├──> ver/1.20.1        (Modern LTS Gold Standard — Fabric/Forge, Java 17)
+  ├──> ver/1.18.2        (World-Gen Overhaul LTS — Fabric/Forge, Java 17)
+  ├──> ver/1.16.5        (Nether Legacy LTS — Fabric/Forge, Java 17/8)
+  └──> ver/1.12.2-forge  (Classic Titan LTS — MinecraftForge, Java 8)
 ```
 
-- **`master`**: The protected stable development trunk. Direct pushes to `master` are strictly prohibited.
-- **`release/v*`**: Batched release staging lines (e.g. `release/v1.0.0` for v1.0.0). We do **not** publish on every individual fix; all work is gathered on the active release branch before tagging.
+- **`master`**: The protected stable production trunk. Direct pushes to `master` are strictly prohibited. It directly hosts the latest production version of HeapHammer and targets Minecraft `1.21.1` (no redundant `ver/1.21.1` branch).
+- **Historical Mod Releases (LTS-Only)**: We maintain active Git branches for historical mod releases **only** if they are officially designated as **Long-Term Support (LTS)**. EOL mod versions are preserved permanently via immutable Git tags (`vX.Y.Z`).
+- **`ver/<minecraft_version>`**: Dedicated downstream platform branches maintained **strictly for historical LTS or actively supported Minecraft versions**. Intermediate non-LTS Minecraft versions do not receive branches.
+- **`release/v*`**: Batched release staging lines (e.g. `release/v1.0.0`, `release/v1.1.0`). We do **not** publish on every individual fix; all work is gathered on the active release branch before tagging.
 - **Strict Semantic Versioning (Zero Alpha Policy)**: We do **not** publish alpha, beta, or pre-release qualifiers (no `alpha.1`, etc.). Releases follow a strict rule of thumb:
   - **Major (`X.0.0`)**: Modifying something big or adding a major new architectural feature.
   - **Minor (`X.Y.0`)**: Every new feature or feature-ish enhancement.
   - **Bug Fix (`X.Y.Z`)**: Severe bug fixes that are really bad, need immediate resolution, and cannot wait until the next minor release.
-- **`ver/<minecraft_version>`**: Dedicated downstream platform branches (e.g. `ver/1.20.1`, `ver/1.12.2-forge`).
-- **Automated Synchronization**: Merges to `master` automatically trigger `.github/workflows/sync-version-branches.yml` to propagate pure-domain improvements downstream.
+- **Automated Synchronization**: Merges to `master` automatically trigger `.github/workflows/sync-version-branches.yml` to propagate pure-domain improvements downstream to all active historical LTS branches.
 
 ### 3.1 Protected Trunk Policy: No Direct Pushes to `master`
 To maintain open-source integrity, reproducible builds, and strict code review:

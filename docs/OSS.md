@@ -20,28 +20,40 @@ HeapHammer is an open-source project designed to empower the Minecraft modding c
 
 ---
 
-## 3. Version Support & Maintenance Policy
+## 3. Version Support & Branch Policy
 
-HeapHammer maintains 5 active release branches corresponding to major modding eras:
+HeapHammer enforces a clear, dual-axis branch and version support policy governing both **HeapHammer mod release versions** and **Minecraft platform versions**:
 
-| Version Branch | Ecosystem Status | Support Tier | Maintenance Scope |
+### 3.1 Mod Release Version Policy
+- **`master` (Latest Production Version)**: The `master` trunk always maintains the latest stable production release of HeapHammer (currently `v1.0.0`). It serves as the authoritative source of truth for active production builds.
+- **Historical Mod Releases (LTS-Only Branches)**: We maintain active Git branches for historical mod release lines **only** if they are officially designated as **Long-Term Support (LTS)** or release lines we actively commit to supporting with backported security updates and critical fixes.
+- **Retirement & Tagging**: Non-supported or End-of-Life (EOL) mod versions do not retain lingering active Git branches. They are permanently archived as immutable Git release tags (e.g. `v1.0.0`).
+
+### 3.2 Minecraft Platform Version Support Matrix
+HeapHammer targets major modding eras while avoiding branch sprawl by maintaining dedicated branches **strictly for historical LTS or actively supported Minecraft versions**:
+
+| Version Branch | Ecosystem Role | Support Tier | Maintenance Scope |
 |---|---|---|---|
-| **`master`** | Modern Frontier (`1.21.1`) | **Tier 1 (Active Development)** | New features, scenarios, statistical enhancements, bug fixes. |
-| **`ver/1.20.1`** | Modern LTS Gold Standard | **Tier 1 (Full Support)** | Automated sync of all domain features, regression fixes. |
+| **`master`** | Modern Frontier (`1.21.1`, Java 21) | **Tier 1 (Active Production Trunk)** | Canonical production codebase, new scenarios, statistical engines. |
+| **`ver/1.20.1`** | Modern LTS Gold Standard | **Tier 1 (Full Support)** | Automated sync of domain features, regression fixes. |
 | **`ver/1.18.2`** | World-Gen Overhaul LTS | **Tier 2 (Maintenance)** | Automated sync of domain features, critical bug fixes. |
-| **`ver/1.16.5`** | Nether Legacy Era | **Tier 2 (Maintenance)** | Automated sync of domain features, critical bug fixes. |
-| **`ver/1.12.2-forge`** | Classic Titan Era | **Tier 3 (Community Bridge)** | Forge platform adapter compatibility, community backports. |
+| **`ver/1.16.5`** | Nether Legacy LTS | **Tier 2 (Maintenance)** | Automated sync of domain features, critical bug fixes. |
+| **`ver/1.12.2-forge`** | Classic Titan LTS | **Tier 3 (Community Bridge)** | Forge platform adapter compatibility, community backports. |
 
-### Branch Protection & Release Lifecycle
+> [!NOTE]
+> **No Redundant or Intermediate Branches**:
+> - Because `master` directly represents the latest production Minecraft version (`1.21.1`), no redundant `ver/1.21.1` branch is maintained.
+> - Intermediate, non-LTS Minecraft versions (such as `1.20.4`, `1.19.4`, `1.17.1`) do not receive dedicated branches.
+
+### 3.3 Branch Protection & Release Lifecycle
 - **Protected Trunk**: Direct pushes to `master` and release branches are prohibited. All contributions must use topic branches (`feat/*`, `fix/*`) and reviewed PRs.
-- **Active Release Branch**: `release/v1.0.0` is the active development line for the upcoming v1.0.0 release.
-- **Stable Releases**: `v1.0.0` initial release upon CurseForge publishing.
+- **Milestone-Batched Releases**: Handled through staging branches (`release/v*`) to protect modpacks from update churn. See **[docs/PUBLICATION.md](PUBLICATION.md)**.
 - **Strict Semantic Versioning (Zero Alpha Policy)**: We do not launch alpha, beta, or pre-release qualifiers (`alpha.1`, etc.). Version progression follows a strict rule of thumb:
   - **Major (`X.0.0`)**: Modifying something big or adding a big new feature / fundamental architectural milestone.
   - **Minor (`X.Y.0`)**: Every new feature or feature-ish enhancement.
   - **Bug Fix (`X.Y.Z`)**: Severe bug fixes that are really bad, need fixing, and cannot wait until the next scheduled minor version.
   - See **[docs/PUBLICATION.md](PUBLICATION.md)** for the complete release lifecycle.
-- **Upstream Synchronization**: Verified changes merged to `master` are automatically propagated to downstream version branches via GitHub Actions. If a version divergence occurs, an automated PR is raised for maintainer review.
+- **Upstream Synchronization**: Verified domain improvements merged to `master` are automatically propagated to downstream historical LTS branches (`ver/*`) via GitHub Actions. If a version divergence occurs, an automated PR is raised for maintainer review.
 
 ---
 

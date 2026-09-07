@@ -45,9 +45,9 @@ In Jenkins under **Manage Jenkins** $\rightarrow$ **Tools** $\rightarrow$ **JDK 
 
 | Tool Name | Version | Download / Installation Path | Used For |
 |---|---|---|---|
-| `JDK21` | Java 21 JDK | Eclipse Temurin 21 or OpenJDK 21 | `master`, `ver/1.21.1`, `ver/1.21.0` |
-| `JDK17` | Java 17 JDK | Eclipse Temurin 17 or OpenJDK 17 | `ver/1.20.1`, `ver/1.19.2`, `ver/1.18.2` |
-| `JDK8` | Java 8 JDK | Eclipse Temurin 8 or OpenJDK 8 | `ver/1.16.5`, `ver/1.12.2` |
+| `JDK21` | Java 21 JDK | Eclipse Temurin 21 or OpenJDK 21 | `master` (1.21.1 production trunk), `release/v*` |
+| `JDK17` | Java 17 JDK | Eclipse Temurin 17 or OpenJDK 17 | `ver/1.20.1`, `ver/1.18.2` |
+| `JDK8` | Java 8 JDK | Eclipse Temurin 8 or OpenJDK 8 | `ver/1.16.5`, `ver/1.12.2-forge` |
 
 ---
 
