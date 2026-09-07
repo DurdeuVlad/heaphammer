@@ -50,8 +50,8 @@ HeapHammer adheres to a strict, production-oriented Semantic Versioning standard
 |---|---|---|---|
 | **1. Development** | Topic Branches (`feat/*`, `fix/*`) | Features and fixes developed in isolation with test-first evidence. | **None** |
 | **2. Active Release** | `release/v<M>.<m>.0` | Staging line gathering upcoming features. CI compiles and verifies unit and integration tests. | **Staging Gate** |
-| **3. Release Gate** | `release/v<M>.<m>.x` | Tag release (`v1.0.0`). Merge back to `master` and sync downstream to `ver/*`. | **Publish to GitHub, Modrinth, CurseForge** |
-| **4. Next Cycle** | `release/v<M>.<m+1>.0` | Cut next release branch, bump `gradle.properties` (`1.1.0`), resume development. | **Development Resumes** |
+| **3. Release Gate** | `release/v<M>.<m>.x` | Tag release (`v1.0.0`). Merge back to `master` and sync downstream to historical LTS branches (`ver/*`). | **Publish to GitHub, Modrinth, CurseForge** |
+| **4. Next Cycle & LTS Decision** | `release/v<M>.<m+1>.0` | If the prior release line is an official LTS line, retain its maintenance branch; otherwise retire the branch. Cut next release branch, bump `gradle.properties`, and resume development. | **Development Resumes** |
 
 ---
 

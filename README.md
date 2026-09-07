@@ -262,7 +262,7 @@ Execute via `/hh` in-game or `hh` directly from the dedicated server console:
 HeapHammer is specifically engineered for safe execution on live staging and production servers:
 
 1. **Configurable Safety Ceilings (`config/heaphammer.json`)**:
-   - Out-of-bounds parameters passed by overzealous operators (e.g., `--radius=1000 --batch=50000`) are automatically clamped to safe configurable maximums (`maxRadius: 32`, `maxBatchSize: 128`, `maxIterations: 50`, `maxOperationsPerTick: 50`, `maxMillisPerTick: 35`).
+   - Out-of-bounds parameters passed by overzealous operators (e.g., `--radius=1000 --batch=50000`) are actively validated and rejected with clear instructions on how to adjust limits safely in `config/heaphammer.json` (`maxRadius: 32`, `maxBatchSize: 128`, `maxIterations: 50`, `maxOperationsPerTick: 50`, `maxMillisPerTick: 35`).
    - Admins running stress-testing staging hardware can freely elevate these limits in `config/heaphammer.json`.
 2. **Runtime Memory Circuit Breaker**:
    - Actively evaluates JVM available heap memory on every server tick.
@@ -289,11 +289,11 @@ HeapHammer is specifically engineered for safe execution on live staging and pro
 
 HeapHammer uses **Hexagonal Architecture (Ports & Adapters)**. The core domain, math engine, and scenario planning are pure Java with **zero Minecraft dependencies**, guaranteeing binary compatibility across all supported versions:
 
-- **1.21.1** (Fabric, Java 21) — Active development trunk (`master`)
-- **1.20.1** (Fabric & Forge, Java 17) — Modern LTS
-- **1.18.2** (Fabric & Forge, Java 17) — World-Gen LTS
-- **1.16.5** (Forge & Fabric, Java 17/8) — Legacy LTS
-- **1.12.2** (MinecraftForge, Java 8) — Classic Titan
+- **1.21.1** (Fabric, Java 21) — Active production trunk (`master`)
+- **1.20.1** (Fabric & Forge, Java 17) — Modern LTS Gold Standard (`ver/1.20.1`)
+- **1.18.2** (Fabric & Forge, Java 17) — World-Gen Overhaul LTS (`ver/1.18.2`)
+- **1.16.5** (Forge & Fabric, Java 17/8) — Nether Legacy LTS (`ver/1.16.5`)
+- **1.12.2** (MinecraftForge, Java 8) — Classic Titan LTS (`ver/1.12.2-forge`)
 
 *See [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md) for version-specific port implementations and adapter details.*
 
