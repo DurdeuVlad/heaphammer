@@ -45,26 +45,27 @@ public class AdversarialServerIntegrationTest {
             // -------------------------------------------------------------
             // Phase 1: Adversarial Parameter Flood (Overzealous Admin Attack)
             // -------------------------------------------------------------
-            System.out.println("\n[Adversarial Test 1] Testing Overzealous Admin Parameter Clamping...");
-            // Issue extreme values that exceed default safety ceilings (radius=1000, batch=50000, iterations=1000)
-            // We use small hold/settle to verify clamping without waiting for hundreds of ticks
-            server.sendCommand("hh run chunks --radius=1000 --batch=50000 --iterations=1000 --hold=2 --settle=2");
+            System.out.println("\n[Adversarial Test 1] Testing Overzealous Admin Parameter Rejection & Explanations...");
 
-            String radiusClampLog = server.waitForLineContaining("Parameter clamping: radius 1000 -> 32", COMMAND_RESPONSE_TIMEOUT);
-            Assertions.assertNotNull(radiusClampLog, "Server must log radius clamping");
+            // 1a: Excessive radius
+            server.sendCommand("hh run chunks --radius=1000");
+            String radiusError = server.waitForLineContaining("Radius 1000 exceeds configured safety ceiling", COMMAND_RESPONSE_TIMEOUT);
+            Assertions.assertNotNull(radiusError, "Server must reject excessive radius");
+            server.waitForLineContaining("increase 'maxRadius' in config/heaphammer.json and run '/hh config reload'", COMMAND_RESPONSE_TIMEOUT);
 
-            String batchClampLog = server.waitForLineContaining("Parameter clamping: batch 50000 -> 128", COMMAND_RESPONSE_TIMEOUT);
-            Assertions.assertNotNull(batchClampLog, "Server must log batch clamping");
+            // 1b: Excessive iterations
+            server.sendCommand("hh run chunks --radius=10 --iterations=1000");
+            String iterError = server.waitForLineContaining("Iterations 1000 exceeds configured safety ceiling", COMMAND_RESPONSE_TIMEOUT);
+            Assertions.assertNotNull(iterError, "Server must reject excessive iterations");
+            server.waitForLineContaining("increase 'maxIterations' in config/heaphammer.json and run '/hh config reload'", COMMAND_RESPONSE_TIMEOUT);
 
-            String iterClampLog = server.waitForLineContaining("Parameter clamping: iterations 1000 -> 50", COMMAND_RESPONSE_TIMEOUT);
-            Assertions.assertNotNull(iterClampLog, "Server must log iterations clamping");
+            // 1c: Excessive batch size
+            server.sendCommand("hh run chunks --radius=10 --iterations=5 --batch=50000");
+            String batchError = server.waitForLineContaining("Batch size 50000 exceeds configured safety ceiling", COMMAND_RESPONSE_TIMEOUT);
+            Assertions.assertNotNull(batchError, "Server must reject excessive batch size");
+            server.waitForLineContaining("increase 'maxBatchSize' in config/heaphammer.json and run '/hh config reload'", COMMAND_RESPONSE_TIMEOUT);
 
-            server.waitForLineContaining("Started Experiment:", COMMAND_RESPONSE_TIMEOUT);
-
-            // Cancel the experiment cleanly so the server is ready for subsequent commands
-            server.sendCommand("hh abort");
-            server.waitForLineContaining("Experiment cancelled", COMMAND_RESPONSE_TIMEOUT);
-            Thread.sleep(2000);
+            Assertions.assertTrue(server.isAlive(), "Server must remain stable and reject excessive inputs");
 
             // -------------------------------------------------------------
             // Phase 2: Malicious Path Traversal Attacks

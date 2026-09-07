@@ -56,65 +56,50 @@ public class FlagParser {
                 } catch (NumberFormatException ignored) {}
             }
         }
-        com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig config =
-                com.dwurdy.heaphammer.infrastructure.config.ConfigManager.getActiveConfig();
-        int maxRadius = config != null ? config.getMaxRadius() : 32;
-        int maxIterations = config != null ? config.getMaxIterations() : 50;
-        int maxBatchSize = config != null ? config.getMaxBatchSize() : 128;
-        int maxWarmup = config != null ? config.getMaxWarmupIterations() : 10;
-        int maxHold = config != null ? config.getMaxHoldTicks() : 1200;
-        int maxSettle = config != null ? config.getMaxSettleTicks() : 1200;
-
         if (flags.containsKey("radius")) {
             try {
-                int r = Integer.parseInt(flags.get("radius"));
-                int clamped = Math.min(maxRadius, Math.max(1, r));
-                if (clamped != r) {
-                    LOGGER.warn("Parameter clamping: radius {} -> {} (max allowed)", r, clamped);
-                }
-                builder.radius(clamped);
-            } catch (NumberFormatException ignored) {}
+                builder.radius(Integer.parseInt(flags.get("radius")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--radius': " + flags.get("radius"));
+            }
         }
         if (flags.containsKey("iterations")) {
             try {
-                int iters = Integer.parseInt(flags.get("iterations"));
-                int clamped = Math.min(maxIterations, Math.max(1, iters));
-                if (clamped != iters) {
-                    LOGGER.warn("Parameter clamping: iterations {} -> {} (max allowed)", iters, clamped);
-                }
-                builder.iterations(clamped);
-            } catch (NumberFormatException ignored) {}
+                builder.iterations(Integer.parseInt(flags.get("iterations")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--iterations': " + flags.get("iterations"));
+            }
         }
         if (flags.containsKey("batch")) {
             try {
-                int batch = Integer.parseInt(flags.get("batch"));
-                int clamped = Math.min(maxBatchSize, Math.max(1, batch));
-                if (clamped != batch) {
-                    LOGGER.warn("Parameter clamping: batch {} -> {} (max allowed)", batch, clamped);
-                }
-                builder.batchSize(clamped);
-            } catch (NumberFormatException ignored) {}
+                builder.batchSize(Integer.parseInt(flags.get("batch")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--batch': " + flags.get("batch"));
+            }
         }
         if (flags.containsKey("strategy")) {
             builder.strategy(flags.get("strategy").toUpperCase(Locale.ROOT));
         }
         if (flags.containsKey("warmup")) {
             try {
-                int warmup = Integer.parseInt(flags.get("warmup"));
-                builder.warmupIterations(Math.min(maxWarmup, Math.max(0, warmup)));
-            } catch (NumberFormatException ignored) {}
+                builder.warmupIterations(Integer.parseInt(flags.get("warmup")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--warmup': " + flags.get("warmup"));
+            }
         }
         if (flags.containsKey("hold")) {
             try {
-                int hold = Integer.parseInt(flags.get("hold"));
-                builder.holdTicks(Math.min(maxHold, Math.max(0, hold)));
-            } catch (NumberFormatException ignored) {}
+                builder.holdTicks(Integer.parseInt(flags.get("hold")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--hold': " + flags.get("hold"));
+            }
         }
         if (flags.containsKey("settle")) {
             try {
-                int settle = Integer.parseInt(flags.get("settle"));
-                builder.settleTicks(Math.min(maxSettle, Math.max(0, settle)));
-            } catch (NumberFormatException ignored) {}
+                builder.settleTicks(Integer.parseInt(flags.get("settle")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--settle': " + flags.get("settle"));
+            }
         }
         if (flags.containsKey("explicit-gc")) {
             builder.explicitGc(Boolean.parseBoolean(flags.get("explicit-gc")));
