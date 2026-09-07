@@ -78,6 +78,8 @@ The `Jenkinsfile` provides optional execution parameters:
   When checked, the pipeline executes the live dedicated server multi-mod matrix benchmarks (`tools/run-mod-matrix-test.ps1`), testing HeapHammer against synthetic leak fixtures and archiving JSON reports.
 - **`OVERRIDE_JDK`** (Default `AUTO`):
   Allows manual testing of specific JDKs (`JDK21`, `JDK17`, `JDK8`) regardless of the branch configuration.
+- **`DEPLOY_PRODUCTION`** (Default `false`):
+  When checked (or automatically when building a release tag `v*.*.*` or `release/*` branch), triggers the **Production Release & Deployment** stage. This stages production bundles into `dist/production/`, generates `SHA256SUMS.txt`, and publishes to GitHub Releases if release credentials are configured.
 
 ---
 
@@ -88,6 +90,11 @@ Each successful Jenkins build archives:
 - `build/testmods/*.jar` — All synthetic test mod jars for staging servers.
 - `build/test-results/**/*.xml` — JUnit XML test reports parsed and tracked in Jenkins dashboards.
 - `build/matrix-reports/*.json` — Empirical slope and plateau reports (when matrix benchmarks are enabled).
+- `dist/production/**/*` — Production release bundle (when triggered by tag, release branch, or `DEPLOY_PRODUCTION`):
+  - `heaphammer-<version>.jar` (unversioned and version-tagged mod binaries)
+  - `HeapHammer_Server_Admin_Guide.pdf` (modpack administrator guide)
+  - `heaphammer_logo.png` (official branding asset)
+  - `SHA256SUMS.txt` (cryptographic integrity checksums)
 
 ---
 
@@ -98,8 +105,15 @@ To prevent release fatigue and ensure stable modpack deployments, the pipeline d
 | Trigger Condition | Target Branches | Pipeline Actions | Deployment Status |
 |---|---|---|---|
 | **Push / PR Merge** | `master`, `ver/*` | Compiles, executes test suite (34 tests), archives local jars. | **No Public Deployment** (CI Only) |
-| **Release Branch** | `release/v*` | Full test suite, packages release candidates, archives release jars. | **Staging Gate** |
-| **Release Tag** | `v*.*.*` | Full test suite, matrix benchmarks, packages production jars. | **Official Release Deployment** (GitHub, Modrinth, CurseForge) |
+| **Release Branch** | `release/v*` | Full test suite, packages release candidates, archives release jars to `dist/production/`. | **Staging Gate** |
+| **Release Tag** / `DEPLOY_PRODUCTION` | `v*.*.*` | Full test suite, matrix benchmarks, stages bundle to `dist/production/`, verifies SHA-256 sums, uploads to GitHub Releases. | **Official Release Deployment** (GitHub, Modrinth, CurseForge) |
+
+### 6.1 Configuring GitHub Release Credentials in Jenkins
+To enable automated GitHub Release uploads in Jenkins:
+1. Under **Manage Jenkins** $\rightarrow$ **Credentials**, add a **Secret text** credential.
+2. Set ID: `github-release-token`.
+3. Set Secret: Your GitHub Personal Access Token (`repo` scope) or GitHub Actions token.
+4. The pipeline will automatically bind `GH_TOKEN` and deploy official releases with release notes, checksums, and attached binaries.
 
 See [docs/PUBLICATION.md](PUBLICATION.md) for the complete release lifecycle and branching workflow.
 

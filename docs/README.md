@@ -8,7 +8,7 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 
 | Role | Start Here | Recommended Reading |
 |---|---|---|
-| **Server Admins & Modpack Creators** | **[CASE_STUDIES.md](CASE_STUDIES.md)** (Modpack Triage Playbook) | [README.md](../README.md#quickstart) • [CASE_STUDIES.md](CASE_STUDIES.md#3-case-study-3-cross-mod-accidental-collision) |
+| **Server Admins & Modpack Creators** | **[SERVER_ADMIN_GUIDE.md](SERVER_ADMIN_GUIDE.md)** (Quickstart & Triage) | [CASE_STUDIES.md](CASE_STUDIES.md) • [README.md](../README.md#quickstart) |
 | **Mod Developers & Contributors** | **[CONTRIBUTING.md](../CONTRIBUTING.md)** (Contribution Standards) | [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md) • [DECISION.md](DECISION.md) • [AGENTS.md](../AGENTS.md) |
 | **DevOps & Release Engineers** | **[PUBLICATION.md](PUBLICATION.md)** (Release & Distribution) | [JENKINS_PIPELINE.md](JENKINS_PIPELINE.md) • [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md#5-automated-branch-synchronization) |
 
@@ -22,6 +22,7 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 - **[DECISION.md](DECISION.md)**: Architectural Decision Records (ADRs) explaining domain isolation, OLS regression math, branch matrix, and release gating.
 
 ### 2. Empirical Benchmarks & Leak Triage
+- **[SERVER_ADMIN_GUIDE.md](SERVER_ADMIN_GUIDE.md)**: Non-technical quickstart guide for server admins and modpack creators. Explains how to catch 3-day memory leaks in 2 minutes.
 - **[CASE_STUDIES.md](CASE_STUDIES.md)**: Live dedicated server test matrix (9 scenarios), OLS mathematical retention formulation ($y = mx + b$), empirical cross-mod collision proof, and the 4-step modpack leak triage playbook.
 
 ### 3. Release & Operations
