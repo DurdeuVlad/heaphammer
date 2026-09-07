@@ -19,20 +19,21 @@ gitGraph
    checkout master
    commit id: "fix(diag): issue #16"
    checkout release/v1.0.0
-   commit id: "tag: v1.0.0-alpha.1 [DEPLOY]"
+   commit id: "tag: v1.0.0 [DEPLOY]"
    checkout master
    merge release/v1.0.0 id: "merge to master"
-   commit id: "bump: 1.1.0-SNAPSHOT"
+   branch release/v1.1.0
+   commit id: "chore: open next release v1.1.0"
 ```
 
 ### The 4-Phase Release Cycle
 
 | Phase | Branch | Actions | Deployment |
 |---|---|---|---|
-| **1. Development** | `master` | PRs and issue fixes merge continuously. CI compiles and runs 34 tests. | **None** (Trunk Only) |
-| **2. Stabilization** | `release/v<M>.<m>.x` | Cut from `master`. Freeze features. Run full dedicated server matrix benchmarks. | **Staging Gate** |
-| **3. Release Gate** | `release/v<M>.<m>.x` | Tag release (`v1.0.0-alpha.1`). Merge back to `master` and sync to `ver/*`. | **Publish to GitHub, Modrinth, CurseForge** |
-| **4. Next Cycle** | `master` | Bump version in `gradle.properties` (`1.1.0-SNAPSHOT`). Open next milestone. | **Development Resumes** |
+| **1. Development** | Topic Branches (`feat/*`, `fix/*`) | Features and fixes developed in isolation with test-first evidence. | **None** |
+| **2. Active Release** | `release/v1.1.0` | Active release line gathering upcoming features. CI compiles and verifies 34 tests. | **Staging Gate** |
+| **3. Release Gate** | `release/v<M>.<m>.x` | Tag release (`v1.0.0`). Merge back to `master` and sync downstream to `ver/*`. | **Publish to GitHub, Modrinth, CurseForge** |
+| **4. Next Cycle** | `release/v<M>.<m+1>.0` | Cut next release branch, bump `gradle.properties` (`1.1.0-alpha.1`), resume development. | **Development Resumes** |
 
 ---
 
@@ -42,11 +43,11 @@ When a release branch is tagged and deployed, artifacts are built across the 5 s
 
 | Minecraft Version | Loader | Git Branch | Java Target | Release JAR |
 |---|---|---|---|---|
-| **1.21.1** *(Primary)* | Fabric | `master` / `release/v*` | Java 21 | `heaphammer-1.0.0-alpha.1.jar` |
-| **1.20.1** | Fabric & Forge | `ver/1.20.1` | Java 17 | `heaphammer-1.20.1-1.0.0-alpha.1.jar` |
-| **1.18.2** | Fabric & Forge | `ver/1.18.2` | Java 17 | `heaphammer-1.18.2-1.0.0-alpha.1.jar` |
-| **1.16.5** | Forge & Fabric | `ver/1.16.5` | Java 8 / 11 | `heaphammer-1.16.5-1.0.0-alpha.1.jar` |
-| **1.12.2** | Forge | `ver/1.12.2-forge` | Java 8 | `heaphammer-1.12.2-1.0.0-alpha.1.jar` |
+| **1.21.1** *(Primary)* | Fabric | `master` / `release/v*` | Java 21 | `heaphammer-1.0.0.jar` |
+| **1.20.1** | Fabric & Forge | `ver/1.20.1` | Java 17 | `heaphammer-1.20.1-1.0.0.jar` |
+| **1.18.2** | Fabric & Forge | `ver/1.18.2` | Java 17 | `heaphammer-1.18.2-1.0.0.jar` |
+| **1.16.5** | Forge & Fabric | `ver/1.16.5` | Java 8 / 11 | `heaphammer-1.16.5-1.0.0.jar` |
+| **1.12.2** | Forge | `ver/1.12.2-forge` | Java 8 | `heaphammer-1.12.2-1.0.0.jar` |
 
 ---
 
@@ -75,8 +76,8 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 ### Step 1: Tag and Push Release
 ```bash
 git checkout release/v1.0.0
-git tag -a v1.0.0-alpha.1 -m "Release v1.0.0-alpha.1: Deterministic workload & retained-memory regression framework"
-git push origin v1.0.0-alpha.1
+git tag -a v1.0.0 -m "Release v1.0.0: Deterministic Minecraft server stress testing and retained-memory regression detector"
+git push origin v1.0.0
 ```
 
 ### Step 2: Merge Back to Master
@@ -86,11 +87,12 @@ git merge --no-ff release/v1.0.0 -m "chore(release): merge release/v1.0.0 into m
 git push origin master
 ```
 
-### Step 3: Bump Master to Next Minor
+### Step 3: Cut Next Release Branch
 ```bash
-# Update mod_version=1.1.0-alpha.1-SNAPSHOT in gradle.properties
-git commit -am "chore(version): bump master to 1.1.0-alpha.1-SNAPSHOT"
-git push origin master
+git checkout -b release/v1.1.0
+# Update mod_version=1.1.0-alpha.1 in gradle.properties
+git commit -am "chore(version): initialize release/v1.1.0 development line"
+git push origin release/v1.1.0
 ```
 
 ---

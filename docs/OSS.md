@@ -32,8 +32,11 @@ HeapHammer maintains 5 active release branches corresponding to major modding er
 | **`ver/1.16.5`** | Nether Legacy Era | **Tier 2 (Maintenance)** | Automated sync of domain features, critical bug fixes. |
 | **`ver/1.12.2-forge`** | Classic Titan Era | **Tier 3 (Community Bridge)** | Forge platform adapter compatibility, community backports. |
 
-### Upstream Synchronization
-All improvements made to `master` are automatically propagated to downstream version branches via GitHub Actions. If a version divergence occurs, an automated PR is raised for maintainer review.
+### Branch Protection & Release Lifecycle
+- **Protected Trunk**: Direct pushes to `master` and release branches are prohibited. All contributions must use topic branches (`feat/*`, `fix/*`) and reviewed PRs.
+- **Active Release Branch**: `release/v1.1.0` is the active development line for the upcoming v1.1.0 release.
+- **Stable Releases**: `release/v1.0.0` tagged as `v1.0.0`.
+- **Upstream Synchronization**: Verified changes merged to `master` are automatically propagated to downstream version branches via GitHub Actions. If a version divergence occurs, an automated PR is raised for maintainer review.
 
 ---
 

@@ -245,7 +245,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal("HeapHammer v1.0.0-alpha.1 (Minecraft 1.21.1 / Fabric)")
+        ctx.getSource().sendSuccess(() -> Component.literal("HeapHammer v1.0.0 (Minecraft 1.21.1 / Fabric)")
                 .withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
