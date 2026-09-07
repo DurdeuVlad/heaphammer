@@ -29,6 +29,6 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 - **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)**: Declarative multibranch Jenkins CI/CD setup, dynamic JDK resolution (`JDK21`, `JDK17`, `JDK8`), and release deployment gating.
 
 ### 4. Governance & Community
-- **[OSS.md](OSS.md)**: Open-source governance, licensing policy (LGPL-3.0), and 5-tier version maintenance roadmap.
+- **[OSS.md](OSS.md)**: Open-source governance, licensing policy (LGPL-3.0), dual-axis branch strategy, and historical LTS version maintenance roadmap.
 - **[CONTRIBUTING.md](../CONTRIBUTING.md)**: Engineering guidelines, conventional commits, test-first proof (RED $\to$ GREEN), and AI disclosure standards.
 - **[AGENTS.md](../AGENTS.md)**: Machine-readable agent constitution, invariant rules, and issue reporting contract.
