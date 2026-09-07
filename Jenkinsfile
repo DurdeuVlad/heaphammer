@@ -41,13 +41,10 @@ pipeline {
                     env.TARGET_MOD_VERSION = modVersion
                     env.TARGET_JAVA_VERSION = targetJava
 
-                    // Select JDK tool based on java_version or user override
+                    // Fabric Loom 1.17+ and Gradle 9.5+ require JDK 21 to run the build daemon,
+                    // while cross-compiling target bytecode to Java 17 or Java 8.
                     if (params.OVERRIDE_JDK != 'AUTO') {
                         env.SELECTED_JDK = params.OVERRIDE_JDK
-                    } else if (targetJava == '8') {
-                        env.SELECTED_JDK = 'JDK8'
-                    } else if (targetJava == '17') {
-                        env.SELECTED_JDK = 'JDK17'
                     } else {
                         env.SELECTED_JDK = 'JDK21'
                     }
