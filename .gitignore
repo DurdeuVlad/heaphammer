@@ -39,3 +39,4 @@ logs/
 # scratch temporary files
 .scratch/*.html
 .scratch/*.js
+.worktrees/
