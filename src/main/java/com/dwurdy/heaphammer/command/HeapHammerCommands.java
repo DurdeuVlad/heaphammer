@@ -255,7 +255,10 @@ public class HeapHammerCommands {
     }
 
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal("HeapHammer v1.0.0 (Minecraft 1.21.1 / Fabric)")
+        EnvironmentFingerprint env = platform.captureFingerprint();
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / Fabric)",
+                        env.heapHammerVersion(), env.minecraftVersion()))
                 .withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
