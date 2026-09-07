@@ -4,6 +4,7 @@ pipeline {
     parameters {
         booleanParam(name: 'RUN_MATRIX_BENCHMARKS', defaultValue: false, description: 'Run dedicated server multi-mod matrix benchmarks')
         choice(name: 'OVERRIDE_JDK', choices: ['AUTO', 'JDK21', 'JDK17', 'JDK8'], description: 'Override detected JDK for this build')
+        booleanParam(name: 'DEPLOY_PRODUCTION', defaultValue: false, description: 'Package and deploy production release bundle to dist/production and GitHub Releases')
     }
 
     options {
@@ -26,15 +27,18 @@ pipeline {
                     echo " Branch: ${env.BRANCH_NAME ?: env.GIT_BRANCH}"
                     echo "================================================="
 
-                    // Read target Minecraft and Java versions from gradle.properties
+                    // Read target Minecraft, mod, and Java versions from gradle.properties
                     def props = readProperties file: 'gradle.properties'
                     def mcVersion = props['minecraft_version'] ?: '1.21.1'
+                    def modVersion = props['mod_version'] ?: '1.0.0'
                     def targetJava = props['java_version'] ?: '21'
 
                     echo "Target Minecraft Version: ${mcVersion}"
+                    echo "Target Mod Version: ${modVersion}"
                     echo "Target Java Version: ${targetJava}"
 
                     env.TARGET_MC_VERSION = mcVersion
+                    env.TARGET_MOD_VERSION = modVersion
                     env.TARGET_JAVA_VERSION = targetJava
 
                     // Select JDK tool based on java_version or user override
@@ -120,20 +124,55 @@ pipeline {
             }
         }
 
-        stage('Release Deployment Gate') {
+        stage('Production Release & Deployment') {
             when {
                 anyOf {
                     buildingTag()
                     branch 'release/*'
+                    expression { return params.DEPLOY_PRODUCTION }
                 }
+            }
+            tools {
+                jdk "${env.SELECTED_JDK}"
             }
             steps {
                 script {
                     echo "================================================="
-                    echo " Official Release Deployment Gate Active"
-                    echo " Branch/Tag: ${env.BRANCH_NAME ?: env.TAG_NAME ?: env.GIT_BRANCH}"
-                    echo " Batched release verified — ready for distribution"
+                    echo " Production Release & Deployment Pipeline Active"
+                    echo " Target Mod Version: ${env.TARGET_MOD_VERSION}"
+                    echo " Target MC Version:  ${env.TARGET_MC_VERSION}"
+                    echo " Branch/Tag:         ${env.BRANCH_NAME ?: env.TAG_NAME ?: env.GIT_BRANCH}"
                     echo "================================================="
+
+                    // Stage production release bundle in dist/production with SHA-256 sums
+                    if (isUnix()) {
+                        sh 'pwsh tools/publish-release.ps1 -SkipGitHub || true'
+                    } else {
+                        bat 'powershell -ExecutionPolicy Bypass -File tools/publish-release.ps1 -SkipGitHub'
+                    }
+
+                    // Optional GitHub Releases deployment if credentials exist
+                    if (env.TAG_NAME || params.DEPLOY_PRODUCTION) {
+                        def releaseTag = env.TAG_NAME ?: "v${env.TARGET_MOD_VERSION}"
+                        echo "Production bundle staged for release tag: ${releaseTag}"
+                        try {
+                            withCredentials([string(credentialsId: 'github-release-token', variable: 'GH_TOKEN')]) {
+                                echo "Publishing release ${releaseTag} to GitHub Releases with credentials..."
+                                if (isUnix()) {
+                                    sh "pwsh tools/publish-release.ps1 -Tag ${releaseTag}"
+                                } else {
+                                    bat "powershell -ExecutionPolicy Bypass -File tools/publish-release.ps1 -Tag ${releaseTag}"
+                                }
+                            }
+                        } catch (Exception e) {
+                            echo "Notice: GitHub credential 'github-release-token' not configured or upload skipped (${e.message}). Artifacts are archived in dist/production/."
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'dist/production/**/*', fingerprint: true, allowEmptyArchive: false
                 }
             }
         }
