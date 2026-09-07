@@ -45,9 +45,9 @@ In Jenkins under **Manage Jenkins** $\rightarrow$ **Tools** $\rightarrow$ **JDK 
 
 | Tool Name | Version | Download / Installation Path | Used For |
 |---|---|---|---|
-| `JDK21` | Java 21 JDK | Eclipse Temurin 21 or OpenJDK 21 | `master`, `ver/1.21.1`, `ver/1.21.0` |
-| `JDK17` | Java 17 JDK | Eclipse Temurin 17 or OpenJDK 17 | `ver/1.20.1`, `ver/1.19.2`, `ver/1.18.2` |
-| `JDK8` | Java 8 JDK | Eclipse Temurin 8 or OpenJDK 8 | `ver/1.16.5`, `ver/1.12.2` |
+| `JDK21` | Java 21 JDK | Eclipse Temurin 21 or OpenJDK 21 | `master` (1.21.1 production trunk), `release/v*` |
+| `JDK17` | Java 17 JDK | Eclipse Temurin 17 or OpenJDK 17 | `ver/1.20.1`, `ver/1.18.2` |
+| `JDK8` | Java 8 JDK | Eclipse Temurin 8 or OpenJDK 8 | `ver/1.16.5`, `ver/1.12.2-forge` |
 
 ---
 
@@ -88,3 +88,18 @@ Each successful Jenkins build archives:
 - `build/testmods/*.jar` — All synthetic test mod jars for staging servers.
 - `build/test-results/**/*.xml` — JUnit XML test reports parsed and tracked in Jenkins dashboards.
 - `build/matrix-reports/*.json` — Empirical slope and plateau reports (when matrix benchmarks are enabled).
+
+---
+
+## 6. Release Gating vs. Continuous Integration
+
+To prevent release fatigue and ensure stable modpack deployments, the pipeline distinguishes routine CI builds from official release deployments:
+
+| Trigger Condition | Target Branches | Pipeline Actions | Deployment Status |
+|---|---|---|---|
+| **Push / PR Merge** | `master`, `ver/*` | Compiles, executes test suite (34 tests), archives local jars. | **No Public Deployment** (CI Only) |
+| **Release Branch** | `release/v*` | Full test suite, packages release candidates, archives release jars. | **Staging Gate** |
+| **Release Tag** | `v*.*.*` | Full test suite, matrix benchmarks, packages production jars. | **Official Release Deployment** (GitHub, Modrinth, CurseForge) |
+
+See [docs/PUBLICATION.md](PUBLICATION.md) for the complete release lifecycle and branching workflow.
+

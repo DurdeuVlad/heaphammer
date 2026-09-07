@@ -125,6 +125,19 @@ public class MockPlatformAdapter implements PlatformAdapter {
         return set == null ? 0 : set.size();
     }
 
+    @Override
+    public int cleanupOrphanedState() {
+        int count = 0;
+        ticketManager.releaseAllTickets();
+        for (String dim : new ArrayList<>(testEntities.keySet())) {
+            count += removeAllTestEntities(dim);
+        }
+        for (String dim : new ArrayList<>(testBlockEntities.keySet())) {
+            count += removeAllTestBlockEntities(dim);
+        }
+        return count;
+    }
+
     public static class MockChunkTicketManager implements ChunkTicketManager {
         private final Map<String, Set<Long>> tickets = new ConcurrentHashMap<>();
 
