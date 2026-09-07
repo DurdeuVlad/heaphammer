@@ -4,9 +4,94 @@ This document establishes the canonical release, packaging, and distribution pro
 
 ---
 
-## 1. Release Architecture & Version Matrix
+## 1. Release Philosophy: Batched Releases vs. Per-Issue Publishing
 
-HeapHammer is engineered under a **Hexagonal Architecture** where core domain logic is decoupled from Minecraft runtime classes. The project maintains 5 version branches synchronized with upstream `master`:
+HeapHammer strictly adheres to a **Milestone-Batched Release Model** rather than continuous deployment on every issue fix.
+
+### Why We Do Not Publish on Every Issue Fixed:
+1. **Modpack & Server Stability**: Server operators and modpack maintainers cannot manage daily version churn. Releasing on every issue creates update fatigue and risks introducing partial regressions into production servers.
+2. **Deterministic Quality Gates**: A release must be validated as a coherent whole against our entire 9-scenario multi-mod matrix and live dedicated servers, rather than isolated hotfixes.
+3. **Cross-Version Parity**: Because HeapHammer supports 5 major Minecraft version lines (`1.21.1`, `1.20.1`, `1.18.2`, `1.16.5`, `1.12.2`), releases must be synchronized so all versions receive consistent feature and fix milestones simultaneously.
+
+---
+
+## 2. The Release Lifecycle & Branching Workflow
+
+Our release lifecycle flows through four distinct phases:
+
+```mermaid
+gitGraph
+   commit id: "fix(chunk): issue #12"
+   commit id: "feat(entity): issue #14"
+   branch release/v1.0.0
+   checkout release/v1.0.0
+   commit id: "chore(release): gather & freeze v1.0.0"
+   commit id: "test(matrix): full server pass"
+   checkout master
+   commit id: "fix(diagnostics): issue #16"
+   checkout release/v1.0.0
+   commit id: "tag: v1.0.0-alpha.1 [DEPLOY]"
+   checkout master
+   merge release/v1.0.0 id: "merge v1.0.0 to master"
+   commit id: "chore(version): bump to 1.1.0-SNAPSHOT"
+```
+
+### Phase 1: Continuous Development on `master`
+- All regular feature development, bug fixes, and community pull requests land continuously on `master`.
+- Every commit on `master` automatically runs unit tests and build verification via CI.
+- **Invariant**: Commits on `master` **never** publish or deploy artifacts to Modrinth, CurseForge, or GitHub Releases.
+
+### Phase 2: Release Version Branch (`release/v<major>.<minor>.x`)
+- When the milestone scope for a release is complete (e.g. Milestone `v1.0.0`), cut a dedicated release branch from `master`:
+  ```bash
+  git checkout master
+  git pull origin master
+  git checkout -b release/v1.0.0
+  git push -u origin release/v1.0.0
+  ```
+- **Gathering the Work**:
+  - Consolidate all closed issue fixes into release notes and changelog.
+  - Finalize version strings in `gradle.properties` (`mod_version=1.0.0-alpha.1`) and `src/main/resources/fabric.mod.json`.
+  - Execute full matrix verification benchmarks on live dedicated servers (`tools/run-mod-matrix-test.ps1`).
+  - Feature freeze is enforced: only critical release-blocking bug fixes are cherry-picked or committed here.
+
+### Phase 3: Merge, Tag & Deploy Gate
+- Once the release candidate passes all quality gates on the release branch:
+  1. **Tag the Release**:
+     ```bash
+     git tag -a v1.0.0-alpha.1 -m "Release v1.0.0-alpha.1: Deterministic workload & retained-memory regression framework"
+     git push origin v1.0.0-alpha.1
+     ```
+  2. **Merge Back to `master`**:
+     ```bash
+     git checkout master
+     git merge --no-ff release/v1.0.0 -m "chore(release): merge release/v1.0.0 into master"
+     git push origin master
+     ```
+  3. **Trigger Deployment**:
+     - Jenkins and GitHub Actions detect the official tag (`v*.*.*`) or release branch and trigger the deployment pipeline.
+     - Artifacts are published to **GitHub Releases**, **Modrinth**, and **CurseForge**.
+
+### Phase 4: Next Minor Version Transition
+- Immediately after the release is merged and deployed:
+  1. On `master`, bump the project version to the next minor snapshot:
+     ```properties
+     # gradle.properties
+     mod_version=1.1.0-alpha.1-SNAPSHOT
+     ```
+  2. Commit and push the version bump to `master`:
+     ```bash
+     git commit -am "chore(version): bump master to 1.1.0-alpha.1-SNAPSHOT for next development cycle"
+     git push origin master
+     ```
+  3. Open the next milestone (e.g. `v1.1.0`) on GitHub Issues.
+  4. Routine development and issue fixes resume targeting `master`.
+
+---
+
+## 3. Release Architecture & Multi-Version Matrix
+
+HeapHammer maintains 5 synchronized version lines. When a release branch is tagged and merged, artifacts are produced across the matrix:
 
 | Minecraft Version | Target Loader | Git Branch | Java Version | Primary Output Jar |
 |---|---|---|---|---|
@@ -18,9 +103,9 @@ HeapHammer is engineered under a **Hexagonal Architecture** where core domain lo
 
 ---
 
-## 2. Pre-Release Verification Checklist
+## 4. Pre-Release Verification Checklist
 
-Before tagging any release or uploading artifacts, verify that every quality gate passes locally on `master`:
+Execute this checklist on the `release/vX.Y.x` branch prior to tagging:
 
 ### Step 1: Unit & Integration Test Suite
 ```powershell
@@ -33,7 +118,7 @@ Before tagging any release or uploading artifacts, verify that every quality gat
 ./gradlew build buildTestmods
 ```
 - **Acceptance Criteria**:
-  - `build/libs/heaphammer-1.0.0-alpha.1.jar` is generated.
+  - `build/libs/heaphammer-*.jar` is generated.
   - All synthetic testmod jars in `build/testmods/` compile successfully.
 
 ### Step 3: Automated Multi-Mod Matrix Verification
@@ -45,7 +130,7 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 ### Step 4: Asset & Metadata Verification
 - Verify `src/main/resources/fabric.mod.json`:
   - `id`: `"heaphammer"`
-  - `version`: `"1.0.0-alpha.1"`
+  - `version`: Matches target release version.
   - `license`: `"LGPL-3.0"`
   - `icon`: `"assets/heaphammer/icon.png"` (512x512 authentic Minecraft voxel icon)
   - `environment`: `"server"` (or `"*"` with server-side only logic)
@@ -53,19 +138,18 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 
 ---
 
-## 3. GitHub Releases Publication
+## 5. GitHub Releases Publication
 
 GitHub Releases serves as the authoritative repository for release tags, release notes, and all version jar artifacts.
 
-### 3.1 Tagging the Release
+### 5.1 Tagging the Release
 ```bash
-git checkout master
-git pull origin master
+git checkout release/v1.0.0
 git tag -a v1.0.0-alpha.1 -m "Release v1.0.0-alpha.1: Deterministic workload & retained-memory regression framework"
 git push origin v1.0.0-alpha.1
 ```
 
-### 3.2 GitHub Release Notes Template
+### 5.2 GitHub Release Notes Template
 ```markdown
 # HeapHammer v1.0.0-alpha.1 — Initial Public Alpha Release
 
@@ -94,11 +178,11 @@ HeapHammer is a deterministic stress-testing and retained-memory regression fram
 
 ---
 
-## 4. Modrinth Publication Checklist
+## 6. Modrinth Publication Checklist
 
 Modrinth is the primary platform for modern Fabric and NeoForge/Forge mods.
 
-### 4.1 Project Settings
+### 6.1 Project Settings
 - **Name**: `HeapHammer`
 - **Slug**: `heaphammer`
 - **Summary**: `Deterministic server stress testing and retained-memory regression framework for modded Minecraft.`
@@ -113,14 +197,14 @@ Modrinth is the primary platform for modern Fabric and NeoForge/Forge mods.
   - Issues: `https://github.com/DurdeuVlad/heaphammer/issues`
   - Documentation: `https://github.com/DurdeuVlad/heaphammer/tree/master/docs`
 
-### 4.2 Brand Imagery
+### 6.2 Brand Imagery
 - **Icon**: Upload `assets/heaphammer_logo.png` (authentic Minecraft voxel anvil & netherite hammer).
 - **Gallery / Banner**: Upload `assets/heaphammer_banner.png` (16:9 isometric floating Minecraft chunks with redstone automation).
 
-### 4.3 Version Upload
+### 6.3 Version Upload
 - **Version Number**: `1.0.0-alpha.1`
 - **Version Title**: `HeapHammer 1.0.0-alpha.1 (1.21.1 Fabric)`
-- **Changelog**: Copy release highlights from Section 3.2.
+- **Changelog**: Copy release highlights from Section 5.2.
 - **Supported Loaders**: `Fabric`
 - **Game Versions**: `1.21.1`
 - **Release Type**: `Alpha`
@@ -128,11 +212,11 @@ Modrinth is the primary platform for modern Fabric and NeoForge/Forge mods.
 
 ---
 
-## 5. CurseForge Publication Checklist
+## 7. CurseForge Publication Checklist
 
 CurseForge reaches large modpack creators, hosting providers, and legacy Forge communities.
 
-### 5.1 Project Configuration
+### 7.1 Project Configuration
 - **Name**: `HeapHammer`
 - **Category**: `Server Utilities` -> `Administrative Tools`
 - **Brief Description**: `Deterministic stress testing and retained-memory regression framework for dedicated Minecraft servers.`
@@ -140,7 +224,7 @@ CurseForge reaches large modpack creators, hosting providers, and legacy Forge c
 - **Side**: `Server` (Client: `Not Needed` / `Allowed`)
 - **License**: `GNU Lesser General Public License v3.0`
 
-### 5.2 File Distribution
+### 7.2 File Distribution
 - Upload `heaphammer-1.0.0-alpha.1.jar` under **Alpha Files**.
 - Set **Release Type** to `Alpha`.
 - Supported Minecraft Versions: `1.21.1`
@@ -149,21 +233,10 @@ CurseForge reaches large modpack creators, hosting providers, and legacy Forge c
 
 ---
 
-## 6. Automated Jenkins CI/CD Pipeline
+## 8. Automated Jenkins CI/CD Release Gate
 
 For unattended builds and automated multi-branch deployments, refer to [`docs/JENKINS_PIPELINE.md`](JENKINS_PIPELINE.md).
 
-The pipeline automatically:
-1. Triggers on tag pushes matching `v*.*.*`.
-2. Checks out each version branch (`master`, `ver/1.20.1`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`).
-3. Executes `./gradlew clean test build` in parallel matrix containers.
-4. Collects and publishes artifacts to the GitHub Release draft.
-
----
-
-## 7. Post-Release Monitoring
-
-Following a public release:
-1. **GitHub Issues**: Monitor incoming bug reports using the issue template standard defined in [`AGENTS.md`](../AGENTS.md#5-how-to-write-a-high-value-issue).
-2. **Community Feedback**: Check Modrinth/CurseForge comments for modpack compatibility inquiries.
-3. **Reproducibility**: When a user reports a memory leak, request their `/hh report show last` JSON and replay command.
+In accordance with our release philosophy:
+1. **Pushes to `master`**: Trigger continuous integration (compile, test, and archive artifacts). **No external publication**.
+2. **Pushes to `release/*` or `v*` tags**: Trigger the official release gate stage, verifying artifacts, producing release archives, and publishing to distribution channels.

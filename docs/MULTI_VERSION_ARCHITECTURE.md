@@ -116,10 +116,13 @@ Because of the radical difference between modern Fabric (1.16–1.21) and legacy
 
 ## 5. The Multi-Version Branching Model
 
-We maintain dedicated release branches for each active Minecraft version line alongside `master`:
+We maintain dedicated version platform branches alongside the active development trunk, with releases managed through batched milestone release branches:
 
 ```text
 master (Trunk: Active Development & Cutting Edge — 1.21.1)
+  │
+  ├──> release/v1.0.0    (Release Staging & Stabilization — gathers work for v1.0.0)
+  │      └──> Tag: v1.0.0-alpha.1 [Deploy Gate] ──> Merged back to master
   │
   ├──> ver/1.21.1        (Modern Cutting Edge — Fabric, Java 21)
   ├──> ver/1.20.1        (Modern LTS Gold Standard — Fabric, Java 17)
@@ -131,11 +134,14 @@ master (Trunk: Active Development & Cutting Edge — 1.21.1)
 | Branch | Target Minecraft | Build Tooling | Mod Loader | Purpose & JVM Target |
 |---|---|---|---|---|
 | **`master`** | Latest (`1.21.1`) | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Primary development trunk. Java 21. |
+| **`release/v*`** | Active Milestone | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Batched release staging, stabilization, and deployment gate. |
 | **`ver/1.21.1`** | `1.21.1` | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Cutting Edge production line. Java 21. |
 | **`ver/1.20.1`** | `1.20.1` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | Modern LTS Gold Standard line. Java 17. |
 | **`ver/1.18.2`** | `1.18.2` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | World-gen overhaul LTS line. Java 17. |
 | **`ver/1.16.5`** | `1.16.5` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | Nether legacy LTS line. Java 17/8. |
 | **`ver/1.12.2-forge`** | `1.12.2` | `Java Library / Forge` | `MinecraftForge` | Classic Titan modpack era line. Java 8. |
+
+> ℹ️ **Release Gating**: To protect modpack ecosystems from daily release churn, we never deploy on individual issue fixes. Routine fixes land continuously on `master`. Work is gathered on a `release/v*` staging branch, tested against live server matrices, tagged and deployed upon approval, and then `master` is bumped to the next minor development version. See [docs/PUBLICATION.md](PUBLICATION.md) for the complete procedure.
 
 ---
 

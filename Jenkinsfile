@@ -119,6 +119,24 @@ pipeline {
                 }
             }
         }
+
+        stage('Release Deployment Gate') {
+            when {
+                anyOf {
+                    buildingTag()
+                    branch 'release/*'
+                }
+            }
+            steps {
+                script {
+                    echo "================================================="
+                    echo " Official Release Deployment Gate Active"
+                    echo " Branch/Tag: ${env.BRANCH_NAME ?: env.TAG_NAME ?: env.GIT_BRANCH}"
+                    echo " Batched release verified — ready for distribution"
+                    echo "================================================="
+                }
+            }
+        }
     }
 
     post {

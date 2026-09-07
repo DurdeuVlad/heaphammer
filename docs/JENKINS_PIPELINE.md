@@ -88,3 +88,18 @@ Each successful Jenkins build archives:
 - `build/testmods/*.jar` — All synthetic test mod jars for staging servers.
 - `build/test-results/**/*.xml` — JUnit XML test reports parsed and tracked in Jenkins dashboards.
 - `build/matrix-reports/*.json` — Empirical slope and plateau reports (when matrix benchmarks are enabled).
+
+---
+
+## 6. Release Gating vs. Continuous Integration
+
+To prevent release fatigue and ensure stable modpack deployments, the pipeline distinguishes routine CI builds from official release deployments:
+
+| Trigger Condition | Target Branches | Pipeline Actions | Deployment Status |
+|---|---|---|---|
+| **Push / PR Merge** | `master`, `ver/*` | Compiles, executes test suite (34 tests), archives local jars. | **No Public Deployment** (CI Only) |
+| **Release Branch** | `release/v*` | Full test suite, packages release candidates, archives release jars. | **Staging Gate** |
+| **Release Tag** | `v*.*.*` | Full test suite, matrix benchmarks, packages production jars. | **Official Release Deployment** (GitHub, Modrinth, CurseForge) |
+
+See [docs/PUBLICATION.md](PUBLICATION.md) for the complete release lifecycle and branching workflow.
+

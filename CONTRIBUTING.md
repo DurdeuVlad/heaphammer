@@ -71,13 +71,14 @@ master (Default Development Trunk — 1.21.1)
   └──> ver/1.12.2-forge  (Classic Titan Era — MinecraftForge, Java 8)
 ```
 
-- **`master`**: The default branch where all new features, core domain logic, scenario generators, regression detection math, and diagnostic tools are committed.
+- **`master`**: The default development trunk where PRs and issue fixes land continuously.
+- **`release/v*`**: Milestone release branches (e.g. `release/v1.0.0`). We do **not** publish on every issue fix. Work is gathered and stabilized on release branches before tagging and deploying.
 - **`ver/<minecraft_version>`**: Dedicated release lines for each supported Minecraft version (e.g. `ver/1.21.1`).
 - **Automated Synchronization**: Every push to `master` automatically triggers our GitHub Actions sync workflow (`.github/workflows/sync-version-branches.yml`), which merges updates into all version branches.
   - If the merge is clean, the test suite is verified and pushed automatically.
   - If code accommodation is required (e.g. Minecraft registry or mapping changes), an automated PR titled `[Auto-Sync] Merge master into ver/<version>` is created for manual adaptation.
 
-For details on accommodating version differences, see [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md).
+For details on the release lifecycle and accommodating version differences, see [docs/PUBLICATION.md](docs/PUBLICATION.md) and [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md).
 
 ---
 
