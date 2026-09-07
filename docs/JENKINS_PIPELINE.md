@@ -30,17 +30,39 @@ The pipeline dynamically reads `gradle.properties` (`minecraft_version` and `jav
 
 ---
 
-## 2. Jenkins Server Prerequisites
+## 2. Turnkey Local Controller (Docker & JCasC)
+
+HeapHammer provides an out-of-the-box, zero-configuration local Jenkins controller container with pre-installed plugins, pre-wired JDKs (`JDK21`, `JDK17`, `JDK8`), and automated Jenkins Configuration as Code (JCasC) that immediately sets up the multibranch pipeline job:
+
+### 2.1 One-Click Launch (PowerShell)
+```powershell
+./tools/start-jenkins.ps1
+```
+This script:
+1. Builds `jenkins/Dockerfile` with Java 21, Java 17, and Adoptium Java 8.
+2. Pre-installs all required pipeline and multibranch plugins using `jenkins-plugin-cli`.
+3. Loads `jenkins/jenkins.yaml` (JCasC) to auto-configure `JDK21`, `JDK17`, `JDK8` and the `HeapHammer` multibranch pipeline.
+4. Starts the container on `http://localhost:8080` (admin/admin) with volume persistence.
+
+### 2.2 Docker Compose Alternative
+```bash
+cd jenkins
+docker compose up -d
+```
+
+---
+
+## 3. Jenkins Server Prerequisites (Self-Hosted / Production)
 
 To run the pipeline, your Jenkins instance requires:
 
-### 2.1 Required Jenkins Plugins
+### 3.1 Required Jenkins Plugins
 1. **Pipeline: Multibranch** (`workflow-multibranch`) — Automatically discovers branches (`master`, `ver/*`).
 2. **Git Plugin** (`git`) — SCM integration with GitHub or GitLab.
 3. **Pipeline Utility Steps** (`pipeline-utility-steps`) — Provides `readProperties` to parse `gradle.properties`.
 4. **JUnit Plugin** (`junit`) — Automatically records, graphs, and trends test results across builds.
 
-### 2.2 Configured JDK Tools (Global Tool Configuration)
+### 3.2 Configured JDK Tools (Global Tool Configuration)
 In Jenkins under **Manage Jenkins** $\rightarrow$ **Tools** $\rightarrow$ **JDK Installations**, define the following JDK tool names:
 
 | Tool Name | Version | Download / Installation Path | Used For |
@@ -51,7 +73,7 @@ In Jenkins under **Manage Jenkins** $\rightarrow$ **Tools** $\rightarrow$ **JDK 
 
 ---
 
-## 3. Configuring the Multibranch Pipeline Job
+## 4. Configuring the Multibranch Pipeline Job
 
 1. In Jenkins dashboard, select **New Item**.
 2. Name the project `HeapHammer` and select **Multibranch Pipeline**.
@@ -70,7 +92,7 @@ In Jenkins under **Manage Jenkins** $\rightarrow$ **Tools** $\rightarrow$ **JDK 
 
 ---
 
-## 4. Pipeline Parameters & Capabilities
+## 5. Pipeline Parameters & Capabilities
 
 The `Jenkinsfile` provides optional execution parameters:
 
@@ -83,7 +105,7 @@ The `Jenkinsfile` provides optional execution parameters:
 
 ---
 
-## 5. Artifact Archiving
+## 6. Artifact Archiving
 
 Each successful Jenkins build archives:
 - `build/libs/heaphammer-*.jar` — The compiled, remapped production mod jar.
@@ -98,7 +120,7 @@ Each successful Jenkins build archives:
 
 ---
 
-## 6. Release Gating vs. Continuous Integration
+## 7. Release Gating vs. Continuous Integration
 
 To prevent release fatigue and ensure stable modpack deployments, the pipeline distinguishes routine CI builds from official release deployments:
 
@@ -108,7 +130,7 @@ To prevent release fatigue and ensure stable modpack deployments, the pipeline d
 | **Release Branch** | `release/v*` | Full test suite, packages release candidates, archives release jars to `dist/production/`. | **Staging Gate** |
 | **Release Tag** / `DEPLOY_PRODUCTION` | `v*.*.*` | Full test suite, matrix benchmarks, stages bundle to `dist/production/`, verifies SHA-256 sums, uploads to GitHub Releases. | **Official Release Deployment** (GitHub, Modrinth, CurseForge) |
 
-### 6.1 Configuring GitHub Release Credentials in Jenkins
+### 7.1 Configuring GitHub Release Credentials in Jenkins
 To enable automated GitHub Release uploads in Jenkins:
 1. Under **Manage Jenkins** $\rightarrow$ **Credentials**, add a **Secret text** credential.
 2. Set ID: `github-release-token`.
