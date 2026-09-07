@@ -1,25 +1,52 @@
-# HeapHammer
+<p align="center">
+  <img src="assets/heaphammer_banner.png" alt="HeapHammer Banner" width="100%">
+</p>
 
-> **Deterministic stress testing and retained-memory regression framework for modded Minecraft.**
->
-> *Take a problem that appears after hours or days under production activity, compress the relevant activity into a repeatable staging workload, and produce a replayable test case with objective evidence.*
->
-> 📊 **Empirical Benchmarks & Case Studies**: For real live server regression data, mathematical retention models, and our cross-mod collision case study, see [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md) and the [docs/README.md](docs/README.md) documentation hub.
+<div align="center">
+
+# 🔨 HeapHammer
+
+**Deterministic server stress testing and retained-memory regression framework for modded Minecraft**
+
+[![Release](https://img.shields.io/badge/release-v1.0.0--alpha.1-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
+[![Minecraft](https://img.shields.io/badge/minecraft-1.12.2_--_1.21.1-brightgreen.svg?style=flat-square)](docs/MULTI_VERSION_ARCHITECTURE.md)
+[![Loaders](https://img.shields.io/badge/loaders-Fabric_%7C_Forge-blue.svg?style=flat-square)](docs/MULTI_VERSION_ARCHITECTURE.md)
+[![Java](https://img.shields.io/badge/java-8_%7C_17_%7C_21-red.svg?style=flat-square)](docs/JENKINS_PIPELINE.md)
+[![License](https://img.shields.io/badge/license-LGPL--3.0-blueviolet.svg?style=flat-square)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-34%20passed-success.svg?style=flat-square)](#7-building--contributing)
+[![Side](https://img.shields.io/badge/side-server--only-informational.svg?style=flat-square)](#2-quickstart-guide-for-server-admins)
+
+[Quickstart](#2-quickstart-guide-for-server-admins) •
+[Commands](#3-command-reference) •
+[Live Server Proof](#4-empirical-verification--testing-methodology) •
+[Cross-Mod Collision](#5-empirical-multi-mod--cross-mod-collision-verification) •
+[Documentation Hub](docs/README.md) •
+[Publication Guide](docs/PUBLICATION.md)
+
+</div>
 
 ---
 
-## 1. Executive Summary
+<table>
+<tr>
+<td width="210" align="center" valign="middle">
+  <img src="assets/heaphammer_logo.png" alt="HeapHammer Logo" width="190"/>
+</td>
+<td>
 
+### Why HeapHammer?
+In modern modpacks containing 200–300+ mods, server-side memory leaks and retained-object regressions are notoriously elusive. They often take days of continuous player traffic to manifest, making staging reproduction painfully slow and expensive.
 
-In modern modpacks with 200–300+ mods, server-side memory leaks and retained-object regressions are notoriously difficult to diagnose. They often take days of continuous player traffic to manifest, making staging reproduction painfully slow.
+**HeapHammer automates deterministic workload compression.**
+Instead of passively waiting for a server crash or guessing with instantaneous profilers:
+1. **Applies a deterministic workload**: Exercises chunk, entity, and block lifecycles under a strict server tick budget.
+2. **Cleans up & settles**: Releases all allocated tickets and references, allowing GC to settle.
+3. **Measures what stays behind**: Tracks retained heap slopes via Ordinary Least Squares ($y = mx + b$), world-state recovery, and JVM class histograms.
+4. **Persists & Replays**: Stores exact operation sequences to JSON, enabling bit-for-bit replay across server restarts.
 
-**HeapHammer solves this by automating deterministic workload compression.**
-
-Instead of passively waiting for a crash or guessing with profilers:
-1. **Apply a deterministic workload**: Hammer the chunk, entity, and block lifecycles repeatedly under a strict server tick budget.
-2. **Clean up & settle**: Release all allocated tickets/references and allow GC to settle.
-3. **Measure what stays behind**: Track retained heap slope, world-state recovery, and class histograms across cycles.
-4. **Persist & Replay**: Save the exact operation sequence to JSON and replay it bit-for-bit across server restarts.
+</td>
+</tr>
+</table>
 
 ```text
 Traditional Profilers (Spark, VisualVM, JFR):  "What is the server doing right now?"
@@ -28,13 +55,23 @@ HeapHammer:                                    "What exact workload breaks this 
 
 ---
 
+## 1. Core Architectural Pillars
+
+- 🛡️ **100% Server-Side Only**: Connecting clients do **not** need the mod installed. No custom packets, blocks, items, or entity registrations. Standard vanilla and modded clients connect seamlessly.
+- ⏱️ **Strict Non-Destructive Tick Budgeting**: Executes bounded operations per tick (`maxOperationsPerTick: 10`, `maxMsPerTick: 15 ms`). Never stalls or starves the server main thread.
+- 📐 **Statistical OLS Regression & Plateau Detection**: Evaluates post-settle heap slopes rather than volatile instantaneous memory deltas ($\Delta\text{Heap}$). Accurately classifies benign cache warming as `PASS (PLATEAU)` and true leaks as `SUSPICIOUS`.
+- 🧩 **Zero-Minecraft Portability Core**: Core domain logic is pure Java with zero `net.minecraft.*` dependencies. All game interactions flow through port adapters, enabling binary portability across 5 supported Minecraft versions (`1.21.1`, `1.20.1`, `1.18.2`, `1.16.5`, `1.12.2`).
+- 🔒 **Zero-Leaked-Reference Invariant**: Retains only primitive coordinates (`ChunkPos.toLong()`), integer tuples, and string IDs. Never holds live game references (`LevelChunk`, `Entity`, `ServerLevel`), ensuring HeapHammer never becomes the leak.
+
+---
+
 ## 2. Quickstart Guide for Server Admins
 
-HeapHammer is **100% server-side only**, requires **zero configuration files**, and does **not** require players or client-side mods.
+HeapHammer requires **zero configuration files** and no client-side setup.
 
-> ℹ️ **Do connecting players or clients need this mod?**  
-> **No.** Clients do **not** need HeapHammer installed. HeapHammer registers zero custom blocks, items, entities, or networking protocols. Standard vanilla clients (and any modpack clients) can connect without issues. All `/hh` commands work via standard vanilla Brigadier command trees.  
-> *(Note: You can also optionally install it on a client instance to benchmark single-player / integrated-server worlds).*
+> [!NOTE]
+> **Do connecting players or clients need this mod?**  
+> **No.** Clients do **not** need HeapHammer installed. HeapHammer registers zero client assets, networking channels, or custom blocks. All `/hh` commands operate via vanilla Brigadier command trees. *(You may also optionally install it on a client to profile singleplayer worlds).*
 
 ### Step 1 — Clone Server to Staging
 Copy your production server to a staging or testing directory:
@@ -44,16 +81,16 @@ cp -r /opt/minecraft/production /opt/minecraft/staging
 *(Tip: Set `server-port=25566` in `staging/server.properties` to avoid port conflicts).*
 
 ### Step 2 — Install HeapHammer
-Drop the single compiled mod jar into the `mods/` folder:
+Drop the compiled mod jar into the `mods/` directory:
 ```bash
 cp heaphammer-1.0.0-alpha.1.jar /opt/minecraft/staging/mods/
 ```
 
 ### Step 3 — Run the Test
-Start your server with your normal production launch script and JVM flags. In the server terminal console (or in-game as an OP), run:
+Start your server with your production launch script and JVM flags. In the server console (or in-game as an OP), run:
 
 ```text
-# 1. Verify environment readiness and loaded chunks
+# 1. Verify environment readiness and loaded chunk safety
 hh doctor
 
 # 2. Preview the deterministic plan (e.g. 10 cycles, 5 chunks/batch, seed 1234)
@@ -62,10 +99,10 @@ hh plan chunks 10 5 1234
 # 3. Execute the workload across server ticks
 hh run chunks 10 5 1234
 
-# 4. Check progress at any time
+# 4. Check real-time progress
 hh status
 
-# 5. Read the verdict once complete
+# 5. Read the empirical verdict once complete
 hh report show last
 ```
 
@@ -79,7 +116,7 @@ hh report show last
 
 ## 3. Command Reference
 
-All commands are prefixed with `/hh` (or `hh` from console):
+All commands are prefixed with `/hh` (or `hh` from the server console):
 
 | Command | Permission | Description |
 |---|---|---|
@@ -117,25 +154,25 @@ Workload generation commands (`/hh plan` and `/hh run`) support the following op
 - `--coverage=<float>`: Registry sampling coverage between `0.0` and `1.0` (e.g. `--coverage 0.25`).
 - `--include-mod=<id,id,...>`: Restrict sampled entities or blocks to specific mod namespaces.
 - `--exclude-mod=<id,id,...>`: Exclude specific mod namespaces from sampling.
-- `--explicit-gc=<true|false>`: Force System.gc() at each checkpoint to isolate true uncollected retention.
+- `--explicit-gc=<true|false>`: Force `System.gc()` at each checkpoint to isolate true uncollected retention.
 
 ---
 
 ## 4. Empirical Verification & Testing Methodology
 
-HeapHammer is tested against a rigorous 5-layer verification methodology:
+HeapHammer is validated against a rigorous 5-layer verification stack:
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │ Layer 5: Live Dedicated Server Integration (Minecraft 1.21.1)│
 ├─────────────────────────────────────────────────────────────┤
-│ Layer 4: Controlled Synthetic Leak Fixtures (Section 23.3)   │
+│ Layer 4: Controlled Synthetic Leak Fixtures (Calibration)   │
 ├─────────────────────────────────────────────────────────────┤
-│ Layer 3: Trend Analysis, R² Fit & Plateau Math (Section 12)  │
+│ Layer 3: Trend Analysis, R² Fit & Plateau Math (OLS)         │
 ├─────────────────────────────────────────────────────────────┤
-│ Layer 2: Deterministic Planning & Replay Invariants (BR-001) │
+│ Layer 2: Deterministic Planning & Replay Invariants         │
 ├─────────────────────────────────────────────────────────────┤
-│ Layer 1: Atomic File Storage & Codec Roundtrips (BR-011)    │
+│ Layer 1: Atomic File Storage & Codec Roundtrips             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -250,7 +287,7 @@ Classification: PASS -> SUSPICIOUS (CHANGED)
 
 ## 5. Empirical Multi-Mod & Cross-Mod Collision Verification
 
-To guarantee that HeapHammer reliably diagnoses real third-party mod bugs, we built an automated matrix test harness (`tools/run-mod-matrix-test.ps1`) executing standalone Fabric test mods on live dedicated servers.
+To ensure that HeapHammer reliably flags complex real-world mod bugs, we built an automated matrix test harness (`tools/run-mod-matrix-test.ps1`) executing standalone Fabric test mods on live dedicated servers.
 
 ### Live Dedicated Server Matrix Results
 
@@ -279,37 +316,34 @@ Comparison ModA_Alone vs CrossMod_Collision:
 Net Delta Diff = +34.93 MB, Slope Diff = +9.78 MB/cycle (PASS -> SUSPICIOUS).
 ```
 
-*For complete logs, class histograms, and deep architectural analysis, see [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md).*
+*For full reproduction logs, class histograms, and mathematical derivations, see [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md).*
 
 ### Modpack Leak Triage Playbook for Server Admins
-
-When experiencing unexplained TPS drops, memory bloat, or out-of-memory crashes on your modpack server:
-
+When experiencing unexplained TPS lag or out-of-memory crashes on your server:
 1. **Establish Baseline**: Run `/hh run chunks --iterations=5 --batch=10 --hold=5 --settle=10 --explicit-gc=true` on your staging server.
-2. **Binary Search**: If `SUSPICIOUS`, split mods in half. If both halves pass alone, you have a **cross-mod collision**.
-3. **Differential Isolation**: Compare runs with `/hh report diff <clean-report> <collision-report>` to identify the divergence point.
-4. **Inspect Classes**: Run `/hh diagnostics histogram` to isolate the exact class names holding retained roots.
+2. **Binary Search**: If `SUSPICIOUS`, partition your mod list in half. If both halves pass individually, you have a **cross-mod collision**.
+3. **Differential Isolation**: Compare runs with `/hh report diff <clean-report> <collision-report>` to pinpoint the divergent cycle.
+4. **Inspect Classes**: Run `/hh diagnostics histogram` to identify the specific class instances retaining JVM heap memory.
 
 ---
 
 ## 6. Architecture & Safety Safeguards
 
-
-1. **Ticket Ownership Isolation (BR-002)**: HeapHammer only unloads chunk tickets registered under its own `TicketType<ChunkPos> heaphammer`. Chunks loaded by players, spawn, or other mods are never touched.
-2. **Tick-Budgeted Execution (Section 15.4)**: Operations execute incrementally per server tick within configurable maximum operations and millisecond limits to protect server TPS.
-3. **Zero Leaked References**: State plans and checkpoints persist only integer chunk coordinates and primitive metrics—never live `LevelChunk` or `ServerLevel` object references.
-4. **Atomic Reports & Plans**: File writes utilize temporary file swaps with atomic replacement (`StandardCopyOption.ATOMIC_MOVE`) to prevent corrupted files if a server crashes.
+1. **Ticket Ownership Isolation**: HeapHammer only manipulates chunk tickets registered under its dedicated `TicketType<ChunkPos> heaphammer`. Chunks loaded by players, world spawn, or other mods are never modified or purged.
+2. **Tick-Budgeted Execution**: Workloads execute incrementally per server tick within configurable maximum operation and millisecond constraints to guarantee TPS stability.
+3. **Zero Leaked References**: Experiment plans, checkpoints, and metrics retain only primitive coordinates and IDs—never live `LevelChunk` or `ServerLevel` instances.
+4. **Atomic Reports & Plans**: All disk writes utilize temporary file staging with atomic replacement (`StandardCopyOption.ATOMIC_MOVE`), eliminating file corruption on server crashes.
 
 ---
 
 ## 7. Building & Contributing
 
 ### Requirements
-- Java 21 JDK
-- Gradle (wrapper provided)
+- **JDK 21** (for modern branches) or **JDK 8 / 17** (for backport branches)
+- **Gradle** (wrapper provided)
 
 ### Build & Run Tests
-```bash
+```powershell
 # Run all automated test suites (34 unit & integration tests)
 ./gradlew test
 
@@ -326,15 +360,18 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 ./gradlew runServer
 ```
 
-### Contributing & Multi-Version Development
-- [docs/README.md](docs/README.md): Master documentation hub and developer index.
-- [CONTRIBUTING.md](CONTRIBUTING.md): Code style, hexagonal architecture rules, determinism invariants, and PR guidelines.
-- [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md): Multi-version Minecraft branching strategy, platform accommodation, and automated synchronization.
-- [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md): Empirical test benchmarks, leak detection proofs, and server triage playbook.
-- [docs/DECISION.md](docs/DECISION.md): Architectural Decision Records (ADRs).
-- [docs/OSS.md](docs/OSS.md): Open-source governance, licensing, and support tiers.
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Contributor Covenant v2.1 community guidelines.
-- [SECURITY.md](SECURITY.md): Vulnerability reporting policy and supported release matrix.
+### Documentation Index
+- **[docs/README.md](docs/README.md)**: Master documentation hub and directory index.
+- **[docs/PUBLICATION.md](docs/PUBLICATION.md)**: Release procedure, packaging, and Modrinth/CurseForge publication guide.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Code style, hexagonal architecture rules, determinism invariants, and PR guidelines.
+- **[docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md)**: Multi-version Minecraft branching strategy, platform accommodation, and automated synchronization.
+- **[docs/CASE_STUDIES.md](docs/CASE_STUDIES.md)**: Empirical test benchmarks, leak detection proofs, and server triage playbook.
+- **[docs/DECISION.md](docs/DECISION.md)**: Architectural Decision Records (ADRs).
+- **[docs/JENKINS_PIPELINE.md](docs/JENKINS_PIPELINE.md)**: Multibranch CI/CD pipeline and dynamic JDK toolchains.
+- **[docs/OSS.md](docs/OSS.md)**: Open-source governance, licensing, and support tiers.
+- **[AGENTS.md](AGENTS.md)**: Machine-readable agent constitution, issue reporting standards, and AI disclosure policy.
+- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)**: Contributor Covenant v2.1 community guidelines.
+- **[SECURITY.md](SECURITY.md)**: Vulnerability reporting policy and supported release matrix.
 
 ### Artifact Locations
 - Compiled mod jar: `build/libs/heaphammer-1.0.0-alpha.1.jar`
@@ -346,5 +383,4 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 
 ## 8. License
 
-Licensed under the [LGPL-3.0 License](LICENSE).
-
+Licensed under the [GNU Lesser General Public License v3.0 (LGPL-3.0)](LICENSE).

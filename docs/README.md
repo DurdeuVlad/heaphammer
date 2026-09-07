@@ -18,7 +18,9 @@ Welcome to the HeapHammer documentation directory. This repository contains the 
 - **[CASE_STUDIES.md](CASE_STUDIES.md)**:
   Live dedicated server benchmarks, mathematical retention model formulation ($y = mx + b$, $R^2$), empirical test matrix across single-subsystem leaks, multi-subsystem leaks, and cross-mod subscriber collisions. Includes the 4-step modpack leak triage playbook.
 
-### 3. CI/CD & Operations
+### 3. CI/CD, Release & Operations
+- **[PUBLICATION.md](PUBLICATION.md)**:
+  Canonical release and publishing guide for GitHub Releases, Modrinth, and CurseForge, including pre-release verification checklists, version packaging, and metadata standards.
 - **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)**:
   Guide to setting up the multibranch Jenkins CI/CD pipeline, dynamic JDK tool resolution (`JDK21`, `JDK17`, `JDK8`), and test artifact archiving.
 
