@@ -1,49 +1,34 @@
-# HeapHammer Documentation Hub
+# 📚 HeapHammer Documentation Hub
 
-Welcome to the HeapHammer documentation directory. This repository contains the complete architectural specifications, empirical benchmarks, multi-version platform accommodation guides, and decision records for HeapHammer.
-
----
-
-## 📚 Documentation Index
-
-### 1. Architecture & Portability
-- **[MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md)**:
-  Comprehensive guide to HeapHammer's Hexagonal Architecture (Ports & Adapters), modding era analysis (1.21.1 down to 1.12.2), cross-version compatibility matrix, branching strategy, and automated synchronization.
-- **[FORGE_1_12_2_BRIDGE.md](FORGE_1_12_2_BRIDGE.md)**:
-  Architectural specification for the classic Minecraft 1.12.2 Forge platform adapter, reflection ticket bridge, and lifecycle event mappings.
-- **[DECISION.md](DECISION.md)**:
-  Durable Architectural Decision Records (ADRs) explaining the rationale behind zero-Minecraft domain coupling, OLS regression, matrix branching, and dynamic Jenkins toolchains.
-
-### 2. Empirical Verification & Case Studies
-- **[CASE_STUDIES.md](CASE_STUDIES.md)**:
-  Live dedicated server benchmarks, mathematical retention model formulation ($y = mx + b$, $R^2$), empirical test matrix across single-subsystem leaks, multi-subsystem leaks, and cross-mod subscriber collisions. Includes the 4-step modpack leak triage playbook.
-
-### 3. CI/CD, Release & Operations
-- **[PUBLICATION.md](PUBLICATION.md)**:
-  Canonical release and publishing guide for GitHub Releases, Modrinth, and CurseForge, including pre-release verification checklists, version packaging, and metadata standards.
-- **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)**:
-  Guide to setting up the multibranch Jenkins CI/CD pipeline, dynamic JDK tool resolution (`JDK21`, `JDK17`, `JDK8`), and test artifact archiving.
-
-### 4. Project Governance & Open Source
-- **[OSS.md](OSS.md)**:
-  Open-source governance, licensing intent (LGPL-3.0), 5-tier version support policy, and release channels.
-- **Temporary Planning & Scratchpad**:
-  Active development scratchpads, task breakdowns, and issue plans reside in [`.scratch/`](../.scratch).
+Welcome to the HeapHammer documentation center. Here you will find architectural specifications, live dedicated server benchmarks, multi-version platform accommodation guides, and release procedures.
 
 ---
 
-## 🎯 Quick Navigation by Role
+## 🎯 Navigation by Role
 
-### For Server Administrators & Modpack Creators
-1. Start with the **[Modpack Leak Triage Playbook](CASE_STUDIES.md#7-modpack-leak-triage-playbook-for-server-administrators)** to diagnose server lag, memory spikes, or OOM crashes.
-2. Review the **[Cross-Mod Collision Case Study](CASE_STUDIES.md#5-case-study-3-the-ghost-leak--cross-mod-accidental-collision)** to understand how two clean mods can combine into a severe memory leak.
-3. Check the command reference in the root [README.md](../README.md).
+| Role | Start Here | Recommended Reading |
+|---|---|---|
+| **Server Admins & Modpack Creators** | **[CASE_STUDIES.md](CASE_STUDIES.md)** (Modpack Triage Playbook) | [README.md](../README.md#quickstart-for-server-admins) • [CASE_STUDIES.md](CASE_STUDIES.md#3-case-study-3-cross-mod-accidental-collision) |
+| **Mod Developers & Contributors** | **[CONTRIBUTING.md](../CONTRIBUTING.md)** (Contribution Standards) | [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md) • [DECISION.md](DECISION.md) • [AGENTS.md](../AGENTS.md) |
+| **DevOps & Release Engineers** | **[PUBLICATION.md](PUBLICATION.md)** (Release & Distribution) | [JENKINS_PIPELINE.md](JENKINS_PIPELINE.md) • [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md#5-automated-branch-synchronization) |
 
-### For Mod Developers & Contributors
-1. Read the **[Hexagonal Portability Boundary](MULTI_VERSION_ARCHITECTURE.md#2-architectural-portability-boundary-hexagonal-architecture)** to understand why core domain classes must never import `net.minecraft.*`.
-2. Follow **[CONTRIBUTING.md](../CONTRIBUTING.md)** for coding standards, pull request processes, and test requirements.
-3. Review **[DECISION.md](DECISION.md)** before proposing changes to core mathematical or architectural models.
+---
 
-### For DevOps & Build Engineers
-1. Refer to **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)** for multibranch pipeline setup.
-2. Inspect **[MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md#6-automated-branch-synchronization-workflow)** to see how commits to `master` automatically propagate to all version branches.
+## 📖 Complete Document Map
+
+### 1. Architecture & Platform Portability
+- **[MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md)**: Hexagonal Architecture (Ports & Adapters), Minecraft version era analysis (1.21.1 to 1.12.2), compatibility matrix, and automated branch synchronization.
+- **[FORGE_1_12_2_BRIDGE.md](FORGE_1_12_2_BRIDGE.md)**: Platform adapter and reflection-decoupled bridge specification for classic Minecraft 1.12.2 Forge.
+- **[DECISION.md](DECISION.md)**: Architectural Decision Records (ADRs) explaining domain isolation, OLS regression math, branch matrix, and release gating.
+
+### 2. Empirical Benchmarks & Leak Triage
+- **[CASE_STUDIES.md](CASE_STUDIES.md)**: Live dedicated server test matrix (9 scenarios), OLS mathematical retention formulation ($y = mx + b$), empirical cross-mod collision proof, and the 4-step modpack leak triage playbook.
+
+### 3. Release & Operations
+- **[PUBLICATION.md](PUBLICATION.md)**: Canonical release lifecycle, milestone-batched release branching model (`release/v*`), pre-release checklists, and Modrinth/CurseForge packaging.
+- **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)**: Declarative multibranch Jenkins CI/CD setup, dynamic JDK resolution (`JDK21`, `JDK17`, `JDK8`), and release deployment gating.
+
+### 4. Governance & Community
+- **[OSS.md](OSS.md)**: Open-source governance, licensing policy (LGPL-3.0), and 5-tier version maintenance roadmap.
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)**: Engineering guidelines, conventional commits, test-first proof (RED $\to$ GREEN), and AI disclosure standards.
+- **[AGENTS.md](../AGENTS.md)**: Machine-readable agent constitution, invariant rules, and issue reporting contract.

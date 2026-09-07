@@ -27,7 +27,7 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
   - Declarative `Jenkinsfile` dynamically detects `java_version` from `gradle.properties` and binds appropriate JDK (`JDK21`, `JDK17`, `JDK8`).
   - Unit tests run and produce JUnit XML reports archived automatically.
   - Multi-version synchronization workflow configured in [`.github/workflows/sync-version-branches.yml`](../.github/workflows/sync-version-branches.yml).
-- **Documentation**: [docs/JENKINS_PIPELINE.md](JENKINS_PIPELINE.md).
+- **Documentation**: [docs/JENKINS_PIPELINE.md](../docs/JENKINS_PIPELINE.md).
 - **Status**: **Completed & Verified** (Merged into `master`).
 
 ---
@@ -51,7 +51,8 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
 - **Acceptance Evidence**:
   - `ver/1.16.5` adapts `Registry.BLOCK` and `Registry.ENTITY_TYPE` and passes all unit tests (`BUILD SUCCESSFUL`).
   - `ver/1.12.2-forge` implements `ForgePlatformAdapter` and passes `ForgePlatformAdapterTest` with 100% pass rate.
-  - Bridge contract fully documented in [docs/FORGE_1_12_2_BRIDGE.md](FORGE_1_12_2_BRIDGE.md).
+  - Bridge architecture documented in [docs/MULTI_VERSION_ARCHITECTURE.md](../docs/MULTI_VERSION_ARCHITECTURE.md).
+  - Bridge contract fully documented in [docs/FORGE_1_12_2_BRIDGE.md](../docs/FORGE_1_12_2_BRIDGE.md).
 - **Status**: **Completed & Verified** (Commit `aaeca2e`, merged into `master`).
 
 ---

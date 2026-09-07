@@ -1,40 +1,33 @@
 # Multi-Version Minecraft Architecture & Accommodation Guide
 
-HeapHammer is engineered to support multiple minor and major Minecraft versions (from modern `1.21.1` and `1.20.1` down to classic `1.12.2`) while maintaining a single, unified source of truth for its core domain, deterministic scenario planning, and statistical regression detection engines.
-
-This document details the ecosystem era analysis, architectural portability boundaries, compatibility matrix, branching strategy, automated synchronization mechanisms, and version-specific accommodation procedures.
+HeapHammer supports 5 major Minecraft version lines (`1.21.1` down to `1.12.2`) while maintaining a single, unified source of truth for its core domain, deterministic scenario planning, and statistical regression engines.
 
 ---
 
-## 1. Modding Ecosystem & Version Era Analysis
+## 1. Modding Ecosystem & Version Matrix
 
-In modded Minecraft, community adoption concentrates in distinct **modding eras** driven by API stability, mod availability, and world-generation overhauls.
+Community adoption concentrates in distinct Minecraft eras:
 
 ```text
-2026                 2023–2024               2021–2022              2020–2021               2017–2019
-Modern Cutting-Edge  Modern Gold Standard    World-Gen Overhaul     Nether Bridge Era       Classic Titan
-     [1.21.1] ───────> [1.20.1] ───────────> [1.18.2] ────────────> [1.16.5] ─────────────> [1.12.2]
-     Java 21           Java 17                Java 17                Java 17 / 8             Java 8
-     Fabric/NeoForge   Fabric/Forge           Fabric/Forge           Fabric/Forge            MinecraftForge
+Modern Cutting-Edge      Modern Gold Standard      World-Gen Overhaul       Legacy Bridge          Classic Titan
+     [1.21.1] ───────────────> [1.20.1] ───────────────> [1.18.2] ────────────> [1.16.5] ────────────> [1.12.2]
+     Java 21                   Java 17                   Java 17                Java 17/8              Java 8
+     Fabric/NeoForge           Fabric/Forge              Fabric/Forge           Fabric/Forge           MinecraftForge
 ```
 
-### The 5 Target Anchor Versions
-
-| Version | Ecosystem Role | JVM Target | Mod Loaders | Why HeapHammer is Essential Here |
+| Version | Ecosystem Role | JVM | Mod Loaders | Primary Challenge |
 |---|---|---|---|---|
-| **1.21.1** | **Active Frontier** | Java 21 | Fabric, NeoForge | High mod churn; newest optimizations (Lithium, FerriteCore) and latest Vanilla mechanics. Primary development trunk (`master`). |
-| **1.20.1** | **Modern Gold Standard** | Java 17 | Fabric, Forge | **Highest modpack player count.** Major tech mods (Mekanism, AE2, Create, Botania) in peak production. Heavy memory leak surface from 300+ modpacks. |
-| **1.18.2** | **World-Gen Overhaul** | Java 17 | Fabric, Forge | 384-block world height ($Y=-64$ to $320$), new chunk format, heavy chunk generation/unloading memory pressure. |
-| **1.16.5** | **Pre-Caves Bridge** | Java 17 / 8 | Fabric, Forge | Highly stable long-term modpacks; transition point before 1.17+ architectural shifts. |
-| **1.12.2** | **The Classic Titan** | Java 8 | MinecraftForge | **Legendary technical mega-packs** (GT: New Horizons, SevTech, Enigmatica 2). Long-running servers suffer massive retention leaks. |
+| **1.21.1** | **Active Frontier** | Java 21 | Fabric, NeoForge | Rapid mod API churn. Primary development trunk (`master`). |
+| **1.20.1** | **Modern Gold Standard** | Java 17 | Fabric, Forge | **Highest modpack population.** 300+ modpacks create high cross-mod collision risks. |
+| **1.18.2** | **World-Gen Overhaul** | Java 17 | Fabric, Forge | 384-block world height ($Y=-64$ to $320$), high chunk memory pressure. |
+| **1.16.5** | **Pre-Caves Bridge** | Java 17/8 | Fabric, Forge | Transitional registry access before modern Mojmap standardization. |
+| **1.12.2** | **Classic Titan** | Java 8 | MinecraftForge | **Massive technical packs** (GT:NH, SevTech). Legacy ticket and event bus models. |
 
 ---
 
-## 2. Architectural Portability Boundary: Hexagonal Architecture
+## 2. Hexagonal Architecture: The Portability Boundary
 
-In traditional Minecraft mods, version migrations are difficult because domain logic is intertwined with Mojang's `net.minecraft` classes and Obfuscation/Mojang mappings.
-
-HeapHammer prevents this through **Hexagonal Architecture (Ports & Adapters)**:
+To eliminate version migration friction, HeapHammer strictly decouples core logic from Minecraft runtime classes:
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -50,7 +43,7 @@ HeapHammer prevents this through **Hexagonal Architecture (Ports & Adapters)**:
 │   ├── EntityScenarioExecutor          ├── ReportComparisonService      │
 │   └── BlockEntityScenarioExecutor     └── HistogramDiff                │
 │                                                                        │
-│   ZERO net.minecraft.*  │  ZERO net.fabricmc.*  │  PURE Java           │
+│   ZERO net.minecraft.*  │  ZERO net.fabricmc.*  │  100% Pure Java      │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ Platform Port Interfaces
                                     ▼
@@ -69,152 +62,68 @@ HeapHammer prevents this through **Hexagonal Architecture (Ports & Adapters)**:
 ```
 
 ### The Invariant Contract
-- **95% of the codebase** (`domain`, `scenario`, `detection`, `reporting`, `storage`, `infrastructure`) has **zero** Minecraft or modloader imports.
-- When `master` receives a new scenario, a statistical slope enhancement, or a CLI command, that code is **100% binary-compatible** across all supported Minecraft versions.
-- Only the platform boundary (`platform.fabric` or `platform.forge`) and command dispatch registration require version-specific adjustments.
+- **95% of the codebase** has **zero** Minecraft or mod loader imports.
+- Any improvement to scenario planners, OLS slope math, or JSON reporting is **100% binary-compatible** across all 5 Minecraft version branches.
+- Version-specific logic is strictly quarantined inside `com.dwurdy.heaphammer.platform.fabric` or `com.dwurdy.heaphammer.platform.forge`.
 
 ---
 
 ## 3. Subsystem Compatibility Matrix
 
-| Architectural Subsystem | Modern Frontier (1.21.x) | Modern LTS (1.20.1, 1.18.2) | Legacy Bridge (1.16.5) | Classic Titan (1.12.2) |
+| Architectural Subsystem | Modern (1.21.x / 1.20.1) | World-Gen (1.18.2) | Legacy (1.16.5) | Classic Titan (1.12.2) |
 |---|---|---|---|---|
-| **Core Domain Logic** | Pure Java 21 | Pure Java 17 | Pure Java 17 / 8 | Pure Java 8 |
-| **Mod Loader** | Fabric Loader | Fabric Loader | Fabric Loader | MinecraftForge (FML) |
-| **Build Tooling** | Fabric Loom 1.17 | Fabric Loom 1.17 | Fabric Loom 1.17 | Java Library / ForgeGradle |
-| **Chunk Ticket System** | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `ForgeChunkManager` / World Tickets |
-| **Entity Lifecycle Hook** | `ServerEntityEvents.ENTITY_LOAD` | `ServerEntityEvents.ENTITY_LOAD` | `ServerEntityEvents.ENTITY_LOAD` | `EntityJoinWorldEvent` (Forge Bus) |
-| **Block State Registry** | `BuiltInRegistries.BLOCK` | `BuiltInRegistries.BLOCK` | `Registry.BLOCK` | `GameRegistry.findRegistry(Block.class)` |
-| **Command System** | Brigadier Callback | Brigadier Callback | Brigadier Callback | `net.minecraft.command.CommandBase` |
+| **JVM Target** | Java 21 / Java 17 | Java 17 | Java 17 / 8 | Java 8 |
+| **Loader** | Fabric Loader | Fabric Loader | Fabric Loader | MinecraftForge (FML) |
+| **Chunk Tickets** | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `ForgeChunkManager.Ticket` |
+| **Entity Lifecycle** | `ServerEntityEvents` | `ServerEntityEvents` | `ServerEntityEvents` | `EntityJoinWorldEvent` |
+| **Block Registry** | `BuiltInRegistries.BLOCK`| `BuiltInRegistries.BLOCK`| `Registry.BLOCK` | `GameRegistry.findRegistry` |
+| **Commands** | Brigadier Callback | Brigadier Callback | Brigadier Callback | `CommandBase` (FML) |
 
 ---
 
-## 4. The 3-Tier Multi-Version Implementation Strategy
-
-Because of the radical difference between modern Fabric (1.16–1.21) and legacy Forge (1.12.2), support is organized into three strategic tiers:
-
-### Tier 1: Modern Fabric Line (`1.21.1` & `1.20.1`)
-- **Status**: Production (`master`, `ver/1.21.1`, `ver/1.20.1`).
-- **Mechanism**: Standard Fabric Loom multi-branching.
-- **Domain Compatibility**: 100% shared code; Java 21 on `master`/`1.21.1`, Java 17 on `1.20.1`.
-- **Registries**: `BuiltInRegistries.BLOCK` and `BuiltInRegistries.ENTITY_TYPE`.
-
-### Tier 2: Transitional Fabric Line (`1.18.2` & `1.16.5`)
-- **Status**: Production (`ver/1.18.2`, `ver/1.16.5`).
-- **Mechanism**: Fabric Loom with legacy mapping channels.
-- **Platform Adaptation**:
-  - `1.18.2`: Java 17, `BuiltInRegistries` resolution.
-  - `1.16.5`: Java 17/8, uses `Registry.BLOCK` and `Registry.ENTITY_TYPE` instead of `BuiltInRegistries`.
-
-### Tier 3: Classic Forge Line (`1.12.2`)
-- **Status**: Production (`ver/1.12.2-forge`).
-- **Mechanism**: Dedicated Forge adapter with reflection-decoupled bridge (`ForgeTicketBridge`).
-- **Platform Bridge**: Maps Forge's `EventBus` (`ChunkEvent.Load`, `EntityJoinWorldEvent`) and `ForgeChunkManager.Ticket` to HeapHammer's `PlatformAdapter` interfaces.
-- **See**: [docs/FORGE_1_12_2_BRIDGE.md](FORGE_1_12_2_BRIDGE.md) for the complete bridge contract.
-
----
-
-## 5. The Multi-Version Branching Model
-
-We maintain dedicated version platform branches alongside the active development trunk, with releases managed through batched milestone release branches:
+## 4. Multi-Version Branching Strategy
 
 ```text
-master (Trunk: Active Development & Cutting Edge — 1.21.1)
+master (Active Trunk — 1.21.1, Java 21)
   │
-  ├──> release/v1.0.0    (Release Staging & Stabilization — gathers work for v1.0.0)
-  │      └──> Tag: v1.0.0-alpha.1 [Deploy Gate] ──> Merged back to master
+  ├──> release/v1.0.0    (Staging branch — gathers work before official tagging)
   │
-  ├──> ver/1.21.1        (Modern Cutting Edge — Fabric, Java 21)
-  ├──> ver/1.20.1        (Modern LTS Gold Standard — Fabric, Java 17)
-  ├──> ver/1.18.2        (World-Gen Overhaul Era — Fabric, Java 17)
-  ├──> ver/1.16.5        (Nether Legacy Era — Fabric, Java 17/8)
-  └──> ver/1.12.2-forge  (Classic Titan Era — MinecraftForge, Java 8)
+  ├──> ver/1.21.1        (Cutting Edge Fabric — Java 21)
+  ├──> ver/1.20.1        (Modern LTS Fabric/Forge — Java 17)
+  ├──> ver/1.18.2        (World-Gen LTS Fabric/Forge — Java 17)
+  ├──> ver/1.16.5        (Legacy LTS Fabric/Forge — Java 17/8)
+  └──> ver/1.12.2-forge  (Classic Titan Forge — Java 8)
 ```
 
-| Branch | Target Minecraft | Build Tooling | Mod Loader | Purpose & JVM Target |
-|---|---|---|---|---|
-| **`master`** | Latest (`1.21.1`) | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Primary development trunk. Java 21. |
-| **`release/v*`** | Active Milestone | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Batched release staging, stabilization, and deployment gate. |
-| **`ver/1.21.1`** | `1.21.1` | `Fabric Loom 1.17` | `Fabric 0.19.5+` | Cutting Edge production line. Java 21. |
-| **`ver/1.20.1`** | `1.20.1` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | Modern LTS Gold Standard line. Java 17. |
-| **`ver/1.18.2`** | `1.18.2` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | World-gen overhaul LTS line. Java 17. |
-| **`ver/1.16.5`** | `1.16.5` | `Fabric Loom 1.17` | `Fabric 0.15.11+` | Nether legacy LTS line. Java 17/8. |
-| **`ver/1.12.2-forge`** | `1.12.2` | `Java Library / Forge` | `MinecraftForge` | Classic Titan modpack era line. Java 8. |
-
-> ℹ️ **Release Gating**: To protect modpack ecosystems from daily release churn, we never deploy on individual issue fixes. Routine fixes land continuously on `master`. Work is gathered on a `release/v*` staging branch, tested against live server matrices, tagged and deployed upon approval, and then `master` is bumped to the next minor development version. See [docs/PUBLICATION.md](PUBLICATION.md) for the complete procedure.
+### Automated Branch Synchronization
+Every push to `master` triggers [`.github/workflows/sync-version-branches.yml`](../.github/workflows/sync-version-branches.yml):
+1. Merges `master` into each `ver/*` branch.
+2. Executes `./gradlew test` with the branch's specific JVM target.
+3. If clean $\rightarrow$ pushes automatically.
+4. If conflict/adaptation required $\rightarrow$ automatically opens a PR labeled `needs-version-adaptation`.
 
 ---
 
-## 6. Automated Branch Synchronization Workflow
+## 5. Version Adaptation Recipes
 
-Every commit pushed to `master` triggers the automated synchronization pipeline:
-[`.github/workflows/sync-version-branches.yml`](../.github/workflows/sync-version-branches.yml).
+When implementing a new platform branch or resolving an adaptation PR:
 
-### Pipeline Flow:
-1. **Trigger**: Push to `master`.
-2. **Matrix Execution**: Runs in parallel for each target version branch (`ver/1.21.1`, `ver/1.20.1`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`).
-3. **Merge Attempt**:
-   ```bash
-   git checkout ver/1.20.1
-   git merge --no-ff master -m "chore(sync): automated merge from master"
-   ```
-4. **Automated Verification**:
-   - Compiles and runs tests against the branch's specific `gradle.properties`:
-     ```bash
-     ./gradlew test
-     ```
-5. **Outcome Handling**:
-   - **Path A (Clean Merge & Tests Pass)**: Pushes the updated version branch automatically.
-   - **Path B (Merge Conflict or Test Failure)**:
-     - Aborts the automated push.
-     - Automatically creates a GitHub Pull Request titled:
-       `[Auto-Sync] Merge master into ver/<version>`
-     - Applies the label `needs-version-adaptation`.
-     - Maintainers review the conflict, adjust platform adapter mappings, and merge.
+### 1. Registry Resolution
+- **1.20.x – 1.21.x**: Use `BuiltInRegistries.BLOCK` and `BuiltInRegistries.ENTITY_TYPE`.
+- **1.16.5**: Use `Registry.BLOCK` and `Registry.ENTITY_TYPE`.
+- **1.12.2**: Use `GameRegistry.findRegistry(Block.class)`.
 
----
-
-## 7. Accommodating Version Differences
-
-When adding a new version branch or resolving an adaptation PR, follow this protocol:
-
-### Step 1: Branch Creation & `gradle.properties` Configuration
-Create the branch from `master` and update the dependency properties:
-
-```properties
-# Example for ver/1.20.1
-minecraft_version=1.20.1
-loader_version=0.15.11
-fabric_api_version=0.92.2+1.20.1
-java_version=17
-```
-
-### Step 2: Adapt Platform Differences
-
-Common Minecraft version divergence points and their resolution patterns:
-
-#### 1. Registry Access (`BuiltInRegistries`)
-- **1.21.x / 1.20.x**: `BuiltInRegistries.ENTITY_TYPE` and `BuiltInRegistries.BLOCK` are directly accessible.
-- **1.16.5**: Requires `Registry.BLOCK` and `Registry.ENTITY_TYPE`.
-- **1.12.2**: Requires `GameRegistry.findRegistry(Block.class)`.
-
-#### 2. Chunk Ticket Registration
-- **1.21.x / 1.20.x / 1.18.2 / 1.16.5**:
+### 2. Chunk Ticket Management
+- **Modern Fabric (1.16–1.21)**:
   ```java
-  public static final TicketType<ChunkPos> HEAPHAMMER_TICKET = 
+  public static final TicketType<ChunkPos> HEAPHAMMER_TICKET =
       TicketType.create("heaphammer", Comparator.comparingLong(ChunkPos::toLong));
   ```
-  Handled cleanly in [`FabricChunkTicketManager.java`](../src/main/java/com/dwurdy/heaphammer/platform/fabric/FabricChunkTicketManager.java).
-- **1.12.2 Forge**: Uses `ForgeChunkManager.requestTicket` and `ForgeChunkManager.forceChunk`.
-  Handled in [`ForgeChunkTicketManager.java`](../src/main/java/com/dwurdy/heaphammer/platform/forge/ForgeChunkTicketManager.java).
+- **Classic Forge (1.12.2)**:
+  Uses reflection-decoupled `ForgeChunkManager.requestTicket` via [`ForgeTicketBridge`](FORGE_1_12_2_BRIDGE.md).
 
-#### 3. Command Registration API
-- **Fabric (1.16–1.21)**: Brigadier registrations in [`HeapHammerCommands.java`](../src/main/java/com/dwurdy/heaphammer/command/HeapHammerCommands.java) rely on `CommandRegistrationCallback.EVENT.register(...)`.
-- **Forge (1.12.2)**: `ServerStartingEvent` registering a `CommandBase` child.
-
-### Step 3: Local Offline Verification
-Run the local branch verification tool before pushing:
+### 3. Local Multi-Branch Verification
+Test synchronization locally across all branches before pushing:
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/sync-version-branches.ps1
 ```
-This tests building, merging, and running the unit test suite across all configured version branches locally.

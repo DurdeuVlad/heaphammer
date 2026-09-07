@@ -59,8 +59,8 @@ The security of Minecraft servers running HeapHammer is paramount.
 
 ## 6. Release Lifecycle & Distribution
 
-- **Alpha Releases**: Tagged directly from passing version branch builds (e.g. `v1.0.0-alpha.1-1.21.1`).
+- **Batched Releases**: Handled through milestone release staging branches (`release/v*`) to protect modpacks from update churn. See **[docs/PUBLICATION.md](PUBLICATION.md)**.
 - **Release Channels**:
-  - GitHub Releases: All compiled jars across all 5 Minecraft versions.
-  - Modrinth & CurseForge: Official mod distributions for server administrators and modpack creators.
-- **Automated CI/CD**: Every commit is verified against our multi-version matrix via GitHub Actions and Jenkins. See [docs/JENKINS_PIPELINE.md](JENKINS_PIPELINE.md).
+  - GitHub Releases: Authoritative release tags and jars across all 5 Minecraft versions.
+  - Modrinth & CurseForge: Official mod distribution pages.
+- **Automated CI/CD**: Verified via GitHub Actions and Jenkins multibranch pipelines. See [docs/JENKINS_PIPELINE.md](JENKINS_PIPELINE.md).
