@@ -25,7 +25,7 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 - **[CASE_STUDIES.md](CASE_STUDIES.md)**: Live dedicated server test matrix (9 scenarios), OLS mathematical retention formulation ($y = mx + b$), empirical cross-mod collision proof, and the 4-step modpack leak triage playbook.
 
 ### 3. Release & Operations
-- **[PUBLICATION.md](PUBLICATION.md)**: Canonical release lifecycle, milestone-batched release branching model (`release/v*`), pre-release checklists, and Modrinth/CurseForge packaging.
+- **[PUBLICATION.md](PUBLICATION.md)**: Canonical release lifecycle, milestone-batched release branching model (`release/v*`), strict Semantic Versioning (Zero Alpha policy), verification checklists, and Modrinth/CurseForge packaging.
 - **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)**: Declarative multibranch Jenkins CI/CD setup, dynamic JDK resolution (`JDK21`, `JDK17`, `JDK8`), and release deployment gating.
 
 ### 4. Governance & Community

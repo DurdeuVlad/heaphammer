@@ -36,6 +36,11 @@ HeapHammer maintains 5 active release branches corresponding to major modding er
 - **Protected Trunk**: Direct pushes to `master` and release branches are prohibited. All contributions must use topic branches (`feat/*`, `fix/*`) and reviewed PRs.
 - **Active Release Branch**: `release/v1.0.0` is the active development line for the upcoming v1.0.0 release.
 - **Stable Releases**: `v1.0.0` initial release upon CurseForge publishing.
+- **Strict Semantic Versioning (Zero Alpha Policy)**: We do not launch alpha, beta, or pre-release qualifiers (`alpha.1`, etc.). Version progression follows a strict rule of thumb:
+  - **Major (`X.0.0`)**: Modifying something big or adding a big new feature / fundamental architectural milestone.
+  - **Minor (`X.Y.0`)**: Every new feature or feature-ish enhancement.
+  - **Bug Fix (`X.Y.Z`)**: Severe bug fixes that are really bad, need fixing, and cannot wait until the next scheduled minor version.
+  - See **[docs/PUBLICATION.md](PUBLICATION.md)** for the complete release lifecycle.
 - **Upstream Synchronization**: Verified changes merged to `master` are automatically propagated to downstream version branches via GitHub Actions. If a version divergence occurs, an automated PR is raised for maintainer review.
 
 ---

@@ -73,6 +73,10 @@ master (Default Development Trunk — 1.21.1)
 
 - **`master`**: The protected stable development trunk. Direct pushes to `master` are strictly prohibited.
 - **`release/v*`**: Batched release staging lines (e.g. `release/v1.0.0` for v1.0.0). We do **not** publish on every individual fix; all work is gathered on the active release branch before tagging.
+- **Strict Semantic Versioning (Zero Alpha Policy)**: We do **not** publish alpha, beta, or pre-release qualifiers (no `alpha.1`, etc.). Releases follow a strict rule of thumb:
+  - **Major (`X.0.0`)**: Modifying something big or adding a major new architectural feature.
+  - **Minor (`X.Y.0`)**: Every new feature or feature-ish enhancement.
+  - **Bug Fix (`X.Y.Z`)**: Severe bug fixes that are really bad, need immediate resolution, and cannot wait until the next minor release.
 - **`ver/<minecraft_version>`**: Dedicated downstream platform branches (e.g. `ver/1.20.1`, `ver/1.12.2-forge`).
 - **Automated Synchronization**: Merges to `master` automatically trigger `.github/workflows/sync-version-branches.yml` to propagate pure-domain improvements downstream.
 

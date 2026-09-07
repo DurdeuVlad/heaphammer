@@ -26,14 +26,32 @@ gitGraph
    commit id: "chore: open next release v1.1.0"
 ```
 
+### The Versioning Contract: Strict Major.Minor.Patch (Zero Alpha Policy)
+
+HeapHammer adheres to a strict, production-oriented Semantic Versioning standard (`MAJOR.MINOR.PATCH`).
+
+> [!IMPORTANT]
+> **Zero Alpha / Pre-Release Policy**:
+> We do **not** launch alpha, beta, or pre-release versions (no `alpha.1`, `-beta`, or `-dev` tags in released artifacts or version strings). Every release launched on GitHub, Modrinth, and CurseForge is an official, production-ready release.
+
+#### Version Progression Rule of Thumb:
+1. **Major Releases (`X.0.0`)**:
+   - Triggered when modifying something big or adding a big new feature / fundamental architectural milestone (e.g. cross-loader paradigm shifts, breaking API evolutions, major framework overhauls).
+2. **Minor Releases (`X.Y.0`)**:
+   - Triggered for every new feature or feature-ish enhancement (e.g. new scenario executors, new detection heuristics, external workload adapter integrations).
+3. **Bug Fix / Patch Releases (`X.Y.Z`)**:
+   - Reserved exclusively for bug fixes that are really bad, need fixing, and cannot wait until the next scheduled minor version.
+
+---
+
 ### The 4-Phase Release Cycle
 
 | Phase | Branch | Actions | Deployment |
 |---|---|---|---|
 | **1. Development** | Topic Branches (`feat/*`, `fix/*`) | Features and fixes developed in isolation with test-first evidence. | **None** |
-| **2. Active Release** | `release/v1.1.0` | Active release line gathering upcoming features. CI compiles and verifies 34 tests. | **Staging Gate** |
+| **2. Active Release** | `release/v<M>.<m>.0` | Staging line gathering upcoming features. CI compiles and verifies unit and integration tests. | **Staging Gate** |
 | **3. Release Gate** | `release/v<M>.<m>.x` | Tag release (`v1.0.0`). Merge back to `master` and sync downstream to `ver/*`. | **Publish to GitHub, Modrinth, CurseForge** |
-| **4. Next Cycle** | `release/v<M>.<m+1>.0` | Cut next release branch, bump `gradle.properties` (`1.1.0-alpha.1`), resume development. | **Development Resumes** |
+| **4. Next Cycle** | `release/v<M>.<m+1>.0` | Cut next release branch, bump `gradle.properties` (`1.1.0`), resume development. | **Development Resumes** |
 
 ---
 
@@ -53,17 +71,17 @@ When a release branch is tagged and deployed, artifacts are built across the 5 s
 
 ## 3. Pre-Release Verification Checklist
 
-Run these quality gates on the `release/v*` branch before tagging:
+Run these automated quality gates before tagging:
 
-```powershell
-# 1. Run unit & integration test suite (34 tests must pass)
-./gradlew clean test
+```bash
+# 1. Run unit test suite
+./gradlew test
 
-# 2. Package release JAR and synthetic testmod fixtures
+# 2. Run automated live-server adversarial integration suite
+./gradlew adversarialServerTest
+
+# 3. Package release JAR and synthetic testmod fixtures
 ./gradlew build buildTestmods
-
-# 3. Run live dedicated server multi-mod matrix verification
-powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 ```
 
 - [ ] `fabric.mod.json`: Verify `id: "heaphammer"`, `version`, `license: "LGPL-3.0"`, and `environment: "*"`.
@@ -87,10 +105,10 @@ git merge --no-ff release/v1.0.0 -m "chore(release): merge release/v1.0.0 into m
 git push origin master
 ```
 
-### Step 3: Cut Next Release Branch
+### Step 3: Cut Next Minor/Patch Release Branch
 ```bash
 git checkout -b release/v1.1.0
-# Update mod_version=1.1.0-alpha.1 in gradle.properties
+# Update mod_version=1.1.0 in gradle.properties (strictly X.Y.Z, no alpha tags)
 git commit -am "chore(version): initialize release/v1.1.0 development line"
 git push origin release/v1.1.0
 ```
