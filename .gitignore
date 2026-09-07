@@ -35,3 +35,7 @@ replay_*.log
 *.hprof
 *.jfr
 logs/
+
+# scratch temporary files
+.scratch/*.html
+.scratch/*.js
