@@ -1,5 +1,15 @@
+<p align="center">
+  <img src="../assets/heaphammer_banner.png" alt="HeapHammer Banner" style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 8px;">
+</p>
+
+<div align="center">
+
+<img src="../assets/heaphammer_logo.png" alt="HeapHammer Logo" width="96">
+
 # 🔨 HeapHammer: The Modpack Admin's Guide
 > **Catch 3-day memory leaks in 2 minutes before your players notice.**
+
+</div>
 
 ---
 
