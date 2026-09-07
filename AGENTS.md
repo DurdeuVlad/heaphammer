@@ -123,3 +123,25 @@ When drafting an issue or milestone task for agent or contributor handoff, follo
 - **Preserve Comments & Docstrings**: Keep all explanatory comments, mathematical proofs, and architectural notes intact.
 - **Inspect Before Editing**: Search existing symbols and registries before creating new abstractions to avoid split-brains and duplicate logic.
 - **Review Guidelines**: For broader project contribution rules, refer to [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/OSS.md](docs/OSS.md).
+
+---
+
+## 7. AI Disclosure, Transparency & Attribution Policy
+
+HeapHammer embraces AI-assisted engineering and pair programming while maintaining strict standards for software integrity, security, and attribution.
+
+### 7.1 Mandatory AI Disclosure for Contributions
+- **Full Transparency**: If an issue, PR, plan, or commit was drafted, generated, or assisted by an AI agent (e.g. Antigravity, Claude Code, Cursor, Copilot), the author **must** explicitly disclose it in the PR description or issue footer:
+  ```markdown
+  > 🤖 **AI Disclosure**: This contribution was developed with AI pair-programming assistance (Tool/Agent: Antigravity / Claude 3.7 Sonnet). All code has been reviewed, locally built, and empirically verified against the test suite.
+  ```
+- **Audit Trails**: If an agent was operated under autonomous loops, link or reference the relevant execution logs or task plan IDs if applicable.
+
+### 7.2 The Human Accountability Invariant
+- **The Contributor Owns the Code**: AI tools and coding agents do not have legal standing or repository accountability. The human committer/author remains 100% legally and technically responsible for every line of code, comment, and configuration merged.
+- **"The AI Wrote It" is Never an Excuse**: Regressions, hallucinated APIs, broken unit tests, security vulnerabilities, or license contaminations cannot be blamed on the AI model.
+
+### 7.3 Anti-Hallucination & Anti-Slop Safeguards
+- **Zero Hallucinated APIs**: Never accept AI-generated code that references non-existent Minecraft, Forge, or Fabric classes, methods, or parameters. Every referenced symbol must resolve against genuine JDK or modloader dependencies.
+- **Empirical Execution over Assumption**: An AI agent must never declare a task complete or state that "tests pass" without actually executing `./gradlew test` in the real environment and inspecting the exit code.
+- **Cleanroom & License Purity**: Contributors and agents must ensure generated code does not plagiarize or reproduce code from incompatible licensed repositories (e.g., non-free or GPLv2 code into LGPLv3).

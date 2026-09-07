@@ -13,7 +13,8 @@ HeapHammer is a deterministic stress-testing and retained-memory regression fram
 4. [Development Workflow & Conventional Commits](#4-development-workflow--conventional-commits)
 5. [How to Prove Your Fix Works (Testing & Verification)](#5-how-to-prove-your-fix-works-testing--verification)
 6. [Pull Request Checklist](#6-pull-request-checklist)
-7. [Code of Conduct & License Agreement](#7-code-of-conduct--license-agreement)
+7. [AI-Assisted Contributions & Disclosure Policy](#7-ai-assisted-contributions--disclosure-policy)
+8. [Code of Conduct & License Agreement](#8-code-of-conduct--license-agreement)
 
 ---
 
@@ -160,10 +161,29 @@ Before submitting a pull request, ensure:
 - [ ] Any new command or scenario is documented in `README.md` and `docs/`.
 - [ ] Commit history is clean, readable, and follows conventional commits.
 - [ ] If modifying detection thresholds or scenarios, include empirical evidence (test logs or report JSON diff).
+- [ ] If AI assistance was used, include the AI disclosure tag in the pull request description.
 
 ---
 
-## 7. Code of Conduct & License Agreement
+## 7. AI-Assisted Contributions & Disclosure Policy
+
+HeapHammer supports the transparent, responsible use of AI tools and coding agents (e.g. Antigravity, Claude Code, Cursor, Copilot).
+
+### 7.1 Mandatory Transparency
+If a pull request, issue, or code submission was generated or assisted by AI, contributors **must** state this clearly in their PR description:
+```markdown
+> 🤖 **AI Disclosure**: This PR was developed with AI assistance (Tool: <ToolName>). All code has been reviewed, locally built, and empirically verified against the test suite.
+```
+
+### 7.2 Human Accountability
+- **You are responsible**: The human author remains 100% accountable for the correctness, safety, and security of all merged code.
+- **Zero Hallucinated Code**: Ensure that all referenced Minecraft, Fabric, and Forge APIs genuinely exist.
+- **Empirical Proof**: Never submit AI-generated code without running `./gradlew test` locally.
+- For complete agent directives, see [AGENTS.md](AGENTS.md).
+
+---
+
+## 8. Code of Conduct & License Agreement
 
 By contributing to HeapHammer, you agree to:
 1. Abide by our [Code of Conduct](CODE_OF_CONDUCT.md).

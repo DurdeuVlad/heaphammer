@@ -44,6 +44,7 @@ We welcome contributions from mod authors, modpack developers, and server admini
 - **Contribution Guidelines**: Detailed instructions on coding conventions, hexagonal architecture rules, and pull request workflows are documented in [CONTRIBUTING.md](../CONTRIBUTING.md).
 - **Code of Conduct**: We adhere to the [Contributor Covenant v2.1](../CODE_OF_CONDUCT.md). All participants are expected to uphold a welcoming, respectful, and harassment-free community.
 - **Architectural Decisions**: Read [docs/DECISION.md](DECISION.md) before proposing significant architectural or algorithmic changes.
+- **AI Disclosure & Accountability**: HeapHammer requires transparent disclosure when AI agents or LLMs assist in drafting code or issues. The human contributor remains 100% accountable. See [AGENTS.md](../AGENTS.md) and [CONTRIBUTING.md](../CONTRIBUTING.md#7-ai-assisted-contributions--disclosure-policy).
 
 ---
 

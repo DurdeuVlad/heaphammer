@@ -108,3 +108,14 @@ When drafting an issue or task specification for an AI agent or contributor, eve
 ### 5.3 Git Safety & Verification Requirement
 - Never run destructive git commands (`git reset --hard`, `git clean -fd`) in the workspace.
 - Always execute `./gradlew test` and confirm all tests pass before completing any task.
+
+---
+
+## 6. AI Disclosure & Accountability Directive
+
+- **Mandatory Disclosure**: When operating as an AI agent drafting PRs, issues, or commits, include an explicit AI disclosure tag:
+  ```markdown
+  > 🤖 **AI Disclosure**: This contribution was generated/assisted by an AI coding agent. All changes have been verified against the test suite.
+  ```
+- **Zero Hallucinated APIs**: Strictly inspect existing interfaces, classpath dependencies, and Mojang/Fabric/Forge mappings before writing calls. Never guess method signatures.
+- **Empirical Proof Obligation**: Never report that code works, builds, or passes tests without running the tool command and inspecting the real output.
