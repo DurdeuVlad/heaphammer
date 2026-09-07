@@ -4,7 +4,7 @@
 >
 > *Take a problem that appears after hours or days under production activity, compress the relevant activity into a repeatable staging workload, and produce a replayable test case with objective evidence.*
 >
-> 📄 **Research Paper Available**: For our empirical methodology, mathematical retention models, live server regression data, and cross-mod collision analysis, see [docs/PAPER.md](docs/PAPER.md) (*Empirical Detection of Accidental Retained-Memory Regressions and Cross-Mod Collisions in Modded Minecraft*).
+> 📊 **Empirical Benchmarks & Case Studies**: For real live server regression data, mathematical retention models, and our cross-mod collision case study, see [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md) and the [docs/README.md](docs/README.md) documentation hub.
 
 ---
 
@@ -323,8 +323,12 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 ```
 
 ### Contributing & Multi-Version Development
+- [docs/README.md](docs/README.md): Master documentation hub and developer index.
 - [CONTRIBUTING.md](CONTRIBUTING.md): Code style, hexagonal architecture rules, determinism invariants, and PR guidelines.
 - [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md): Multi-version Minecraft branching strategy, platform accommodation, and automated synchronization.
+- [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md): Empirical test benchmarks, leak detection proofs, and server triage playbook.
+- [docs/Decision.md](docs/Decision.md): Architectural Decision Records (ADRs).
+- [docs/OSS.md](docs/OSS.md): Open-source governance, licensing, and support tiers.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Contributor Covenant v2.1 community guidelines.
 - [SECURITY.md](SECURITY.md): Vulnerability reporting policy and supported release matrix.
 

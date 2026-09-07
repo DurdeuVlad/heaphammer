@@ -1,10 +1,10 @@
 # HeapHammer Case Studies: Empirical Multi-Mod & Cross-Mod Leak Detection
 
-This document details empirical tests conducted on real Minecraft 1.21.1 Fabric dedicated servers using standalone companion test mods. Every metric, slope, checkpoint, and differential comparison is grounded in actual live dedicated server runs.
+This document details empirical benchmarks conducted on real Minecraft 1.21.1 Fabric dedicated servers using standalone companion test mods. Every metric, slope, checkpoint, and differential comparison is grounded in actual live dedicated server runs.
 
 ---
 
-## Executive Summary: Multi-Mod Matrix Results
+## 1. Executive Summary: Multi-Mod Matrix Results
 
 All benchmarks executed with 5 iterations, 10 chunks/batch, radius 6, 5 hold ticks, 10 settle ticks, and `--explicit-gc=true`.
 
@@ -22,7 +22,25 @@ All benchmarks executed with 5 iterations, 10 chunks/batch, radius 6, 5 hold tic
 
 ---
 
-## Case Study 1: Single-Subsystem Chunk Cache Leak (`testmod-leak-chunkcache`)
+## 2. Mathematical Retention Model & Verdict Engine
+
+HeapHammer avoids instantaneous memory diffing (which is susceptible to GC allocation noise) by evaluating retained memory across post-cleanup checkpoints using Ordinary Least Squares (OLS) linear regression:
+
+### Formulation
+Let $i \in \{1, 2, \dots, n\}$ represent the post-warmup iteration index, and $y_i$ represent the retained heap memory in bytes measured at the end of iteration $i$'s settle phase:
+
+$$\text{Slope } m = \frac{\sum_{i=1}^n (i - \bar{x})(y_i - \bar{y})}{\sum_{i=1}^n (i - \bar{x})^2}$$
+
+$$\text{Goodness of Fit } R^2 = \frac{\left[\sum_{i=1}^n (i - \bar{x})(y_i - \bar{y})\right]^2}{\sum_{i=1}^n (i - \bar{x})^2 \sum_{i=1}^n (y_i - \bar{y})^2}$$
+
+### Verdict Classification Rules
+- **`PASS`**: Slope $m \le \text{Threshold}$ (default $5.0\text{ MB/cycle}$) OR Plateau pattern detected (early cache warming that flattens into zero incremental retention).
+- **`SUSPICIOUS`**: Slope $m > \text{Threshold}$ AND $R^2 \ge 0.70$ AND $\text{Net Delta} > 0$. High confidence ($>0.85$) is assigned when $R^2 \ge 0.85$ across $n \ge 4$ iterations.
+- **`FAIL`**: Cleanup validation failure (e.g., active chunk tickets or entity references owned by HeapHammer remain unreleased after the settle phase).
+
+---
+
+## 3. Case Study 1: Single-Subsystem Chunk Cache Leak (`testmod-leak-chunkcache`)
 
 ### The Problem
 A common bug in utility, map, and chunk-claiming mods is unmanaged chunk caching. The mod registers a listener for `ServerChunkEvents.CHUNK_LOAD` to cache chunk data or coordinates in a static map, but fails to implement eviction on `ServerChunkEvents.CHUNK_UNLOAD`. As players explore or load chunks, `LevelChunk` instances are permanently pinned in JVM heap memory.
@@ -43,7 +61,7 @@ HeapHammer runs its deterministic chunk churn scenario:
 
 ---
 
-## Case Study 2: Multi-Subsystem Leak (`testmod-leak-omnitrack`)
+## 4. Case Study 2: Multi-Subsystem Leak (`testmod-leak-omnitrack`)
 
 ### The Problem
 Advanced mods (analytics trackers, discord bridges, complex tech mods) interact with multiple Minecraft subsystems simultaneously. A memory leak in such a mod can be diffuse:
@@ -62,16 +80,17 @@ Advanced mods (analytics trackers, discord bridges, complex tech mods) interact 
 
 ---
 
-## Case Study 3: The Ghost Leak — Cross-Mod Accidental Collision
+## 5. Case Study 3: The Ghost Leak — Cross-Mod Accidental Collision
 
 ### The Scenario: Mod A Alone = PASS, Mod B Alone = PASS, Together = CRASH
-This represents the most notorious class of modpack bugs:
+This represents the most contentious class of modpack bugs:
 - **Mod A (`testmod-crossmod-core`)**: A central API mod providing a static event bus (`CrossModEventBus`). When tested alone with HeapHammer, no listeners subscribe; slope is **`+0.74 MB/cycle` (`PASS`)**.
 - **Mod B (`testmod-crossmod-consumer`)**: A machine/consumer mod with an optional dependency on Mod A. When tested alone without Mod A, it uses clean internal fallbacks; slope is **`+0.75 MB/cycle` (`PASS`)**.
 - **The Modpack Collision**:
   When both mods are installed together, Mod B detects Mod A via `FabricLoader.isModLoaded("testmod-crossmod-core")` and hooks chunk listeners into Mod A's bus:
   `CrossModEventBus.subscribe("chunk_tick", ...)`
-  Mod B's closure captures `LevelChunk` and `ServerLevel`. Mod B never unregisters on chunk unload, and Mod A stores listeners in strong reference collections.
+  Mod B's closure captures `LevelChunk` and `ServerLevel`. Mod B never unregisters on chunk unload, and Mod A stores listeners in strong reference collections:
+  $$\text{CrossModEventBus.SUBSCRIPTIONS} \longrightarrow \text{ModB Closure} \longrightarrow \text{LevelChunk} \longrightarrow \text{ServerLevel}$$
 
 ### The Empirical Evidence
 Executing HeapHammer across the three runs:
@@ -97,10 +116,10 @@ Comparison hh-20260906-165414-7322 vs hh-20260906-165620-1884:
 ```
 
 The differential engine proves that neither mod was leaking in isolation; the fault exists exclusively at the integration boundary where Mod B registered unmanaged callbacks into Mod A.
- 
+
 ---
 
-## Case Study 4: Active Lifecycle Acceleration vs. Passive Waiting
+## 6. Case Study 4: Active Lifecycle Acceleration vs. Passive Waiting
 
 ### The Core Question: Does HeapHammer Actually Trigger Leaks Faster?
 A fundamental question in modpack staging is whether active stress testing is necessary, or if leaking mods will simply manifest on their own without intervention. To answer this empirically, we executed a controlled two-phase experiment on a live dedicated server staging `testmod-leak-chunkcache-1.0.0.jar`:
@@ -142,7 +161,7 @@ A fundamental question in modpack staging is whether active stress testing is ne
 
 ---
 
-## Modpack Leak Triage Playbook for Server Administrators
+## 7. Modpack Leak Triage Playbook for Server Administrators
 
 When a modpack exhibits unexplained server stutter, memory bloat, or OOM crashes, follow this 4-step triage methodology:
 

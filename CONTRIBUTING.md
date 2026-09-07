@@ -44,11 +44,13 @@ All code submitted to HeapHammer must adhere to our **Hexagonal Architecture (Po
 HeapHammer supports multiple minor and patch versions of Minecraft through a structured branching strategy:
 
 ```text
-master (Default Development Trunk)
+master (Default Development Trunk — 1.21.1)
   │
-  ├──> ver/1.21.1  (Active Primary Target)
-  ├──> ver/1.21.0  (Patch Compatibility Target)
-  └──> ver/1.20.4  (LTS Compatibility Target)
+  ├──> ver/1.21.1        (Modern Frontier — Fabric, Java 21)
+  ├──> ver/1.20.1        (Modern LTS Gold Standard — Fabric, Java 17)
+  ├──> ver/1.18.2        (World-Gen Overhaul Era — Fabric, Java 17)
+  ├──> ver/1.16.5        (Nether Legacy Era — Fabric, Java 17/8)
+  └──> ver/1.12.2-forge  (Classic Titan Era — MinecraftForge, Java 8)
 ```
 
 - **`master`**: The default branch where all new features, core domain logic, scenario generators, regression detection math, and diagnostic tools are committed.
