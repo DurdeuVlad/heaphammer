@@ -24,8 +24,10 @@ bin/
 # macos
 *.DS_Store
 
-# fabric
+# fabric & runtime
 run/
+/heaphammer/
+/config/
 
 # java
 hs_err_*.log

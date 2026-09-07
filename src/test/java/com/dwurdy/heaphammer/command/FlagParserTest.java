@@ -37,4 +37,18 @@ class FlagParserTest {
         assertEquals(8, spec.batchSize());
         assertTrue(spec.explicitGc());
     }
+
+    @Test
+    @DisplayName("FlagParser clamps excessive inputs to safe configured ceilings")
+    void testClamping() {
+        String[] args = {"--radius=9999", "--iterations=500", "--batch=50000", "--warmup=100", "--hold=99999", "--settle=99999"};
+        ExperimentSpec spec = FlagParser.parseSpec(args, 0, 0, 0);
+
+        assertEquals(32, spec.radius());
+        assertEquals(50, spec.iterations());
+        assertEquals(128, spec.batchSize());
+        assertEquals(10, spec.warmupIterations());
+        assertEquals(1200, spec.holdTicks());
+        assertEquals(1200, spec.settleTicks());
+    }
 }

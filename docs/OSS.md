@@ -34,8 +34,8 @@ HeapHammer maintains 5 active release branches corresponding to major modding er
 
 ### Branch Protection & Release Lifecycle
 - **Protected Trunk**: Direct pushes to `master` and release branches are prohibited. All contributions must use topic branches (`feat/*`, `fix/*`) and reviewed PRs.
-- **Active Release Branch**: `release/v1.1.0` is the active development line for the upcoming v1.1.0 release.
-- **Stable Releases**: `release/v1.0.0` tagged as `v1.0.0`.
+- **Active Release Branch**: `release/v1.0.0` is the active development line for the upcoming v1.0.0 release.
+- **Stable Releases**: `v1.0.0` initial release upon CurseForge publishing.
 - **Upstream Synchronization**: Verified changes merged to `master` are automatically propagated to downstream version branches via GitHub Actions. If a version divergence occurs, an automated PR is raised for maintainer review.
 
 ---
