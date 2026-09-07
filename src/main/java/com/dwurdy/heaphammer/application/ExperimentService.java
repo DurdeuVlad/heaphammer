@@ -23,12 +23,20 @@ public class ExperimentService {
     private static final Logger LOGGER = LoggerFactory.getLogger("heaphammer-service");
 
     private final PlatformAdapter platform;
+    private final SafetyCircuitBreaker circuitBreaker;
+    private final CrashRecoveryJournal recoveryJournal;
     private volatile ScenarioExecutor activeExecutor = null;
     private BiConsumer<com.dwurdy.heaphammer.domain.CheckpointPhase, Integer> checkpointListener = (p, i) -> {};
     private Consumer<ScenarioExecutor> completionListener = e -> {};
 
     public ExperimentService(PlatformAdapter platform) {
+        this(platform, new SafetyCircuitBreaker(), new CrashRecoveryJournal());
+    }
+
+    public ExperimentService(PlatformAdapter platform, SafetyCircuitBreaker circuitBreaker, CrashRecoveryJournal recoveryJournal) {
         this.platform = Objects.requireNonNull(platform, "platform must not be null");
+        this.circuitBreaker = Objects.requireNonNull(circuitBreaker, "circuitBreaker must not be null");
+        this.recoveryJournal = Objects.requireNonNull(recoveryJournal, "recoveryJournal must not be null");
         platform.registerServerTickHook(this::onServerTick);
     }
 
@@ -117,6 +125,7 @@ public class ExperimentService {
         );
 
         this.activeExecutor = executor;
+        recoveryJournal.recordStart(plan);
         return executor;
     }
 
@@ -124,6 +133,7 @@ public class ExperimentService {
         if (activeExecutor != null && !activeExecutor.getStateMachine().getState().isTerminal()) {
             LOGGER.warn("Stopping experiment {}: {}", activeExecutor.getPlan().id(), reason);
             activeExecutor.stop(reason);
+            recoveryJournal.recordFinish();
             return true;
         }
         return false;
@@ -137,9 +147,24 @@ public class ExperimentService {
         return Optional.ofNullable(activeExecutor);
     }
 
+    public CrashRecoveryJournal getRecoveryJournal() {
+        return recoveryJournal;
+    }
+
+    public SafetyCircuitBreaker getCircuitBreaker() {
+        return circuitBreaker;
+    }
+
     private void onServerTick(long tick) {
         ScenarioExecutor executor = this.activeExecutor;
         if (executor != null && !executor.getStateMachine().getState().isTerminal()) {
+            SafetyCircuitBreaker.TripResult trip = circuitBreaker.evaluate();
+            if (trip.tripped()) {
+                LOGGER.error("SAFETY CIRCUIT BREAKER TRIPPED: {}", trip.reason());
+                executor.stop(trip.reason());
+                return;
+            }
+
             try {
                 executor.tick();
             } catch (Exception e) {
@@ -151,6 +176,7 @@ public class ExperimentService {
 
     private void onExecutorFinished(ExperimentState finalState) {
         LOGGER.info("Experiment finished with state: {}", finalState);
+        recoveryJournal.recordFinish();
         ScenarioExecutor finished = this.activeExecutor;
         this.activeExecutor = null;
         if (finished != null) {

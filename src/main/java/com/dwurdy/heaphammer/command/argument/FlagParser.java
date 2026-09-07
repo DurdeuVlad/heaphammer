@@ -51,19 +51,31 @@ public class FlagParser {
                 } catch (NumberFormatException ignored) {}
             }
         }
+        com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig config =
+                com.dwurdy.heaphammer.infrastructure.config.ConfigManager.getActiveConfig();
+        int maxRadius = config != null ? config.getMaxRadius() : 32;
+        int maxIterations = config != null ? config.getMaxIterations() : 50;
+        int maxBatchSize = config != null ? config.getMaxBatchSize() : 128;
+        int maxWarmup = config != null ? config.getMaxWarmupIterations() : 10;
+        int maxHold = config != null ? config.getMaxHoldTicks() : 1200;
+        int maxSettle = config != null ? config.getMaxSettleTicks() : 1200;
+
         if (flags.containsKey("radius")) {
             try {
-                builder.radius(Math.max(1, Integer.parseInt(flags.get("radius"))));
+                int r = Integer.parseInt(flags.get("radius"));
+                builder.radius(Math.min(maxRadius, Math.max(1, r)));
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("iterations")) {
             try {
-                builder.iterations(Math.max(1, Integer.parseInt(flags.get("iterations"))));
+                int iters = Integer.parseInt(flags.get("iterations"));
+                builder.iterations(Math.min(maxIterations, Math.max(1, iters)));
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("batch")) {
             try {
-                builder.batchSize(Math.max(1, Integer.parseInt(flags.get("batch"))));
+                int batch = Integer.parseInt(flags.get("batch"));
+                builder.batchSize(Math.min(maxBatchSize, Math.max(1, batch)));
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("strategy")) {
@@ -71,17 +83,20 @@ public class FlagParser {
         }
         if (flags.containsKey("warmup")) {
             try {
-                builder.warmupIterations(Math.max(0, Integer.parseInt(flags.get("warmup"))));
+                int warmup = Integer.parseInt(flags.get("warmup"));
+                builder.warmupIterations(Math.min(maxWarmup, Math.max(0, warmup)));
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("hold")) {
             try {
-                builder.holdTicks(Math.max(0, Integer.parseInt(flags.get("hold"))));
+                int hold = Integer.parseInt(flags.get("hold"));
+                builder.holdTicks(Math.min(maxHold, Math.max(0, hold)));
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("settle")) {
             try {
-                builder.settleTicks(Math.max(0, Integer.parseInt(flags.get("settle"))));
+                int settle = Integer.parseInt(flags.get("settle"));
+                builder.settleTicks(Math.min(maxSettle, Math.max(0, settle)));
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("explicit-gc")) {

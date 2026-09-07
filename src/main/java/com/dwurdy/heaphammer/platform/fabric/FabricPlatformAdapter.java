@@ -145,6 +145,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         return server != null && server.isRunning();
     }
 
+    public static final String TEST_ENTITY_TAG = "heaphammer:test";
     private final Map<String, Set<UUID>> testEntitiesByDimension = new ConcurrentHashMap<>();
     private final Map<String, Set<BlockPos>> testBlockEntitiesByDimension = new ConcurrentHashMap<>();
 
@@ -182,6 +183,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
             mob.setNoAi(true);
             mob.setPersistenceRequired();
         }
+        entity.addTag(TEST_ENTITY_TAG);
 
         boolean added = level.addFreshEntity(entity);
         if (!added) return null;
@@ -303,6 +305,39 @@ public class FabricPlatformAdapter implements PlatformAdapter {
             }
         }
         return count;
+    }
+
+    @Override
+    public int cleanupOrphanedState() {
+        int cleaned = 0;
+
+        // 1. Release all chunk tickets
+        ticketManager.releaseAllTickets();
+
+        // 2. Revert any tracked block entities
+        for (String dim : new ArrayList<>(testBlockEntitiesByDimension.keySet())) {
+            cleaned += removeAllTestBlockEntities(dim);
+        }
+
+        // 3. Discard any tracked test entities
+        for (String dim : new ArrayList<>(testEntitiesByDimension.keySet())) {
+            cleaned += removeAllTestEntities(dim);
+        }
+
+        // 4. Sweep all server levels for any orphaned entity bearing TEST_ENTITY_TAG
+        MinecraftServer server = serverSupplier.get();
+        if (server != null) {
+            for (ServerLevel level : server.getAllLevels()) {
+                for (Entity entity : level.getAllEntities()) {
+                    if (entity.getTags().contains(TEST_ENTITY_TAG)) {
+                        entity.discard();
+                        cleaned++;
+                    }
+                }
+            }
+        }
+
+        return cleaned;
     }
 
     private ServerLevel getLevel(String dimension) {

@@ -209,8 +209,8 @@ HeapHammer is not theoretical. Every algorithm, regression slope, and ticket lif
 - **Active HeapHammer (18 seconds)**: 35 chunks churned $\rightarrow$ **`+10.60 MB/cycle` (`+37.89 MB`)** $\rightarrow$ **`SUSPICIOUS` (Caught immediately!)**.
 
 ### 3. Automated Test Suite
-- **34 unit and integration tests** pass continuously in CI (`./gradlew test`).
-- Covers domain isolation (zero-Minecraft imports), OLS linear regression math, tick budget throttling, and serialization integrity.
+- **86 unit and integration tests** pass continuously in CI (`./gradlew test`).
+- Covers domain isolation (zero-Minecraft imports), OLS linear regression math, tick budget throttling, configurable safety ceilings, runtime circuit breaker, crash recovery journaling, and path traversal defense-in-depth.
 
 *See [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md) for full server logs, class histograms, and raw JSON benchmark reports.*
 
@@ -229,6 +229,7 @@ HeapHammer automatically integrates with Fabric Permissions API and LuckPerms if
 | `heaphammer.admin` | Wildcard granting full access to all HeapHammer commands. | OP Level 2 |
 | `heaphammer.use` | Root command access (`/hh`, `/hh version`, `/hh help`). | OP Level 2 |
 | `heaphammer.run` | Execute workloads (`/hh run ...`, `/hh stop`, `/hh cleanup`). | OP Level 2 |
+| `heaphammer.config` | View and reload runtime safety configuration (`/hh config ...`). | OP Level 2 |
 | `heaphammer.diagnostics` | Capture class histograms and `.hprof` heap dumps. | OP Level 2 |
 | `heaphammer.report` | View, export, and diff test reports (`/hh report ...`). | OP Level 2 |
 | `heaphammer.doctor` | View server health and JVM metrics (`/hh doctor`, `/hh metrics`). | OP Level 2 |
@@ -245,12 +246,32 @@ Execute via `/hh` in-game or `hh` directly from the dedicated server console:
 | `hh run blockentities [flags]` | Executes block entity placement and destruction stress. | `hh run blockentities --iterations=5 --batch=20` |
 | `hh status` | Displays active test progress, current cycle, and tickets. | `hh status` |
 | `hh stop` | Immediately halts test and releases all tickets. | `hh stop` |
-| `hh cleanup` | Forcibly purges all active HeapHammer tickets and entities. | `hh cleanup` |
+| `hh cleanup` | Forcibly purges all active HeapHammer tickets and entities across all dimensions. | `hh cleanup` |
+| `hh config show` | Displays active safety limits, circuit breaker, and crash recovery settings. | `hh config show` |
+| `hh config reload` | Hot-reloads safety configuration from `config/heaphammer.json`. | `hh config reload` |
 | `hh report show <id\|last>` | Displays memory retention slope, $R^2$, and verdict. | `hh report show last` |
 | `hh report diff <runA> <runB>` | Compares two runs to detect regressions between modpack updates. | `hh report diff run-01 run-02` |
 | `hh replay <run-id>` | Replays the exact resolved operation sequence. | `hh replay run-01` |
 | `hh diagnostics histogram` | Samples top 10 JVM class instances and memory size. | `hh diagnostics histogram` |
 | `hh diagnostics heapdump` | Dumps a standard HotSpot `.hprof` snapshot for MAT/JProfiler. | `hh diagnostics heapdump` |
+
+---
+
+## Production Safety & Crash Resilience
+
+HeapHammer is specifically engineered for safe execution on live staging and production servers:
+
+1. **Configurable Safety Ceilings (`config/heaphammer.json`)**:
+   - Out-of-bounds parameters passed by overzealous operators (e.g., `--radius=1000 --batch=50000`) are automatically clamped to safe configurable maximums (`maxRadius: 32`, `maxBatchSize: 128`, `maxIterations: 50`, `maxOperationsPerTick: 50`, `maxMillisPerTick: 35`).
+   - Admins running stress-testing staging hardware can freely elevate these limits in `config/heaphammer.json`.
+2. **Runtime Memory Circuit Breaker**:
+   - Actively evaluates JVM available heap memory on every server tick.
+   - If available heap drops below `minFreeMemoryMb` (default `64 MB`), the circuit breaker trips, immediately aborting the test and releasing all tickets and entities before an `OutOfMemoryError` or server watchdog crash can occur.
+3. **Automated Server Crash Recovery**:
+   - If the server halts unexpectedly during testing (e.g. power loss or external mod crash), all spawned test entities are persistent-tagged with `heaphammer:test`, and placed blocks/entities are tracked in `heaphammer/active_run_journal.json`.
+   - On the next server startup (`SERVER_STARTED`), HeapHammer automatically detects the interrupted run, purges all leftover test entities across all worlds, reverts placed test blocks to air, releases chunk tickets, and cleans the journal.
+4. **Path Traversal Defense-in-Depth**:
+   - Strict alphanumeric whitelist validation (`^[a-zA-Z0-9_-]{1,64}$`) on `ExperimentId` completely neutralizes directory traversal (`../`) vulnerabilities in report loading and replay pipelines.
 
 ### Key Command Flags
 - `--iterations=<int>`: Number of test cycles (default: `5`).
@@ -280,7 +301,7 @@ HeapHammer uses **Hexagonal Architecture (Ports & Adapters)**. The core domain, 
 
 ## Documentation & Building
 
-- **Build Mod**: `./gradlew test build buildTestmods` (34 tests pass)
+- **Build Mod**: `./gradlew test build buildTestmods` (86 tests pass)
 - **Documentation Hub**: [docs/README.md](docs/README.md)
 - **Case Studies & Benchmarks**: [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md)
 - **Architecture & Version Ports**: [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md)

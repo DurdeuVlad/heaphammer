@@ -1,5 +1,8 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.dwurdy.heaphammer.infrastructure.config.ConfigManager;
+import com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,14 +38,48 @@ public record ExperimentSpec(
         Objects.requireNonNull(scenarioId, "scenarioId must not be null");
         Objects.requireNonNull(dimension, "dimension must not be null");
         Objects.requireNonNull(strategy, "strategy must not be null");
-        if (radius <= 0) throw new IllegalArgumentException("radius must be > 0");
-        if (iterations <= 0) throw new IllegalArgumentException("iterations must be > 0");
-        if (batchSize <= 0) throw new IllegalArgumentException("batchSize must be > 0");
-        if (maxOperationsPerTick <= 0) throw new IllegalArgumentException("maxOperationsPerTick must be > 0");
-        if (maxMillisPerTick <= 0) throw new IllegalArgumentException("maxMillisPerTick must be > 0");
-        if (warmupIterations < 0) throw new IllegalArgumentException("warmupIterations must be >= 0");
-        if (holdTicks < 0) throw new IllegalArgumentException("holdTicks must be >= 0");
-        if (settleTicks < 0) throw new IllegalArgumentException("settleTicks must be >= 0");
+
+        HeapHammerConfig config = ConfigManager.getActiveConfig();
+        int maxRadius = config != null ? config.getMaxRadius() : 32;
+        int effectiveMaxRadius = (scenarioId == ScenarioId.ENTITIES) ? maxRadius * 4 : maxRadius;
+        if (radius <= 0 || radius > effectiveMaxRadius) {
+            throw new IllegalArgumentException("radius must be between 1 and " + effectiveMaxRadius + " (received: " + radius + ")");
+        }
+
+        int maxIterations = config != null ? config.getMaxIterations() : 50;
+        if (iterations <= 0 || iterations > maxIterations) {
+            throw new IllegalArgumentException("iterations must be between 1 and " + maxIterations + " (received: " + iterations + ")");
+        }
+
+        int maxBatchSize = config != null ? config.getMaxBatchSize() : 128;
+        if (batchSize <= 0 || batchSize > maxBatchSize) {
+            throw new IllegalArgumentException("batchSize must be between 1 and " + maxBatchSize + " (received: " + batchSize + ")");
+        }
+
+        int maxOps = config != null ? config.getMaxOperationsPerTick() : 50;
+        if (maxOperationsPerTick <= 0 || maxOperationsPerTick > maxOps) {
+            throw new IllegalArgumentException("maxOperationsPerTick must be between 1 and " + maxOps + " (received: " + maxOperationsPerTick + ")");
+        }
+
+        long maxMs = config != null ? config.getMaxMillisPerTick() : 35;
+        if (maxMillisPerTick <= 0 || maxMillisPerTick > maxMs) {
+            throw new IllegalArgumentException("maxMillisPerTick must be between 1 and " + maxMs + " (received: " + maxMillisPerTick + ")");
+        }
+
+        int maxWarmup = config != null ? config.getMaxWarmupIterations() : 10;
+        if (warmupIterations < 0 || warmupIterations > maxWarmup) {
+            throw new IllegalArgumentException("warmupIterations must be between 0 and " + maxWarmup + " (received: " + warmupIterations + ")");
+        }
+
+        int maxHold = config != null ? config.getMaxHoldTicks() : 1200;
+        if (holdTicks < 0 || holdTicks > maxHold) {
+            throw new IllegalArgumentException("holdTicks must be between 0 and " + maxHold + " (received: " + holdTicks + ")");
+        }
+
+        int maxSettle = config != null ? config.getMaxSettleTicks() : 1200;
+        if (settleTicks < 0 || settleTicks > maxSettle) {
+            throw new IllegalArgumentException("settleTicks must be between 0 and " + maxSettle + " (received: " + settleTicks + ")");
+        }
         if (coverage <= 0.0 || coverage > 1.0) coverage = 1.0;
         includeMods = (includeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(includeMods));
         excludeMods = (excludeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(excludeMods));
