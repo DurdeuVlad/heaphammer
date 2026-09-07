@@ -95,7 +95,7 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'build/libs/*.jar, build/testmods/*.jar', fingerprint: true, allowEmptyArchive: false
+                    archiveArtifacts artifacts: 'build/libs/*.jar, build/testmods/*.jar', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }
