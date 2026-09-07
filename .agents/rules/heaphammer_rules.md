@@ -52,18 +52,59 @@ These directives define mandatory operating principles, architectural invariants
 
 ---
 
-## 3. Being Helpful, Not Destructive
+## 3. How to Prove Your Fix Works (TDD & Empirical Proof)
 
-### 3.1 Non-Destructive Code Modifications
-- **Preserve Existing Architecture**: Do not refactor or rewrite existing working components unless specifically requested.
-- **Preserve Docstrings & Comments**: Retain all existing architectural comments, invariants documentation, and explanatory docstrings.
-- **Check Before Overwriting**: Inspect existing implementations and tests before adding new abstractions. Avoid introducing redundant utility classes.
+*Nothing works until proven it works in real environments.*
 
-### 3.2 Safe Server & Environment Handling
-- Test fixtures in `testmods/` simulate genuine modpack leak patterns. Do not edit test mods unless specifically modifying test matrix fixtures.
+### 3.1 Test-First Verification (RED → GREEN)
+1. **Reproduce First (RED)**:
+   - Before modifying code to fix a bug or regression, write an automated test in `src/test/java/...` or run against a testmod fixture that captures the failure.
+   - Run the test and confirm it fails.
+2. **Apply Minimal Fix (GREEN)**:
+   - Implement the change at the canonical owner.
+   - Run the test and confirm it turns green.
+3. **Full Regression Test**:
+   - Run `./gradlew test` to ensure zero regressions across all 34+ invariant tests.
+
+### 3.2 Proving Memory Leak & Performance Claims
+- Always provide baseline vs. candidate measurements using the exact same workload parameters (`--iterations`, `--batch`, `--hold`, `--settle`).
+- Quote the Ordinary Least Squares slope ($m$), $R^2$ fit, and net delta.
+- Use JVM class histograms (`/hh diagnostics histogram`) to prove that the accumulating class roots were eliminated.
+
+---
+
+## 4. How to Write a High-Value Issue (Inspired by Happier OSS)
+
+Describing the problem thoroughly and objectively is often more valuable than an unreviewed PR.
+
+### 4.1 What Makes a Great Issue
+- **Descriptive, Specific Title**: E.g., `[1.20.1-Fabric] Chunk ticket leak on emergency server shutdown during HOLDING phase`.
+- **Platform & Environment Context**: Target Minecraft version, loader version, Java runtime (vendor + version), and active modpack size.
+- **Reproducible Command**: Exact CLI invocation including all flags and seeds.
+- **Observed vs. Expected**: Concrete numbers (e.g., slope $+10.56\text{ MB/cycle}$ vs expected $\le 0.75\text{ MB/cycle}$, active tickets leftover).
+- **Diagnostics Attached**: JSON report from `run/heaphammer/reports/` or class histogram snippet.
+
+### 4.2 Production Issue / Task Handoff Standard
+When drafting an issue or task specification for an AI agent or contributor, every item must provide:
+1. **Strategic Intent & Milestone Placement**: Why this task exists in the overall system outcome.
+2. **Expected Agent Responsibilities**: Actionable step-by-step implementation tasks.
+3. **Explicit Anti-Assumptions (What the Agent MUST NOT Infer)**: Explicit negative boundaries preventing scope creep.
+4. **Exact File Boundaries**: Precise lists of `[NEW]` and `[MODIFY]` files.
+5. **Measurable Acceptance Criteria & Test Surfaces**: Executable commands confirming completion.
+
+---
+
+## 5. Being Helpful, Not Destructive
+
+### 5.1 Non-Destructive Code Modifications
+- **Preserve Existing Architecture**: Never refactor working subsystems or introduce speculative machinery.
+- **Preserve Docstrings & Comments**: Retain all mathematical, architectural, and explanatory docstrings.
+- **Check Before Overwriting**: Inspect existing implementations to prevent split-brains or duplicate utility classes.
+
+### 5.2 Safe Server & Environment Handling
+- Test fixtures in `testmods/` simulate genuine modpack leak patterns. Do not edit them unless modifying fixture contracts.
 - Generated server test runs deposit artifacts in `run/heaphammer/reports/`, `plans/`, and `heapdumps/`. Do not delete or commit these directories.
 
-### 3.3 Empirical Verification Requirement
-- Never guess or declare that code works without verifying.
-- Always execute `./gradlew test` and ensure all unit tests pass before completing a task.
-- Check `git status` and `git diff` to ensure no unintended files or formatting changes were introduced.
+### 5.3 Git Safety & Verification Requirement
+- Never run destructive git commands (`git reset --hard`, `git clean -fd`) in the workspace.
+- Always execute `./gradlew test` and confirm all tests pass before completing any task.

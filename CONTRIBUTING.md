@@ -7,16 +7,33 @@ HeapHammer is a deterministic stress-testing and retained-memory regression fram
 ---
 
 ## Table of Contents
-1. [Core Architectural Principles](#1-core-architectural-principles)
-2. [Multi-Version Minecraft Branching Model](#2-multi-version-minecraft-branching-model)
-3. [Development Workflow & Conventional Commits](#3-development-workflow--conventional-commits)
-4. [Testing & Verification Requirements](#4-testing--verification-requirements)
-5. [Pull Request Checklist](#5-pull-request-checklist)
-6. [Code of Conduct & License Agreement](#6-code-of-conduct--license-agreement)
+1. [The Most Valuable Contribution: A Great Issue](#1-the-most-valuable-contribution-a-great-issue)
+2. [Core Architectural Principles](#2-core-architectural-principles)
+3. [Multi-Version Minecraft Branching Model](#3-multi-version-minecraft-branching-model)
+4. [Development Workflow & Conventional Commits](#4-development-workflow--conventional-commits)
+5. [How to Prove Your Fix Works (Testing & Verification)](#5-how-to-prove-your-fix-works-testing--verification)
+6. [Pull Request Checklist](#6-pull-request-checklist)
+7. [Code of Conduct & License Agreement](#7-code-of-conduct--license-agreement)
 
 ---
 
-## 1. Core Architectural Principles
+## 1. The Most Valuable Contribution: A Great Issue
+
+You do not need to write code to make a high-impact contribution to HeapHammer.
+
+In a diagnostic framework targeting elusive memory leaks, a **thorough, reproducible issue report** is often *more* valuable than an unreviewed PR. It enables maintainers and AI coding agents to reproduce the regression in an isolated environment and resolve it at the canonical owner without architectural churn.
+
+### What Makes a Great Issue:
+- **Descriptive Title**: State the affected component and failure mode clearly (e.g., `[1.20.1-Forge] ForgeChunkTicketManager fails to unforce ticket on abort during SETTLING phase`).
+- **Platform & Environment Context**: Target Minecraft version, loader version, Java runtime (vendor + version), and active modpack size.
+- **Reproducible Command**: Exact CLI invocation (`/hh run chunks --iterations=5 --batch=10 ...`) including any custom parameters and world seed.
+- **Observed vs. Expected**: Concrete metrics (e.g., slope $+10.56\text{ MB/cycle}$ vs expected $\le 0.75\text{ MB/cycle}$, active tickets remaining).
+- **Diagnostics Attached**: JSON run report from `run/heaphammer/reports/` or class histogram snippet (`/hh diagnostics histogram`).
+- **Agent Handoff Standards**: For AI agent instructions and machine-readable issue specs, see [AGENTS.md](AGENTS.md).
+
+---
+
+## 2. Core Architectural Principles
 
 All code submitted to HeapHammer must adhere to our **Hexagonal Architecture (Ports & Adapters)**:
 
@@ -39,7 +56,7 @@ All code submitted to HeapHammer must adhere to our **Hexagonal Architecture (Po
 
 ---
 
-## 2. Multi-Version Minecraft Branching Model
+## 3. Multi-Version Minecraft Branching Model
 
 HeapHammer supports multiple minor and patch versions of Minecraft through a structured branching strategy:
 
@@ -63,18 +80,18 @@ For details on accommodating version differences, see [docs/MULTI_VERSION_ARCHIT
 
 ---
 
-## 3. Development Workflow & Conventional Commits
+## 4. Development Workflow & Conventional Commits
 
-### 3.1 Prerequisites
+### 4.1 Prerequisites
 - Java 21 JDK (OpenJDK or Eclipse Temurin)
 - Git 2.30+
 
-### 3.2 Branch Naming
+### 4.2 Branch Naming
 - Features: `feat/<short-description>` (e.g., `feat/blockentity-filtering`)
 - Bug fixes: `fix/<issue-number>-<short-description>` (e.g., `fix/ticket-leak-on-abort`)
 - Documentation: `docs/<topic>` (e.g., `docs/triage-guide`)
 
-### 3.3 Commit Message Convention
+### 4.3 Commit Message Convention
 We adhere strictly to [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```text
@@ -97,23 +114,31 @@ We adhere strictly to [Conventional Commits](https://www.conventionalcommits.org
 
 ---
 
-## 4. Testing & Verification Requirements
+## 5. How to Prove Your Fix Works (Testing & Verification)
 
-No PR will be merged without concrete test proof. Every contribution must pass all three test tiers:
+*Nothing works until proven it works in real environments.* No PR will be merged without concrete test proof.
 
-### Tier 1: Unit & Domain Invariant Tests
+### 5.1 Test-First Requirement (RED → GREEN)
+For all production bug fixes and feature additions:
+1. **RED**: Write a unit test in `src/test/java/...` or execute against a companion synthetic testmod fixture that captures the bug before modifying production code. Confirm it fails.
+2. **GREEN**: Apply the minimal fix at the canonical owner. Confirm the test passes.
+
+### 5.2 Verification Tiers
+Every contribution must pass all three test tiers:
+
+#### Tier 1: Unit & Domain Invariant Tests
 Fast, pure Java JUnit 5 tests covering domain state machines, codecs, mathematical regressions, and ticket managers:
 ```bash
 ./gradlew test
 ```
 
-### Tier 2: Compilation & Synthetic Testmod Assembly
+#### Tier 2: Compilation & Synthetic Testmod Assembly
 Ensures the mod jar and all companion test mod fixtures compile cleanly:
 ```bash
 ./gradlew build buildTestmods
 ```
 
-### Tier 3: Dedicated Server Multi-Mod Matrix Verification
+#### Tier 3: Dedicated Server Multi-Mod Matrix Verification
 Executes live dedicated server integration benchmarks:
 ```powershell
 # Run all matrix verification scenarios
@@ -125,11 +150,12 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1 -Specific
 
 ---
 
-## 5. Pull Request Checklist
+## 6. Pull Request Checklist
 
 Before submitting a pull request, ensure:
 - [ ] Code compiles with `./gradlew build buildTestmods` without errors or warnings.
 - [ ] All unit tests pass (`./gradlew test`).
+- [ ] Production behavior changes include test-first RED → GREEN verification.
 - [ ] Zero Minecraft/Fabric imports added outside of `com.dwurdy.heaphammer.platform` and `command`.
 - [ ] Any new command or scenario is documented in `README.md` and `docs/`.
 - [ ] Commit history is clean, readable, and follows conventional commits.
@@ -137,7 +163,7 @@ Before submitting a pull request, ensure:
 
 ---
 
-## 6. Code of Conduct & License Agreement
+## 7. Code of Conduct & License Agreement
 
 By contributing to HeapHammer, you agree to:
 1. Abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
