@@ -40,12 +40,12 @@ It loads batches of chunks, spawns test entities, and exercises machine blocks u
 
 ## 3. Quick Setup (60 Seconds)
 
-1. Put `heaphammer-1.0.0.jar` into your server's `mods/` folder.
+1. Download the JAR matching your Minecraft version (e.g. `heaphammer-1.20.1-1.0.0.jar` or `heaphammer-1.21.1-1.0.0.jar`) from Releases and place it into your server's `mods/` folder.
 2. Restart the server.
 3. Done.
 
 > [!NOTE]
-> **100% Server-Side Only**: Your players do **not** need to install HeapHammer. It runs purely on the server.
+> **100% Server-Side Only**: Your players do **not** need to install HeapHammer. It runs purely on the server. Supported versions: 1.21.1, 1.20.1, 1.18.2, 1.16.5, and 1.12.2.
 
 ---
 
