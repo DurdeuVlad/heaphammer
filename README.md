@@ -17,11 +17,12 @@
 [![Side](https://img.shields.io/badge/side-server--only-informational.svg?style=flat-square)](#quickstart)
 
 <p align="center">
-  <a href="#quickstart"><b>Quickstart</b></a> •
   <a href="#what-can-it-simulate"><b>Workloads</b></a> •
   <a href="#how-it-works"><b>How It Works</b></a> •
+  <a href="#built-for-staging-safe-on-live-production"><b>Safety</b></a> •
+  <a href="#quickstart"><b>Quickstart</b></a> •
   <a href="#commands"><b>Commands</b></a> •
-  <a href="docs/README.md"><b>Documentation Hub</b></a>
+  <a href="docs/README.md"><b>Docs</b></a>
 </p>
 
 </div>
@@ -66,6 +67,16 @@ stress sequence         (TPS stays smooth)      & force cleanup         or keeps
 2. **Safe for TPS**: Operations run incrementally within strict limits (`10 ops/tick`, `15 ms max`). It never starves or freezes the server thread.
 3. **Clean Isolation**: Operates only on its own test tickets. Player chunks, world spawn, and existing builds are never touched.
 4. **Smart Math vs. GC Noise**: Rather than guessing from volatile instantaneous memory spikes, it measures if memory steadily creeps up across repeated cycles (`PASS` vs `SUSPICIOUS`).
+
+---
+
+## Built for Staging. Safe on Live Production.
+
+While HeapHammer is **designed primarily for staging and test servers** to catch regressions before rolling out modpack updates, it is engineered with strict **zero-destruction safety invariants** so it can safely run on live production worlds:
+
+- 🛡️ **Zero World Corruption**: Allocates only dedicated test tickets (`TicketType heaphammer`). Player chunks, world spawn, and player builds are never touched or modified.
+- ⏱️ **Strict TPS Protection**: Operations execute within a strict tick budget (`max 10 ops/tick`, `15 ms max`), preventing watchdog stalls and TPS lag for active players.
+- 🧹 **Instant Clean Abort**: Running `/hh stop` or `/hh cleanup` immediately and cleanly releases 100% of test tickets and entities without requiring a server restart.
 
 ---
 
