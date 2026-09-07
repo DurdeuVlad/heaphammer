@@ -72,7 +72,7 @@ master (Default Development Trunk — 1.21.1)
 ```
 
 - **`master`**: The protected stable development trunk. Direct pushes to `master` are strictly prohibited.
-- **`release/v*`**: Batched release staging lines (e.g. `release/v1.0.0` for v1.0.0, `release/v1.1.0` for the upcoming v1.1.0 release). We do **not** publish on every individual fix; all work is gathered on the active release branch before tagging.
+- **`release/v*`**: Batched release staging lines (e.g. `release/v1.0.0` for v1.0.0). We do **not** publish on every individual fix; all work is gathered on the active release branch before tagging.
 - **`ver/<minecraft_version>`**: Dedicated downstream platform branches (e.g. `ver/1.20.1`, `ver/1.12.2-forge`).
 - **Automated Synchronization**: Merges to `master` automatically trigger `.github/workflows/sync-version-branches.yml` to propagate pure-domain improvements downstream.
 
@@ -80,7 +80,7 @@ master (Default Development Trunk — 1.21.1)
 To maintain open-source integrity, reproducible builds, and strict code review:
 1. **Direct pushes to `master` and release branches are forbidden**.
 2. **Always branch off the active target**:
-   - For new features and general improvements: `git checkout -b feat/<name> origin/release/v1.1.0`
+   - For new features and general improvements: `git checkout -b feat/<name> origin/master`
    - For critical bug fixes: `git checkout -b fix/<issue>-<name> origin/master`
 3. **Submit a Pull Request**: All changes must be proposed via a Pull Request using our [PR Template](.github/pull_request_template.md) with passing automated tests (`./gradlew test`) before merging.
 

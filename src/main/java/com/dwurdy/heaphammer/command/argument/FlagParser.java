@@ -2,12 +2,17 @@ package com.dwurdy.heaphammer.command.argument;
 
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.*;
 
 /**
  * Parses named flags from command line arguments (e.g. --seed=123 --radius=6 --center=0,0).
  */
 public class FlagParser {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("heaphammer-flags");
 
     public static Map<String, String> parseRawFlags(String[] args, int startIndex) {
         Map<String, String> flags = new HashMap<>();
@@ -63,19 +68,31 @@ public class FlagParser {
         if (flags.containsKey("radius")) {
             try {
                 int r = Integer.parseInt(flags.get("radius"));
-                builder.radius(Math.min(maxRadius, Math.max(1, r)));
+                int clamped = Math.min(maxRadius, Math.max(1, r));
+                if (clamped != r) {
+                    LOGGER.warn("Parameter clamping: radius {} -> {} (max allowed)", r, clamped);
+                }
+                builder.radius(clamped);
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("iterations")) {
             try {
                 int iters = Integer.parseInt(flags.get("iterations"));
-                builder.iterations(Math.min(maxIterations, Math.max(1, iters)));
+                int clamped = Math.min(maxIterations, Math.max(1, iters));
+                if (clamped != iters) {
+                    LOGGER.warn("Parameter clamping: iterations {} -> {} (max allowed)", iters, clamped);
+                }
+                builder.iterations(clamped);
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("batch")) {
             try {
                 int batch = Integer.parseInt(flags.get("batch"));
-                builder.batchSize(Math.min(maxBatchSize, Math.max(1, batch)));
+                int clamped = Math.min(maxBatchSize, Math.max(1, batch));
+                if (clamped != batch) {
+                    LOGGER.warn("Parameter clamping: batch {} -> {} (max allowed)", batch, clamped);
+                }
+                builder.batchSize(clamped);
             } catch (NumberFormatException ignored) {}
         }
         if (flags.containsKey("strategy")) {

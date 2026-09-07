@@ -75,8 +75,8 @@ class DomainSerializationTest {
     void testReportSerialization() {
         ExperimentSpec spec = ExperimentSpec.builder().build();
         EnvironmentFingerprint env = new EnvironmentFingerprint(
-                "1.1.0-alpha.1", "1.21.1", "0.19.5", "21.0.8", 99999L, "hash123",
-                Map.of("fabricloader", "0.19.5", "heaphammer", "1.1.0-alpha.1")
+                "1.0.0", "1.21.1", "0.19.5", "21.0.8", 99999L, "hash123",
+                Map.of("fabricloader", "0.19.5", "heaphammer", "1.0.0")
         );
 
         MetricSample sample = new MetricSample(

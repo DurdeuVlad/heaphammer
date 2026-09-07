@@ -115,7 +115,7 @@ When drafting an issue or milestone task for agent or contributor handoff, follo
 - **Never Discard Uncommitted Changes**: Never run `git reset --hard`, `git clean -fd`, or discard uncommitted changes in the primary checkout without explicit authorization.
 - **No Direct Pushes to `master` or Release Branches**:
   - `master` and release branches (`release/v*`) are protected trunks. AI agents must **never** push directly to `master`.
-  - Always work on dedicated branches (`feat/<name>`, `fix/<issue>-<name>`) targeting the active release line (`release/v1.1.0`) or `master`.
+  - Always work on dedicated branches (`feat/<name>`, `fix/<issue>-<name>`) targeting `master` or the active release line (`release/v1.0.0`).
   - Run verification (`./gradlew test`) and prepare the branch/PR for human review.
 - **Conventional Commits**: Format commit messages as `<type>(<scope>): <subject>` (e.g., `fix(platform): release chunk tickets cleanly on emergency abort`).
 
