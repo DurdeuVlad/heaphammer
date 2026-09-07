@@ -54,3 +54,9 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+// Stub task for Jenkins pipeline compatibility across version branches
+task buildTestmods {
+    description = 'Stub task for testmod packaging on Forge 1.12.2 branch'
+}
+
