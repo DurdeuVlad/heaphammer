@@ -11,6 +11,7 @@
 **Deterministic Minecraft server stress testing and retained-memory regression detection.**
 
 [![Release](https://img.shields.io/badge/release-v1.0.0-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
+[![CI](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml/badge.svg)](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml)
 [![Minecraft](https://img.shields.io/badge/minecraft-1.12.2_--_1.21.1-brightgreen.svg?style=flat-square)](docs/MULTI_VERSION_ARCHITECTURE.md)
 [![Loaders](https://img.shields.io/badge/loaders-Fabric_%7C_Forge-blue.svg?style=flat-square)](docs/MULTI_VERSION_ARCHITECTURE.md)
 [![License](https://img.shields.io/badge/license-LGPL--3.0-blueviolet.svg?style=flat-square)](LICENSE)
