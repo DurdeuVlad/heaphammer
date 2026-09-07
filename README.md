@@ -32,6 +32,10 @@ HeapHammer:                                    "What exact workload breaks this 
 
 HeapHammer is **100% server-side only**, requires **zero configuration files**, and does **not** require players or client-side mods.
 
+> ℹ️ **Do connecting players or clients need this mod?**  
+> **No.** Clients do **not** need HeapHammer installed. HeapHammer registers zero custom blocks, items, entities, or networking protocols. Standard vanilla clients (and any modpack clients) can connect without issues. All `/hh` commands work via standard vanilla Brigadier command trees.  
+> *(Note: You can also optionally install it on a client instance to benchmark single-player / integrated-server worlds).*
+
 ### Step 1 — Clone Server to Staging
 Copy your production server to a staging or testing directory:
 ```bash
