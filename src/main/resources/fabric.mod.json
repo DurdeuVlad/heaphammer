@@ -3,14 +3,16 @@
 	"id": "heaphammer",
 	"version": "${version}",
 	"name": "HeapHammer",
-	"description": "HeapHammer Minecraft Mod by dwurdy.com",
+	"description": "Deterministic stress-testing and retained-memory regression framework for modded Minecraft.",
 	"authors": [
 		"dwurdy"
 	],
 	"contact": {
-		"homepage": "https://dwurdy.com"
+		"homepage": "https://github.com/DurdeuVlad/heaphammer",
+		"sources": "https://github.com/DurdeuVlad/heaphammer",
+		"issues": "https://github.com/DurdeuVlad/heaphammer/issues"
 	},
-	"license": "CC0-1.0",
+	"license": "LGPL-3.0",
 	"icon": "assets/heaphammer/icon.png",
 	"environment": "*",
 	"entrypoints": {
@@ -29,9 +31,9 @@
 		}
 	],
 	"depends": {
-		"fabricloader": ">=0.19.5",
-		"minecraft": "~1.21.1",
-		"java": ">=21",
+		"fabricloader": ">=0.14.0",
+		"minecraft": "~1.18.2",
+		"java": ">=17",
 		"fabric-api": "*"
 	}
 }
