@@ -112,6 +112,8 @@ public class HeapHammerCommands {
 
         // Operator commands (requires level 2)
         root.then(Commands.literal("stop").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
+        root.then(Commands.literal("abort").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
+        root.then(Commands.literal("cancel").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
         root.then(Commands.literal("cleanup").requires(s -> s.hasPermission(2)).executes(this::cmdCleanup));
         root.then(Commands.literal("checkpoint").requires(s -> s.hasPermission(2))
                 .executes(this::cmdCheckpoint)
@@ -246,7 +248,10 @@ public class HeapHammerCommands {
     }
 
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(new TextComponent("HeapHammer v1.0.0-alpha.1 (Minecraft 1.21.1 / Fabric)")
+        EnvironmentFingerprint env = platform.captureFingerprint();
+        ctx.getSource().sendSuccess(new TextComponent(
+                String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / Fabric)",
+                        env.heapHammerVersion(), env.minecraftVersion()))
                 .withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
