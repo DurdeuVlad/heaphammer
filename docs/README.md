@@ -8,7 +8,7 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 
 | Role | Start Here | Recommended Reading |
 |---|---|---|
-| **Server Admins & Modpack Creators** | **[CASE_STUDIES.md](CASE_STUDIES.md)** (Modpack Triage Playbook) | [README.md](../README.md#quickstart-for-server-admins) • [CASE_STUDIES.md](CASE_STUDIES.md#3-case-study-3-cross-mod-accidental-collision) |
+| **Server Admins & Modpack Creators** | **[CASE_STUDIES.md](CASE_STUDIES.md)** (Modpack Triage Playbook) | [README.md](../README.md#quickstart) • [CASE_STUDIES.md](CASE_STUDIES.md#3-case-study-3-cross-mod-accidental-collision) |
 | **Mod Developers & Contributors** | **[CONTRIBUTING.md](../CONTRIBUTING.md)** (Contribution Standards) | [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md) • [DECISION.md](DECISION.md) • [AGENTS.md](../AGENTS.md) |
 | **DevOps & Release Engineers** | **[PUBLICATION.md](PUBLICATION.md)** (Release & Distribution) | [JENKINS_PIPELINE.md](JENKINS_PIPELINE.md) • [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md#5-automated-branch-synchronization) |
 

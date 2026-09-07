@@ -19,6 +19,7 @@
 <p align="center">
   <a href="#why-heaphammer"><b>Why HeapHammer?</b></a> •
   <a href="#simulated-workloads"><b>Workloads</b></a> •
+  <a href="#does-it-work-with-any-mod"><b>Mod Support</b></a> •
   <a href="#how-it-works"><b>How It Works</b></a> •
   <a href="#built-for-staging-safe-on-production"><b>Safety</b></a> •
   <a href="#quickstart"><b>Quickstart</b></a> •
@@ -72,6 +73,26 @@ Rather than running generic stress loops, HeapHammer exercises real Minecraft me
 ### 4. 🔌 Cross-Mod Collision Isolation (`/hh adapters`)
 - **The Reality**: Mod A works fine alone. Mod B works fine alone. Installed together, Mod A registers a listener onto Mod B's custom event bus on every dimension change and never unsubscribes.
 - **What HeapHammer Does**: Executes dedicated workload adapters registered via entrypoints and compares differential retention slopes (`/hh report diff`).
+
+---
+
+## Does It Work With Any Mod?
+
+**Yes. HeapHammer works automatically out of the box with any mod**—no mod-specific plugins, custom configs, or patches required.
+
+Because HeapHammer stresses the **native Minecraft server engine** and queries the **JVM runtime directly**, any mod running on your server is automatically included in tests:
+
+| Mod Category | Examples | Automatic Behavior | What HeapHammer Catches |
+|---|---|---|---|
+| 🗺️ **World-Gen & Biomes** | Terralith, BYG, Biomes O' Plenty | **100% Automatic** | Chunk loading triggers native feature generation, population, and lighting passes. Catches listeners that leak chunk data. |
+| 📍 **Maps & Claims** | Dynmap, JourneyMap, FTB Chunks | **100% Automatic** | Exercises whether map rendering and claiming listeners cleanly evict terrain cache data when chunks unload. |
+| 👾 **Custom Mobs & Bosses** | Alex's Mobs, Lycanites, Cataclysm | **100% Automatic** | Spawns, ticks, and discards registered entity types, verifying that entity tracking and combat listeners don't pin dead mobs in static lists. |
+| ⚙️ **Machines & Tech** | Create, Mekanism, Applied Energistics 2 | **100% Automatic** | Placing and breaking blocks tests tile entity tick queue deregistration (`BlockEntity.setRemoved()`) and inventory buffer cleanup. |
+| 📦 **Full Modpacks** | ATM, Better MC, Custom Packs (200+ mods) | **100% Automatic** | `/hh report diff` isolates which mod update introduced a regression by comparing memory slopes before and after adding a mod. |
+
+> [!TIP]
+> **What about the `/hh adapters` command?**  
+> For 99% of mods, zero adapters are needed. The **Workload Adapter SPI** is an *optional* extension point for mod authors who want to write specialized stress scenarios for proprietary, non-standard systems (such as off-thread simulations or custom dimension networks).
 
 ---
 
