@@ -43,7 +43,7 @@ We welcome contributions from mod authors, modpack developers, and server admini
 
 - **Contribution Guidelines**: Detailed instructions on coding conventions, hexagonal architecture rules, and pull request workflows are documented in [CONTRIBUTING.md](../CONTRIBUTING.md).
 - **Code of Conduct**: We adhere to the [Contributor Covenant v2.1](../CODE_OF_CONDUCT.md). All participants are expected to uphold a welcoming, respectful, and harassment-free community.
-- **Architectural Decisions**: Read [docs/Decision.md](Decision.md) before proposing significant architectural or algorithmic changes.
+- **Architectural Decisions**: Read [docs/DECISION.md](DECISION.md) before proposing significant architectural or algorithmic changes.
 
 ---
 

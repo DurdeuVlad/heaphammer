@@ -327,7 +327,7 @@ powershell -ExecutionPolicy Bypass -File tools/run-mod-matrix-test.ps1
 - [CONTRIBUTING.md](CONTRIBUTING.md): Code style, hexagonal architecture rules, determinism invariants, and PR guidelines.
 - [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md): Multi-version Minecraft branching strategy, platform accommodation, and automated synchronization.
 - [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md): Empirical test benchmarks, leak detection proofs, and server triage playbook.
-- [docs/Decision.md](docs/Decision.md): Architectural Decision Records (ADRs).
+- [docs/DECISION.md](docs/DECISION.md): Architectural Decision Records (ADRs).
 - [docs/OSS.md](docs/OSS.md): Open-source governance, licensing, and support tiers.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Contributor Covenant v2.1 community guidelines.
 - [SECURITY.md](SECURITY.md): Vulnerability reporting policy and supported release matrix.

@@ -11,7 +11,7 @@ Welcome to the HeapHammer documentation directory. This repository contains the 
   Comprehensive guide to HeapHammer's Hexagonal Architecture (Ports & Adapters), modding era analysis (1.21.1 down to 1.12.2), cross-version compatibility matrix, branching strategy, and automated synchronization.
 - **[FORGE_1_12_2_BRIDGE.md](FORGE_1_12_2_BRIDGE.md)**:
   Architectural specification for the classic Minecraft 1.12.2 Forge platform adapter, reflection ticket bridge, and lifecycle event mappings.
-- **[Decision.md](Decision.md)**:
+- **[DECISION.md](DECISION.md)**:
   Durable Architectural Decision Records (ADRs) explaining the rationale behind zero-Minecraft domain coupling, OLS regression, matrix branching, and dynamic Jenkins toolchains.
 
 ### 2. Empirical Verification & Case Studies
@@ -22,11 +22,11 @@ Welcome to the HeapHammer documentation directory. This repository contains the 
 - **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)**:
   Guide to setting up the multibranch Jenkins CI/CD pipeline, dynamic JDK tool resolution (`JDK21`, `JDK17`, `JDK8`), and test artifact archiving.
 
-### 4. Project Governance & Milestones
+### 4. Project Governance & Open Source
 - **[OSS.md](OSS.md)**:
-  Open-source governance, licensing intent (LGPL-3.0), version support tiers, and release channels.
-- **[Milestones.md](Milestones.md)**:
-  Outcome-based milestone tracking ledger detailing completed releases (M1–M3) and active roadmap horizons (M4–M6).
+  Open-source governance, licensing intent (LGPL-3.0), 5-tier version support policy, and release channels.
+- **Temporary Planning & Scratchpad**:
+  Active development scratchpads, task breakdowns, and issue plans reside in [`.scratch/`](../.scratch).
 
 ---
 
@@ -40,7 +40,7 @@ Welcome to the HeapHammer documentation directory. This repository contains the 
 ### For Mod Developers & Contributors
 1. Read the **[Hexagonal Portability Boundary](MULTI_VERSION_ARCHITECTURE.md#2-architectural-portability-boundary-hexagonal-architecture)** to understand why core domain classes must never import `net.minecraft.*`.
 2. Follow **[CONTRIBUTING.md](../CONTRIBUTING.md)** for coding standards, pull request processes, and test requirements.
-3. Review **[Decision.md](Decision.md)** before proposing changes to core mathematical or architectural models.
+3. Review **[DECISION.md](DECISION.md)** before proposing changes to core mathematical or architectural models.
 
 ### For DevOps & Build Engineers
 1. Refer to **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)** for multibranch pipeline setup.
