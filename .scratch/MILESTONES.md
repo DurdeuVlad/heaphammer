@@ -14,9 +14,9 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
 | **M4: Entity & Block Entity Churn** | Release 1.1.0 | Deterministic entity & tile entity lifecycle stress scenarios | Live dedicated server stress matrix | **Active Specification** |
 | **M5: Registry Coverage Sampling** | Release 1.2.0 | Namespace targeting (`/hh target <modid>`) | Registry iteration & filter test suite | **Planned Horizon** |
 | **M6: Third-Party Workload SPI** | Release 2.0.0 | Workload Adapter SPI for external mod authors | SPI contract test suite | **Future Exploration** |
-| **M7: Modern Frontier (1.21.4 & NeoForge)** | Release 1.3.0 | 1.21.4 Fabric & NeoForge 1.21.x loader adapter | `./gradlew test`, NeoForge server launch | **Planned Specification** |
-| **M8: Modern LTS Bridge (1.19.2)** | Release 1.3.0 | 1.19.2 Fabric & Forge release line | `./gradlew test`, 1.19.2 dedicated server | **Planned Specification** |
-| **M9: Golden Age Titan (1.7.10)** | Release 1.4.0 | 1.7.10 Forge & CleanroomMC legacy adapter | `./gradlew test`, 1.7.10 server ticket churn | **Planned Specification** |
+| **M7: Modern Frontier (1.21.4 & NeoForge)** | Release 1.3.0 | 1.21.4 Fabric & NeoForge 1.21.x loader adapter | `./gradlew test`, NeoForge unit suite (PR #48, ver/1.21.4) | **Completed & Verified** |
+| **M8: Modern LTS Bridge (1.19.2)** | Release 1.3.0 | 1.19.2 Fabric & Forge release line | `./gradlew test`, 34 tests pass, jar artifact (ver/1.19.2) | **Completed & Verified** |
+| **M9: Golden Age Titan (1.7.10)** | Release 1.4.0 | 1.7.10 Forge & CleanroomMC legacy adapter | `./gradlew test`, 71 tests pass, jar artifact (ver/1.7.10-forge) | **Completed & Verified** |
 
 ---
 
@@ -106,7 +106,7 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
   - NeoForge platform adapter registers commands via `RegisterCommandsEvent` and manages tickets cleanly.
 - **Detailed Specification**: See [.scratch/MILESTONES_POPULAR_VERSIONS.md](MILESTONES_POPULAR_VERSIONS.md#milestone-m7-modern-frontier--neoforge-hub-minecraft-1214--neoforge-121x).
 - **Target Horizon**: Release 1.3.0.
-- **Status**: Planned Specification.
+- **Status**: **Completed & Verified** (Issue #43 closed in branch `ver/1.21.4`, Issue #44 closed in PR #48).
 
 ---
 
@@ -119,7 +119,7 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
   - Dedicated server chunk churn executes with zero leftover tickets.
 - **Detailed Specification**: See [.scratch/MILESTONES_POPULAR_VERSIONS.md](MILESTONES_POPULAR_VERSIONS.md#milestone-m8-modern-lts-bridge-minecraft-1192-fabric--forge).
 - **Target Horizon**: Release 1.3.0.
-- **Status**: Planned Specification.
+- **Status**: **Completed & Verified** (Issue #45 closed in branch `ver/1.19.2`, commit `cd75dc4`).
 
 ---
 
@@ -132,5 +132,5 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
   - Legacy `ForgeChunkManager.forceChunk(...)` and `unforceChunk(...)` cycles operate without ticket retention.
 - **Detailed Specification**: See [.scratch/MILESTONES_POPULAR_VERSIONS.md](MILESTONES_POPULAR_VERSIONS.md#milestone-m9-golden-age-classic-titan-minecraft-1710-forge--cleanroommc).
 - **Target Horizon**: Release 1.4.0.
-- **Status**: Planned Specification.
+- **Status**: **Completed & Verified** (Issue #46 closed in branch `ver/1.7.10-forge`, commit `823a5f6`).
 
