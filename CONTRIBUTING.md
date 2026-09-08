@@ -62,14 +62,17 @@ All code submitted to HeapHammer must adhere to our **Hexagonal Architecture (Po
 HeapHammer adheres to a structured, dual-axis branching strategy covering both mod releases and Minecraft platforms:
 
 ```text
-master (Active Production Trunk — 1.21.1 Fabric, Java 21)
+master (Active Production Trunk — 1.21.1 Fabric & NeoForge, Java 21)
   │
   ├──> release/v*        (Batched release staging lines — e.g. release/v1.0.0)
   │
+  ├──> ver/1.21.4        (Active Frontier — Fabric, Java 21)
   ├──> ver/1.20.1        (Modern LTS Gold Standard — Fabric/Forge, Java 17)
+  ├──> ver/1.19.2        (Modern LTS Bridge — Fabric/Forge, Java 17)
   ├──> ver/1.18.2        (World-Gen Overhaul LTS — Fabric/Forge, Java 17)
   ├──> ver/1.16.5        (Nether Legacy LTS — Fabric/Forge, Java 17/8)
-  └──> ver/1.12.2-forge  (Classic Titan LTS — MinecraftForge, Java 8)
+  ├──> ver/1.12.2-forge  (Classic Titan LTS — MinecraftForge, Java 8)
+  └──> ver/1.7.10-forge  (Golden Age Titan LTS — MinecraftForge, Java 8)
 ```
 
 - **`master`**: The protected stable production trunk. Direct pushes to `master` are strictly prohibited. It directly hosts the latest production version of HeapHammer and targets Minecraft `1.21.1` (no redundant `ver/1.21.1` branch).
