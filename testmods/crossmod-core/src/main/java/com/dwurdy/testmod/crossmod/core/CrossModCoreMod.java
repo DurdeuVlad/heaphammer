@@ -31,14 +31,14 @@ public class CrossModCoreMod implements ModInitializer {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("status").executes(ctx -> {
                     int subs = CrossModEventBus.getSubscriptionCount();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-CrossModCore] Active subscriptions: %d", subs)), false);
                     return subs;
                 }))
                 .then(Commands.literal("clear").executes(ctx -> {
                     int subs = CrossModEventBus.getSubscriptionCount();
                     CrossModEventBus.clearAll();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-CrossModCore] Cleared %d subscriptions", subs)), false);
                     return subs;
                 }))

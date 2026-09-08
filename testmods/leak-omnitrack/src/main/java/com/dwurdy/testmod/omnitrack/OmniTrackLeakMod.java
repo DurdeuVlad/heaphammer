@@ -81,19 +81,19 @@ public class OmniTrackLeakMod implements ModInitializer {
                     int ticks = TICK_BUFFER.size();
                     boolean enabled = LEAK_ENABLED.get();
 
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-OmniTrack] Status: enabled=%b, chunks=%d, entities=%d, ticks=%d",
                             enabled, chunks, entities, ticks)), false);
                     return chunks + entities + ticks;
                 }))
                 .then(Commands.literal("enable").executes(ctx -> {
                     LEAK_ENABLED.set(true);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-OmniTrack] Leak ENABLED"), false);
+                    ctx.getSource().sendSuccess(Component.literal("[TestMod-OmniTrack] Leak ENABLED"), false);
                     return 1;
                 }))
                 .then(Commands.literal("disable").executes(ctx -> {
                     LEAK_ENABLED.set(false);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-OmniTrack] Leak DISABLED"), false);
+                    ctx.getSource().sendSuccess(Component.literal("[TestMod-OmniTrack] Leak DISABLED"), false);
                     return 0;
                 }))
                 .then(Commands.literal("clear").executes(ctx -> {
@@ -103,7 +103,7 @@ public class OmniTrackLeakMod implements ModInitializer {
                     CHUNK_AUDIT_LOG.clear();
                     ENTITY_TRACKER.clear();
                     TICK_BUFFER.clear();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-OmniTrack] Cleared records (chunks=%d, entities=%d, ticks=%d)",
                             chunks, entities, ticks)), false);
                     return chunks + entities + ticks;

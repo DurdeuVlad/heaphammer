@@ -224,7 +224,7 @@ public class HeapHammerCommands {
         List<com.dwurdy.heaphammer.adapter.WorkloadAdapter> list =
                 com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance().getAllAdapters();
         if (list.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("No external workload adapters registered.").withStyle(ChatFormatting.GRAY), false);
+            ctx.getSource().sendSuccess(Component.literal("No external workload adapters registered.").withStyle(ChatFormatting.GRAY), false);
             return 1;
         }
 
@@ -233,13 +233,13 @@ public class HeapHammerCommands {
             sb.append("- ").append(adapter.displayName()).append(" (ID: ").append(adapter.adapterId())
               .append("): Scenarios: [").append(String.join(", ", adapter.supportedScenarios())).append("]\n");
         }
-        ctx.getSource().sendSuccess(() -> Component.literal(sb.toString().trim()).withStyle(ChatFormatting.AQUA), false);
+        ctx.getSource().sendSuccess(Component.literal(sb.toString().trim()).withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 
     private int cmdFixtureReset(CommandContext<CommandSourceStack> ctx) {
         com.dwurdy.heaphammer.fixture.SyntheticLeakFixture.reset();
-        ctx.getSource().sendSuccess(() -> Component.literal("Synthetic fixture reset to OFF and storage cleared.").withStyle(ChatFormatting.GREEN), true);
+        ctx.getSource().sendSuccess(Component.literal("Synthetic fixture reset to OFF and storage cleared.").withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 
@@ -247,7 +247,7 @@ public class HeapHammerCommands {
         try {
             var mode = com.dwurdy.heaphammer.fixture.SyntheticLeakFixture.Mode.valueOf(modeStr.trim().toUpperCase(Locale.ROOT));
             com.dwurdy.heaphammer.fixture.SyntheticLeakFixture.setMode(mode);
-            ctx.getSource().sendSuccess(() -> Component.literal("Synthetic fixture set to " + mode + " (" + sizeMb + " MB/cycle).").withStyle(ChatFormatting.GOLD), true);
+            ctx.getSource().sendSuccess(Component.literal("Synthetic fixture set to " + mode + " (" + sizeMb + " MB/cycle).").withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
             ctx.getSource().sendFailure(Component.literal("Unknown fixture mode: " + modeStr + ". Valid modes: OFF, LEAK, CLEAN, BOUNDED."));
         }
@@ -256,7 +256,7 @@ public class HeapHammerCommands {
 
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
         EnvironmentFingerprint env = platform.captureFingerprint();
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / Fabric)",
                         env.heapHammerVersion(), env.minecraftVersion()))
                 .withStyle(ChatFormatting.GOLD), false);
@@ -264,7 +264,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdHelp(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "--- HeapHammer Commands ---\n" +
                 "/hh plan chunks [flags]   - Compute deterministic workload plan\n" +
                 "/hh run chunks [flags]    - Execute chunk churn experiment\n" +
@@ -282,7 +282,7 @@ public class HeapHammerCommands {
 
     private int cmdHelpTopic(CommandContext<CommandSourceStack> ctx) {
         String topic = StringArgumentType.getString(ctx, "topic");
-        ctx.getSource().sendSuccess(() -> Component.literal("Help topic: " + topic).withStyle(ChatFormatting.AQUA), false);
+        ctx.getSource().sendSuccess(Component.literal("Help topic: " + topic).withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 
@@ -290,7 +290,7 @@ public class HeapHammerCommands {
         Runtime rt = Runtime.getRuntime();
         long maxMb = rt.maxMemory() / (1024 * 1024);
         long totalMb = rt.totalMemory() / (1024 * 1024);
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "HeapHammer Capabilities:\n" +
                 "- Scenario: chunks (v1.0)\n" +
                 "- JVM Max Memory: " + maxMb + " MB (Allocated: " + totalMb + " MB)\n" +
@@ -302,7 +302,7 @@ public class HeapHammerCommands {
 
     private int cmdDoctor(CommandContext<CommandSourceStack> ctx) {
         int totalLoaded = platform.getTotalLoadedChunkCount();
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "HeapHammer Doctor:\n" +
                 "- Server status: READY\n" +
                 "- Total loaded chunks: " + totalLoaded + "\n" +
@@ -315,7 +315,7 @@ public class HeapHammerCommands {
     private int cmdStatus(CommandContext<CommandSourceStack> ctx) {
         Optional<ScenarioExecutor> opt = experimentService.getActiveExecutor();
         if (opt.isEmpty() || !opt.get().getStateMachine().getState().isActive()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("No experiment currently active.").withStyle(ChatFormatting.GRAY), false);
+            ctx.getSource().sendSuccess(Component.literal("No experiment currently active.").withStyle(ChatFormatting.GRAY), false);
             return 1;
         }
 
@@ -323,7 +323,7 @@ public class HeapHammerCommands {
         ExperimentPlan plan = executor.getPlan();
         int currentIter = executor.getCurrentIteration();
         int totalIter = plan.spec().iterations();
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Active Experiment: " + plan.id() + " (" + plan.spec().scenarioId() + ")\n" +
                 "- State: " + executor.getStateMachine().getState() + " (" + executor.getStateMachine().getStatusMessage() + ")\n" +
                 "- Iteration: " + currentIter + " / " + totalIter + "\n" +
@@ -339,7 +339,7 @@ public class HeapHammerCommands {
         long maxMb = rt.maxMemory() / (1024 * 1024);
         int totalChunks = platform.getTotalLoadedChunkCount();
 
-        ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+        ctx.getSource().sendSuccess(Component.literal(String.format(Locale.ROOT,
                 "Metrics: Heap: %d MB / %d MB (Max %d MB) | Loaded Chunks: %d | Active Tickets: %d",
                 usedMb, committedMb, maxMb, totalChunks, platform.getChunkTicketManager().getActiveTicketCount()
         )).withStyle(ChatFormatting.AQUA), false);
@@ -349,7 +349,7 @@ public class HeapHammerCommands {
     private int cmdStop(CommandContext<CommandSourceStack> ctx) {
         boolean stopped = experimentService.stop("Cancelled by operator command");
         if (stopped) {
-            ctx.getSource().sendSuccess(() -> Component.literal("Experiment cancelled. Releasing all tickets.").withStyle(ChatFormatting.RED), true);
+            ctx.getSource().sendSuccess(Component.literal("Experiment cancelled. Releasing all tickets.").withStyle(ChatFormatting.RED), true);
         } else {
             ctx.getSource().sendFailure(Component.literal("No active experiment to stop."));
         }
@@ -360,7 +360,7 @@ public class HeapHammerCommands {
         int journalCleaned = experimentService.getRecoveryJournal().recoverIfInterrupted(platform);
         int platformCleaned = platform.cleanupOrphanedState();
         int total = journalCleaned + platformCleaned;
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Cleanup complete: Purged all tickets, removed " + total + " orphaned test entities and block entities across all dimensions."
         ).withStyle(ChatFormatting.GREEN), true);
         return 1;
@@ -368,13 +368,13 @@ public class HeapHammerCommands {
 
     private int cmdCheckpoint(CommandContext<CommandSourceStack> ctx) {
         Checkpoint cp = checkpointService.recordCheckpoint(CheckpointPhase.MANUAL, 0, "minecraft:overworld", false);
-        ctx.getSource().sendSuccess(() -> Component.literal("Recorded manual checkpoint: Heap used = " +
+        ctx.getSource().sendSuccess(Component.literal("Recorded manual checkpoint: Heap used = " +
                 String.format(Locale.ROOT, "%.2f MB", cp.metrics().heapUsedMb())).withStyle(ChatFormatting.GREEN), false);
         return 1;
     }
 
     private int cmdScenarioList(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Available Scenarios:\n" +
                 "- chunks (v1.0): Deterministic chunk load/unload churn\n" +
                 "- entities (v1.0): Deterministic entity lifecycle churn\n" +
@@ -384,7 +384,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdScenarioDescribeChunks(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Scenario: chunks\n" +
                 "Acquires, holds, and releases chunk tickets within a specified radius using selectable strategies (SPIRAL, RING, RANDOM_WALK, HOTSPOT_CHURN, GRID_SWEEP)."
         ).withStyle(ChatFormatting.YELLOW), false);
@@ -392,7 +392,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdScenarioDescribeEntities(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Scenario: entities\n" +
                 "Spawns deterministic entity batches, exercises them for configured lifetime ticks, then discards or kills them to verify complete cleanup."
         ).withStyle(ChatFormatting.YELLOW), false);
@@ -400,7 +400,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdScenarioDescribeBlockEntities(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Scenario: blockentities\n" +
                 "Places deterministic block entity states in a test grid, allows conservative tick initialization, then removes blocks to verify lifecycle cleanup."
         ).withStyle(ChatFormatting.YELLOW), false);
@@ -417,7 +417,7 @@ public class HeapHammerCommands {
             ExperimentSpec spec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
             ExperimentPlan plan = planner.plan(spec);
             Path path = planStorage.savePlan(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(Component.literal(
                     "Plan Created: " + plan.id() + "\n" +
                     "- Operations: " + plan.totalOperations() + " (Unique chunks: " + plan.uniqueChunksCount() + ")\n" +
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
@@ -448,7 +448,7 @@ public class HeapHammerCommands {
             ExperimentPlan plan = planner.plan(spec);
             planStorage.savePlan(plan);
             experimentService.start(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(Component.literal(
                     "Started Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, radius " + spec.radius() + ")"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
@@ -487,7 +487,7 @@ public class HeapHammerCommands {
             List<String> available = platform.getAvailableEntityTypes();
             ExperimentPlan plan = entityPlanner.plan(spec, available);
             Path path = planStorage.savePlan(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(Component.literal(
                     "Entity Plan Created: " + plan.id() + "\n" +
                     "- Operations: " + plan.totalOperations() + "\n" +
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
@@ -536,7 +536,7 @@ public class HeapHammerCommands {
             ExperimentPlan plan = entityPlanner.plan(spec, available);
             planStorage.savePlan(plan);
             experimentService.start(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(Component.literal(
                     "Started Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " entities/batch)"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
@@ -575,7 +575,7 @@ public class HeapHammerCommands {
             List<String> available = platform.getAvailableBlockEntityTypes();
             ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
             Path path = planStorage.savePlan(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(Component.literal(
                     "Block Entity Plan Created: " + plan.id() + "\n" +
                     "- Operations: " + plan.totalOperations() + "\n" +
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
@@ -624,7 +624,7 @@ public class HeapHammerCommands {
             ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
             planStorage.savePlan(plan);
             experimentService.start(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(Component.literal(
                     "Started Block Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " block entities/batch)"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
@@ -639,7 +639,7 @@ public class HeapHammerCommands {
         try {
             checkpointService.clear();
             ScenarioExecutor executor = replayService.replay(target);
-            ctx.getSource().sendSuccess(() -> Component.literal("Replaying plan: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
+            ctx.getSource().sendSuccess(Component.literal("Replaying plan: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
         } catch (Exception e) {
             ctx.getSource().sendFailure(Component.literal("Replay failed: " + e.getMessage()));
         }
@@ -650,7 +650,7 @@ public class HeapHammerCommands {
         try {
             checkpointService.clear();
             ScenarioExecutor executor = replayService.rerun(target);
-            ctx.getSource().sendSuccess(() -> Component.literal("Rerunning spec for: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
+            ctx.getSource().sendSuccess(Component.literal("Rerunning spec for: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
         } catch (Exception e) {
             ctx.getSource().sendFailure(Component.literal("Rerun failed: " + e.getMessage()));
         }
@@ -661,9 +661,9 @@ public class HeapHammerCommands {
         try {
             List<String> reports = reportService.listReportIds();
             if (reports.isEmpty()) {
-                ctx.getSource().sendSuccess(() -> Component.literal("No reports found.").withStyle(ChatFormatting.GRAY), false);
+                ctx.getSource().sendSuccess(Component.literal("No reports found.").withStyle(ChatFormatting.GRAY), false);
             } else {
-                ctx.getSource().sendSuccess(() -> Component.literal("Saved Reports (" + reports.size() + "):\n- " +
+                ctx.getSource().sendSuccess(Component.literal("Saved Reports (" + reports.size() + "):\n- " +
                         String.join("\n- ", reports.stream().limit(10).toList())).withStyle(ChatFormatting.YELLOW), false);
             }
         } catch (IOException e) {
@@ -680,7 +680,7 @@ public class HeapHammerCommands {
                 ctx.getSource().sendFailure(Component.literal("Report not found: " + target));
             } else {
                 String summary = reportService.formatSummary(repOpt.get());
-                ctx.getSource().sendSuccess(() -> Component.literal(summary).withStyle(ChatFormatting.YELLOW), false);
+                ctx.getSource().sendSuccess(Component.literal(summary).withStyle(ChatFormatting.YELLOW), false);
             }
         } catch (IllegalArgumentException e) {
             ctx.getSource().sendFailure(Component.literal(e.getMessage()));
@@ -714,7 +714,7 @@ public class HeapHammerCommands {
             }
 
             ReportDiff diff = ReportDiffer.diff(repA.get(), repB.get());
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(Component.literal(
                     "--- Report Diff (" + diff.runA().value() + " vs " + diff.runB().value() + ") ---\n" +
                     "Environment: " + diff.environmentComparison() + "\n" +
                     String.format(Locale.ROOT, "Initial Heap: %.2f MB -> %.2f MB\n",
@@ -738,7 +738,7 @@ public class HeapHammerCommands {
     private int cmdCheckpointDiagnostics(CommandContext<CommandSourceStack> ctx) {
         cmdCheckpoint(ctx);
         if (!histogramCollector.isSupported()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("Diagnostics: Histogram capture unsupported on this JVM.")
+            ctx.getSource().sendSuccess(Component.literal("Diagnostics: Histogram capture unsupported on this JVM.")
                     .withStyle(ChatFormatting.GRAY), false);
             return 1;
         }
@@ -749,7 +749,7 @@ public class HeapHammerCommands {
                 sb.append(String.format(Locale.ROOT, "- #%d %s: %d (%.2f MB)\n",
                         e.rank(), e.className(), e.instances(), e.bytesMb()));
             }
-            ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD), false);
+            ctx.getSource().sendSuccess(Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD), false);
         }
         return 1;
     }
@@ -759,7 +759,7 @@ public class HeapHammerCommands {
             ctx.getSource().sendFailure(Component.literal("Class histogram capture is not supported on this JVM."));
             return 0;
         }
-        ctx.getSource().sendSuccess(() -> Component.literal("Capturing JVM class histogram...").withStyle(ChatFormatting.GRAY), false);
+        ctx.getSource().sendSuccess(Component.literal("Capturing JVM class histogram...").withStyle(ChatFormatting.GRAY), false);
         Optional<ClassHistogram> histOpt = histogramCollector.capture(10);
         if (histOpt.isEmpty() || histOpt.get().entries().isEmpty()) {
             ctx.getSource().sendFailure(Component.literal("Failed to capture class histogram."));
@@ -773,7 +773,7 @@ public class HeapHammerCommands {
         }
         sb.append(String.format(Locale.ROOT, "Total: %d instances, %.2f MB",
                 hist.totalInstances(), hist.totalBytes() / (1024.0 * 1024.0)));
-        ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD), false);
+        ctx.getSource().sendSuccess(Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
 
@@ -784,7 +784,7 @@ public class HeapHammerCommands {
         }
         Path dumpDir = Path.of("heaphammer", "reports", "heapdumps");
         String filename = "manual-" + System.currentTimeMillis() + ".hprof";
-        ctx.getSource().sendSuccess(() -> Component.literal("Triggering async heap dump to " + filename + " (Warning: temporary STW pause possible)...")
+        ctx.getSource().sendSuccess(Component.literal("Triggering async heap dump to " + filename + " (Warning: temporary STW pause possible)...")
                 .withStyle(ChatFormatting.RED), true);
         heapDumpService.dumpHeapAsync(dumpDir, filename, true)
                 .thenAccept(path -> LOGGER.info("Manual heap dump written to {}", path))
@@ -802,7 +802,7 @@ public class HeapHammerCommands {
         }
         boolean started = jfrTrigger.start("HeapHammer-Manual-" + System.currentTimeMillis());
         if (started) {
-            ctx.getSource().sendSuccess(() -> Component.literal("JFR recording started.").withStyle(ChatFormatting.GREEN), true);
+            ctx.getSource().sendSuccess(Component.literal("JFR recording started.").withStyle(ChatFormatting.GREEN), true);
         } else {
             ctx.getSource().sendFailure(Component.literal("Failed to start JFR recording (may already be active)."));
         }
@@ -815,7 +815,7 @@ public class HeapHammerCommands {
             return 0;
         }
         jfrTrigger.stop();
-        ctx.getSource().sendSuccess(() -> Component.literal("JFR recording stopped.").withStyle(ChatFormatting.YELLOW), true);
+        ctx.getSource().sendSuccess(Component.literal("JFR recording stopped.").withStyle(ChatFormatting.YELLOW), true);
         return 1;
     }
 
@@ -827,7 +827,7 @@ public class HeapHammerCommands {
         Path dir = Path.of("heaphammer", "reports", "jfr");
         Path dumped = jfrTrigger.dump(dir, "manual-" + System.currentTimeMillis());
         if (dumped != null) {
-            ctx.getSource().sendSuccess(() -> Component.literal("Dumped JFR to: " + dumped).withStyle(ChatFormatting.GOLD), true);
+            ctx.getSource().sendSuccess(Component.literal("Dumped JFR to: " + dumped).withStyle(ChatFormatting.GOLD), true);
         } else {
             ctx.getSource().sendFailure(Component.literal("Failed to dump JFR recording."));
         }
@@ -836,7 +836,7 @@ public class HeapHammerCommands {
 
     private int cmdInspectMods(CommandContext<CommandSourceStack> ctx) {
         EnvironmentFingerprint env = platform.captureFingerprint();
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Installed Mods (" + env.installedMods().size() + "):\n" +
                 "Hash: " + env.modpackHash() + "\n" +
                 String.join(", ", env.installedMods().keySet().stream().limit(15).toList()) + "..."
@@ -856,13 +856,13 @@ public class HeapHammerCommands {
         sb.append("- Max Ops/Tick: ").append(cfg.getMaxOperationsPerTick()).append(" ops (max ").append(cfg.getMaxMillisPerTick()).append(" ms)\n");
         sb.append("- Circuit Breaker: ").append(cfg.isCircuitBreakerEnabled() ? "ENABLED (min free " + cfg.getMinFreeMemoryMb() + " MB)" : "DISABLED").append("\n");
         sb.append("- Auto Cleanup on Startup: ").append(cfg.isAutoCleanupOnStartup() ? "YES" : "NO");
-        ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()).withStyle(ChatFormatting.AQUA), false);
+        ctx.getSource().sendSuccess(Component.literal(sb.toString()).withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 
     private int cmdConfigReload(CommandContext<CommandSourceStack> ctx) {
         com.dwurdy.heaphammer.infrastructure.config.ConfigManager.reload();
-        ctx.getSource().sendSuccess(() -> Component.literal("HeapHammer configuration reloaded successfully from disk.").withStyle(ChatFormatting.GREEN), true);
+        ctx.getSource().sendSuccess(Component.literal("HeapHammer configuration reloaded successfully from disk.").withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 

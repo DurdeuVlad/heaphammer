@@ -53,25 +53,25 @@ public class ChunkCacheLeakMod implements ModInitializer {
                 .then(Commands.literal("status").executes(ctx -> {
                     int count = CACHE.size();
                     boolean enabled = LEAK_ENABLED.get();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-ChunkCache] Status: enabled=%b, cached_chunks=%d",
                             enabled, count)), false);
                     return count;
                 }))
                 .then(Commands.literal("enable").executes(ctx -> {
                     LEAK_ENABLED.set(true);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-ChunkCache] Leak ENABLED"), false);
+                    ctx.getSource().sendSuccess(Component.literal("[TestMod-ChunkCache] Leak ENABLED"), false);
                     return 1;
                 }))
                 .then(Commands.literal("disable").executes(ctx -> {
                     LEAK_ENABLED.set(false);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-ChunkCache] Leak DISABLED"), false);
+                    ctx.getSource().sendSuccess(Component.literal("[TestMod-ChunkCache] Leak DISABLED"), false);
                     return 0;
                 }))
                 .then(Commands.literal("clear").executes(ctx -> {
                     int size = CACHE.size();
                     CACHE.clear();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-ChunkCache] Cleared %d cached chunks", size)), false);
                     return size;
                 }))

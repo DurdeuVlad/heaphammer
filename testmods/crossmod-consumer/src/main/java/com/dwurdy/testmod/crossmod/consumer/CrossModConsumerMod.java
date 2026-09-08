@@ -72,7 +72,7 @@ public class CrossModConsumerMod implements ModInitializer {
                     boolean core = CORE_MOD_ACTIVE.get();
                     int fallbackCount = FALLBACK_TRANSIENT_MAP.size();
                     int bridgeCount = core ? ChunkListenerBridge.getActiveBridgeCount() : 0;
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-CrossModConsumer] CoreDetected=%b, BridgesCreated=%d, FallbackCount=%d",
                             core, bridgeCount, fallbackCount)), false);
                     return bridgeCount;

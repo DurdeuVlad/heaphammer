@@ -7,7 +7,7 @@ import com.google.common.collect.Iterables;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -15,7 +15,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -67,7 +66,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         String heapHammerVersion = FabricLoader.getInstance()
                 .getModContainer("heaphammer")
                 .map(m -> m.getMetadata().getVersion().getFriendlyString())
-                .orElse("1.0.0");
+                .orElse("1.0.0-alpha.1");
 
         String mcVersion = FabricLoader.getInstance()
                 .getModContainer("minecraft")
@@ -83,8 +82,16 @@ public class FabricPlatformAdapter implements PlatformAdapter {
 
         MinecraftServer server = serverSupplier.get();
         long worldSeed = 0L;
-        if (server != null && server.getWorldData() != null && server.getWorldData().worldGenOptions() != null) {
-            worldSeed = server.getWorldData().worldGenOptions().seed();
+        if (server != null && server.getWorldData() != null) {
+            try {
+                Object options = server.getWorldData().getClass().getMethod("worldGenOptions").invoke(server.getWorldData());
+                worldSeed = (long) options.getClass().getMethod("seed").invoke(options);
+            } catch (Exception e1) {
+                try {
+                    Object settings = server.getWorldData().getClass().getMethod("worldGenSettings").invoke(server.getWorldData());
+                    worldSeed = (long) settings.getClass().getMethod("seed").invoke(settings);
+                } catch (Exception ignored) {}
+            }
         }
 
         Map<String, String> mods = new TreeMap<>();
@@ -145,15 +152,14 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         return server != null && server.isRunning();
     }
 
-    public static final String TEST_ENTITY_TAG = "heaphammer:test";
     private final Map<String, Set<UUID>> testEntitiesByDimension = new ConcurrentHashMap<>();
     private final Map<String, Set<BlockPos>> testBlockEntitiesByDimension = new ConcurrentHashMap<>();
 
     @Override
     public List<String> getAvailableEntityTypes() {
         List<String> types = new ArrayList<>();
-        for (ResourceLocation key : BuiltInRegistries.ENTITY_TYPE.keySet()) {
-            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(key);
+        for (ResourceLocation key : Registry.ENTITY_TYPE.keySet()) {
+            EntityType<?> type = Registry.ENTITY_TYPE.get(key);
             if (type != null && type.canSummon() && type != EntityType.PLAYER) {
                 types.add(key.toString());
             }
@@ -170,7 +176,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         ResourceLocation loc = ResourceLocation.tryParse(entityTypeId);
         if (loc == null) return null;
 
-        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(loc);
+        EntityType<?> type = Registry.ENTITY_TYPE.get(loc);
         if (type == null || !type.canSummon() || type == EntityType.PLAYER) {
             return null;
         }
@@ -183,7 +189,6 @@ public class FabricPlatformAdapter implements PlatformAdapter {
             mob.setNoAi(true);
             mob.setPersistenceRequired();
         }
-        entity.addTag(TEST_ENTITY_TAG);
 
         boolean added = level.addFreshEntity(entity);
         if (!added) return null;
@@ -236,7 +241,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
     @Override
     public List<String> getAvailableBlockEntityTypes() {
         List<String> types = new ArrayList<>();
-        for (ResourceLocation key : BuiltInRegistries.BLOCK_ENTITY_TYPE.keySet()) {
+        for (ResourceLocation key : Registry.BLOCK_ENTITY_TYPE.keySet()) {
             types.add(key.toString());
         }
         Collections.sort(types);
@@ -251,12 +256,12 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         ResourceLocation loc = ResourceLocation.tryParse(blockEntityTypeId);
         if (loc == null) return false;
 
-        BlockEntityType<?> type = BuiltInRegistries.BLOCK_ENTITY_TYPE.get(loc);
+        BlockEntityType<?> type = Registry.BLOCK_ENTITY_TYPE.get(loc);
         if (type == null) return false;
 
         // Find a valid block state for this block entity type
         BlockState validState = null;
-        for (net.minecraft.world.level.block.Block block : BuiltInRegistries.BLOCK) {
+        for (net.minecraft.world.level.block.Block block : Registry.BLOCK) {
             BlockState defaultState = block.defaultBlockState();
             if (type.isValid(defaultState)) {
                 validState = defaultState;
@@ -307,39 +312,6 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         return count;
     }
 
-    @Override
-    public int cleanupOrphanedState() {
-        int cleaned = 0;
-
-        // 1. Release all chunk tickets
-        ticketManager.releaseAllTickets();
-
-        // 2. Revert any tracked block entities
-        for (String dim : new ArrayList<>(testBlockEntitiesByDimension.keySet())) {
-            cleaned += removeAllTestBlockEntities(dim);
-        }
-
-        // 3. Discard any tracked test entities
-        for (String dim : new ArrayList<>(testEntitiesByDimension.keySet())) {
-            cleaned += removeAllTestEntities(dim);
-        }
-
-        // 4. Sweep all server levels for any orphaned entity bearing TEST_ENTITY_TAG
-        MinecraftServer server = serverSupplier.get();
-        if (server != null) {
-            for (ServerLevel level : server.getAllLevels()) {
-                for (Entity entity : level.getAllEntities()) {
-                    if (entity.getTags().contains(TEST_ENTITY_TAG)) {
-                        entity.discard();
-                        cleaned++;
-                    }
-                }
-            }
-        }
-
-        return cleaned;
-    }
-
     private ServerLevel getLevel(String dimension) {
         MinecraftServer server = serverSupplier.get();
         if (server == null) return null;
@@ -347,7 +319,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         ResourceLocation loc = ResourceLocation.tryParse(dimension);
         if (loc == null) return null;
 
-        ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, loc);
+        ResourceKey<Level> key = ResourceKey.create(Registry.DIMENSION_REGISTRY, loc);
         return server.getLevel(key);
     }
 }
