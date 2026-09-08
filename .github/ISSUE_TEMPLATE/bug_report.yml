@@ -20,11 +20,14 @@ body:
     attributes:
       label: "Minecraft Version"
       options:
-        - "1.21.1 (Production - master)"
+        - "1.21.4 (Active Frontier Fabric)"
+        - "1.21.1 (Production Trunk - Fabric & NeoForge)"
         - "1.20.1 (Modern LTS Gold Standard)"
+        - "1.19.2 (Modern LTS Bridge)"
         - "1.18.2 (World-Gen Overhaul LTS)"
         - "1.16.5 (Nether Legacy LTS)"
         - "1.12.2 (Classic Titan Forge LTS)"
+        - "1.7.10 (Golden Age Titan Forge LTS)"
         - "Other"
     validations:
       required: true
