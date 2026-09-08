@@ -3,18 +3,22 @@
 **Deterministic Minecraft server stress testing and retained-memory regression detection.**
 
 ### Supported Minecraft Versions
-HeapHammer v1.0.0 provides dedicated, precompiled binaries for 5 major Minecraft version lines:
+HeapHammer v1.0.0 provides dedicated, precompiled binaries for 8 major Minecraft version lines:
 
 | Minecraft Version | Mod Loader | Java Target | Release Binary |
 |---|---|---|---|
-| **1.21.1** *(Primary)* | Fabric | Java 21 | `heaphammer-1.21.1-1.0.0.jar` |
+| **1.21.4** | Fabric | Java 21 | `heaphammer-1.21.4-1.0.0.jar` |
+| **1.21.1** *(Trunk)* | Fabric & NeoForge | Java 21 | `heaphammer-1.21.1-1.0.0.jar` |
 | **1.20.1** | Fabric & Forge | Java 17 | `heaphammer-1.20.1-1.0.0.jar` |
+| **1.19.2** | Fabric & Forge | Java 17 | `heaphammer-1.19.2-1.0.0.jar` |
 | **1.18.2** | Fabric & Forge | Java 17 | `heaphammer-1.18.2-1.0.0.jar` |
 | **1.16.5** | Forge & Fabric | Java 8 / 17 | `heaphammer-1.16.5-1.0.0.jar` |
 | **1.12.2** | Forge | Java 8 | `heaphammer-1.12.2-1.0.0.jar` |
+| **1.7.10** | Forge | Java 8 | `heaphammer-1.7.10-1.0.0.jar` |
 
 ### Release Highlights
 - **Hexagonal Core Architecture**: 100% pure Java domain engine with zero `net.minecraft.*` runtime coupling.
+- **Dual Modern Loader Integration**: Built-in native support for both Fabric and NeoForge 1.21.x loaders.
 - **Statistical OLS Regression**: Ordinary Least Squares (y = mx + b) trend slope and plateau pattern detection vs GC noise.
 - **Production Safety**: Safety ceilings (`config/heaphammer.json`), tick budgets (15ms max), and automated crash recovery journal.
 - **Command Security**: Operator Level 2 gating and Fabric Permissions API / LuckPerms integration.
@@ -28,10 +32,13 @@ HeapHammer v1.0.0 provides dedicated, precompiled binaries for 5 major Minecraft
 
 ### Checksums (SHA-256)
 ```
-e1c389bf060c44b5f704beb16e356a78d3ae7d43ed187103e5b8ca411b6a2c8f  heaphammer-1.0.0.jar
+7e27288d087bfcf15fc08893252ee3874c700ecbb00fdcc4e5b67db664dc212b  heaphammer-1.0.0.jar
 2dcad642ba74c0b6bc956bb0bb96a3d80e619098b4e81b159362fb8a37c57a6d  heaphammer-1.12.2-1.0.0.jar
 333867296c9573e9f84014676f18e1d7d3ac0b1fff0baf28e36be46eba20aff6  heaphammer-1.16.5-1.0.0.jar
 e3a13c4d3fa14061323b9c9de2f26172b5f48337ce853b0b125296904bcc58c9  heaphammer-1.18.2-1.0.0.jar
+6a69839493d2614947f1af1cda4f3acf077d790346e8e367591db8745fdd1e3e  heaphammer-1.19.2-1.0.0.jar
 e9adcca915ce98717489cb28dfbc82e4bb43e8266f6123fe7a5352006955b749  heaphammer-1.20.1-1.0.0.jar
-e1c389bf060c44b5f704beb16e356a78d3ae7d43ed187103e5b8ca411b6a2c8f  heaphammer-1.21.1-1.0.0.jar
+7e27288d087bfcf15fc08893252ee3874c700ecbb00fdcc4e5b67db664dc212b  heaphammer-1.21.1-1.0.0.jar
+5d145574ecb3a311080be77788e27d2df2aedcd1b9a1ff303b71bd3c12c9a8f4  heaphammer-1.21.4-1.0.0.jar
+d2781ef59b0013b8854a573a558f4a9505ff6530ac6e3cc92581a0c83e8909ad  heaphammer-1.7.10-1.0.0.jar
 ```
