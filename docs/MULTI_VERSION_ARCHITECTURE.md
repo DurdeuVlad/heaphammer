@@ -54,30 +54,35 @@ To eliminate version migration friction, HeapHammer strictly decouples core logi
 │   ├── PlatformAdapter (Interface)                                      │
 │   └── ChunkTicketManager (Interface)                                   │
 │                                                                        │
-│   Modern Fabric (1.16–1.21.1)        Classic Forge (1.12.2)            │
-│   ├── FabricPlatformAdapter          ├── ForgePlatformAdapter          │
-│   └── FabricChunkTicketManager       ├── ForgeChunkTicketManager       │
-│                                      └── ForgeTicketBridge             │
+│   Modern Fabric (1.16–1.21.4)        Modern NeoForge (1.21.x)          │
+│   ├── FabricPlatformAdapter          ├── NeoForgePlatformAdapter       │
+│   └── FabricChunkTicketManager       ├── NeoForgeChunkTicketManager    │
+│                                      └── NeoForgeTicketBridge          │
+│                                                                        │
+│   Classic Forge (1.12.2 / 1.7.10)                                      │
+│   ├── ForgePlatformAdapter                                             │
+│   ├── ForgeChunkTicketManager                                          │
+│   └── ForgeTicketBridge                                                │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### The Invariant Contract
 - **95% of the codebase** has **zero** Minecraft or mod loader imports.
-- Any improvement to scenario planners, OLS slope math, or JSON reporting is **100% binary-compatible** across all 5 Minecraft version branches.
-- Version-specific logic is strictly quarantined inside `com.dwurdy.heaphammer.platform.fabric` or `com.dwurdy.heaphammer.platform.forge`.
+- Any improvement to scenario planners, OLS slope math, or JSON reporting is **100% binary-compatible** across all supported Minecraft versions.
+- Version-specific logic is strictly quarantined inside `com.dwurdy.heaphammer.platform.fabric`, `com.dwurdy.heaphammer.platform.neoforge`, or `com.dwurdy.heaphammer.platform.forge`.
 
 ---
 
 ## 3. Subsystem Compatibility Matrix
 
-| Architectural Subsystem | Modern (1.21.x / 1.20.1) | World-Gen (1.18.2) | Legacy (1.16.5) | Classic Titan (1.12.2) |
-|---|---|---|---|---|
-| **JVM Target** | Java 21 / Java 17 | Java 17 | Java 17 / 8 | Java 8 |
-| **Loader** | Fabric Loader | Fabric Loader | Fabric Loader | MinecraftForge (FML) |
-| **Chunk Tickets** | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `ForgeChunkManager.Ticket` |
-| **Entity Lifecycle** | `ServerEntityEvents` | `ServerEntityEvents` | `ServerEntityEvents` | `EntityJoinWorldEvent` |
-| **Block Registry** | `BuiltInRegistries.BLOCK`| `BuiltInRegistries.BLOCK`| `Registry.BLOCK` | `GameRegistry.findRegistry` |
-| **Commands** | Brigadier Callback | Brigadier Callback | Brigadier Callback | `CommandBase` (FML) |
+| Architectural Subsystem | Modern Fabric (1.21.x) | Modern NeoForge (1.21.x) | World-Gen (1.18.2 / 1.19.2) | Legacy (1.16.5) | Classic Titan (1.12.2 / 1.7.10) |
+|---|---|---|---|---|---|
+| **JVM Target** | Java 21 | Java 21 | Java 17 | Java 17 / 8 | Java 8 |
+| **Loader** | Fabric Loader | NeoForge | Fabric / Forge | Fabric / Forge | MinecraftForge / Cleanroom |
+| **Chunk Tickets** | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `TicketType<ChunkPos>` | `ForgeChunkManager.Ticket` |
+| **Entity Lifecycle** | `ServerEntityEvents` | `ServerLevel` tracking | `ServerEntityEvents` | `ServerEntityEvents` | `EntityJoinWorldEvent` |
+| **Block Registry** | `BuiltInRegistries.BLOCK`| `BuiltInRegistries.BLOCK`| `BuiltInRegistries.BLOCK`| `Registry.BLOCK` | `GameRegistry.findRegistry` |
+| **Commands** | Brigadier Callback | `RegisterCommandsEvent` | Brigadier Callback | Brigadier Callback | `CommandBase` (FML) |
 
 ---
 
