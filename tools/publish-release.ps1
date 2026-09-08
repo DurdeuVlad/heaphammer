@@ -56,10 +56,13 @@ Copy-Item $primaryJar "$prodDir/heaphammer-$mcVersion-$modVersion.jar" -Force
 if ($BuildAll) {
     Write-Host "`n[-BuildAll specified] Compiling multi-version LTS release binaries..." -ForegroundColor Cyan
     $versionBranches = @(
+        @{ Branch = "ver/1.21.4"; MC = "1.21.4" },
         @{ Branch = "ver/1.20.1"; MC = "1.20.1" },
+        @{ Branch = "ver/1.19.2"; MC = "1.19.2" },
         @{ Branch = "ver/1.18.2"; MC = "1.18.2" },
         @{ Branch = "ver/1.16.5"; MC = "1.16.5" },
-        @{ Branch = "ver/1.12.2-forge"; MC = "1.12.2" }
+        @{ Branch = "ver/1.12.2-forge"; MC = "1.12.2" },
+        @{ Branch = "ver/1.7.10-forge"; MC = "1.7.10" }
     )
 
     $wtBase = "$WorkspaceRoot/.worktrees"
@@ -151,15 +154,18 @@ $notesLines = @(
     "**Deterministic Minecraft server stress testing and retained-memory regression detection.**",
     "",
     "### Supported Minecraft Versions",
-    "HeapHammer v$modVersion provides dedicated, precompiled binaries for 5 major Minecraft version lines:",
+    "HeapHammer v$modVersion provides dedicated, precompiled binaries for 8 major Minecraft version lines:",
     "",
     "| Minecraft Version | Mod Loader | Java Target | Release Binary |",
     "|---|---|---|---|",
-    "| **1.21.1** *(Primary)* | Fabric | Java 21 | ``heaphammer-1.21.1-$modVersion.jar`` |",
+    "| **1.21.4** | Fabric | Java 21 | ``heaphammer-1.21.4-$modVersion.jar`` |",
+    "| **1.21.1** *(Trunk)* | Fabric & NeoForge | Java 21 | ``heaphammer-1.21.1-$modVersion.jar`` |",
     "| **1.20.1** | Fabric & Forge | Java 17 | ``heaphammer-1.20.1-$modVersion.jar`` |",
+    "| **1.19.2** | Fabric & Forge | Java 17 | ``heaphammer-1.19.2-$modVersion.jar`` |",
     "| **1.18.2** | Fabric & Forge | Java 17 | ``heaphammer-1.18.2-$modVersion.jar`` |",
     "| **1.16.5** | Forge & Fabric | Java 8 / 17 | ``heaphammer-1.16.5-$modVersion.jar`` |",
     "| **1.12.2** | Forge | Java 8 | ``heaphammer-1.12.2-$modVersion.jar`` |",
+    "| **1.7.10** | Forge | Java 8 | ``heaphammer-1.7.10-$modVersion.jar`` |",
     "",
     "### Release Highlights",
     "- **Hexagonal Core Architecture**: 100% pure Java domain engine with zero ``net.minecraft.*`` runtime coupling.",
