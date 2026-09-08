@@ -32,3 +32,5 @@ replay_*.log
 *.hprof
 *.jfr
 logs/
+/dist/
+/heaphammer/

@@ -57,6 +57,6 @@ test {
 
 // Stub task for Jenkins pipeline compatibility across version branches
 task buildTestmods {
-    description = 'Stub task for testmod packaging on Forge 1.12.2 branch'
+    description = 'Stub task for testmod packaging on Forge 1.7.10 branch'
 }
 
