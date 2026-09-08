@@ -14,6 +14,9 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
 | **M4: Entity & Block Entity Churn** | Release 1.1.0 | Deterministic entity & tile entity lifecycle stress scenarios | Live dedicated server stress matrix | **Active Specification** |
 | **M5: Registry Coverage Sampling** | Release 1.2.0 | Namespace targeting (`/hh target <modid>`) | Registry iteration & filter test suite | **Planned Horizon** |
 | **M6: Third-Party Workload SPI** | Release 2.0.0 | Workload Adapter SPI for external mod authors | SPI contract test suite | **Future Exploration** |
+| **M7: Modern Frontier (1.21.4 & NeoForge)** | Release 1.3.0 | 1.21.4 Fabric & NeoForge 1.21.x loader adapter | `./gradlew test`, NeoForge unit suite (PR #48, ver/1.21.4) | **Completed & Verified** |
+| **M8: Modern LTS Bridge (1.19.2)** | Release 1.3.0 | 1.19.2 Fabric & Forge release line | `./gradlew test`, 34 tests pass, jar artifact (ver/1.19.2) | **Completed & Verified** |
+| **M9: Golden Age Titan (1.7.10)** | Release 1.4.0 | 1.7.10 Forge & CleanroomMC legacy adapter | `./gradlew test`, 71 tests pass, jar artifact (ver/1.7.10-forge) | **Completed & Verified** |
 
 ---
 
@@ -91,3 +94,43 @@ This document defines the outcome-based checkpoints for the HeapHammer project. 
   - External mod can implement `HeapHammerStressProvider` without compile-time coupling to HeapHammer internal classes.
 - **Target Horizon**: Release 2.0.0.
 - **Status**: Future Exploration.
+
+---
+
+### Milestone M7: Modern Frontier & NeoForge Hub (Minecraft 1.21.4 & NeoForge 1.21.x)
+- **Intended Outcome**: Extend HeapHammer to Minecraft 1.21.4 (Pale Garden / Bundles) and provide a native NeoForge 1.21.x platform adapter for modern tech/magic modpacks.
+- **Scope Boundary**: Branch `ver/1.21.4`, `com.dwurdy.heaphammer.platform.neoforge` package, dual-loader build configurations.
+- **Dependencies**: M1–M3.
+- **Acceptance Evidence**:
+  - `ver/1.21.4` compiles against Fabric API `0.110.0+1.21.4` and passes all 34 pure-domain unit tests.
+  - NeoForge platform adapter registers commands via `RegisterCommandsEvent` and manages tickets cleanly.
+- **Detailed Specification**: See [.scratch/MILESTONES_POPULAR_VERSIONS.md](MILESTONES_POPULAR_VERSIONS.md#milestone-m7-modern-frontier--neoforge-hub-minecraft-1214--neoforge-121x).
+- **Target Horizon**: Release 1.3.0.
+- **Status**: **Completed & Verified** (Issue #43 closed in branch `ver/1.21.4`, Issue #44 closed in PR #48).
+
+---
+
+### Milestone M8: Modern LTS Bridge (Minecraft 1.19.2 Fabric & Forge)
+- **Intended Outcome**: Provide native HeapHammer support for Minecraft 1.19.2, covering landmark modpacks (All The Mods 8, Better MC 1.19.2, Medieval MC, Create: Astral).
+- **Scope Boundary**: Branch `ver/1.19.2`, Fabric API `0.77.0+1.19.2`, Forge `43.4.x` bridge, CI multibranch scan.
+- **Dependencies**: M1–M3.
+- **Acceptance Evidence**:
+  - `ver/1.19.2` compiles on Java 17 and passes 100% of unit tests.
+  - Dedicated server chunk churn executes with zero leftover tickets.
+- **Detailed Specification**: See [.scratch/MILESTONES_POPULAR_VERSIONS.md](MILESTONES_POPULAR_VERSIONS.md#milestone-m8-modern-lts-bridge-minecraft-1192-fabric--forge).
+- **Target Horizon**: Release 1.3.0.
+- **Status**: **Completed & Verified** (Issue #45 closed in branch `ver/1.19.2`, commit `cd75dc4`).
+
+---
+
+### Milestone M9: Golden Age Classic Titan (Minecraft 1.7.10 Forge & CleanroomMC)
+- **Intended Outcome**: Deliver a deterministic retained-memory stress testing and regression framework for 1.7.10 Forge and CleanroomMC servers (GT:NH 1.7.10, Thaumcraft 4, Witchery).
+- **Scope Boundary**: Branch `ver/1.7.10-forge`, `ForgePlatformAdapter1710`, `ForgeChunkTicketManager1710`, RetroFuturaGradle build pipeline.
+- **Dependencies**: M3 (`ver/1.12.2-forge` legacy bridge).
+- **Acceptance Evidence**:
+  - Pure-domain code compiles on Java 8 bytecode and passes all 34 unit tests.
+  - Legacy `ForgeChunkManager.forceChunk(...)` and `unforceChunk(...)` cycles operate without ticket retention.
+- **Detailed Specification**: See [.scratch/MILESTONES_POPULAR_VERSIONS.md](MILESTONES_POPULAR_VERSIONS.md#milestone-m9-golden-age-classic-titan-minecraft-1710-forge--cleanroommc).
+- **Target Horizon**: Release 1.4.0.
+- **Status**: **Completed & Verified** (Issue #46 closed in branch `ver/1.7.10-forge`, commit `823a5f6`).
+
