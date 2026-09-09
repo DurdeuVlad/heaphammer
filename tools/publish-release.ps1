@@ -57,10 +57,16 @@ if ($BuildAll) {
     Write-Host "`n[-BuildAll specified] Compiling multi-version LTS release binaries..." -ForegroundColor Cyan
     $versionBranches = @(
         @{ Branch = "ver/1.21.4"; MC = "1.21.4" },
+        @{ Branch = "ver/1.20.6"; MC = "1.20.6" },
+        @{ Branch = "ver/1.20.4"; MC = "1.20.4" },
         @{ Branch = "ver/1.20.1"; MC = "1.20.1" },
+        @{ Branch = "ver/1.19.4"; MC = "1.19.4" },
         @{ Branch = "ver/1.19.2"; MC = "1.19.2" },
         @{ Branch = "ver/1.18.2"; MC = "1.18.2" },
+        @{ Branch = "ver/1.17.1"; MC = "1.17.1" },
         @{ Branch = "ver/1.16.5"; MC = "1.16.5" },
+        @{ Branch = "ver/1.15.2"; MC = "1.15.2" },
+        @{ Branch = "ver/1.14.4"; MC = "1.14.4" },
         @{ Branch = "ver/1.12.2-forge"; MC = "1.12.2" },
         @{ Branch = "ver/1.7.10-forge"; MC = "1.7.10" }
     )
