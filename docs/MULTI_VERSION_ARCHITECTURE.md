@@ -1,6 +1,6 @@
 # Multi-Version Minecraft Architecture & Accommodation Guide
 
-HeapHammer supports 8 major Minecraft version lines (`1.21.4` down to `1.7.10`) while maintaining a single, unified source of truth for its core domain, deterministic scenario planning, and statistical regression engines.
+HeapHammer supports 14 major Minecraft version lines (`1.21.4` down to `1.7.10`) while maintaining a single, unified source of truth for its core domain, deterministic scenario planning, and statistical regression engines.
 
 ---
 
@@ -9,20 +9,26 @@ HeapHammer supports 8 major Minecraft version lines (`1.21.4` down to `1.7.10`) 
 Community adoption concentrates in distinct Minecraft eras:
 
 ```text
-Active Frontier         Modern Gold Standard      World-Gen Overhaul       Legacy Bridge          Classic Titans
- [1.21.4] ──> [1.21.1] ──> [1.20.1] ──> [1.19.2] ──> [1.18.2] ────────────> [1.16.5] ────────────> [1.12.2] ──> [1.7.10]
- Java 21      Java 21      Java 17      Java 17      Java 17                Java 17/8              Java 8        Java 8
- Fabric       Fabric/Neo   Fabric/Forge Fabric/Forge Fabric/Forge           Fabric/Forge           Forge         Forge
+Modern Frontiers & Standards          World-Gen & Nether Bridges       Village/Buzzy Pioneers       Classic Titans
+ [1.21.4] ──> [1.21.1] ──> [1.20.6/4/1] ──> [1.19.4/2] ──> [1.18.2] ──> [1.17.1] ──> [1.16.5] ──> [1.15.2] ──> [1.14.4] ──> [1.12.2] ──> [1.7.10]
+ Java 21      Java 21      Java 21/17       Java 17        Java 17        Java 17        Java 17/8      Java 8         Java 8         Java 8        Java 8
+ Fabric       Fabric/Neo   Fabric/Forge     Fabric/Forge   Fabric/Forge   Fabric         Fabric/Forge   Fabric         Fabric         Forge         Forge
 ```
 
-| Version | Ecosystem Role | JVM | Mod Loaders | Primary Challenge |
+| Version | Ecosystem Role | JVM | Mod Loaders | Primary Architectural Traits |
 |---|---|---|---|---|
-| **1.21.4** | **Active Frontier** | Java 21 | Fabric | Registry Holder wrapping (`Registry.getValue`), `EntitySpawnReason.COMMAND`, `entity.kill(level)`. |
+| **1.21.4** | **Active Frontier** | Java 21 | Fabric | Registry Holder wrapping (`Registry.getValue`), Data Components, `entity.kill(level)`. |
 | **1.21.1** | **Modern Standard (Trunk)** | Java 21 | Fabric, NeoForge | Primary development trunk (`master`). Unified NeoForge & Fabric dual platform support. |
+| **1.20.6** | **Armored Paws Modern** | Java 21 | Fabric | JVM requirement bumped to Java 21 by Mojang. Data component initialization. |
+| **1.20.4** | **Trails & Tales Intermediate** | Java 17 | Fabric | Pre-data component registry structures. High modpack count. |
 | **1.20.1** | **Modern Gold Standard** | Java 17 | Fabric, Forge | **Highest modpack population.** 300+ modpacks create high cross-mod collision risks. |
+| **1.19.4** | **Late Wild Update** | Java 17 | Fabric | `BuiltInRegistries` standardized, display entities, modern interaction events. |
 | **1.19.2** | **Modern LTS Bridge** | Java 17 | Fabric, Forge | Pre-1.19.3 `Registry` APIs (`Registry.DIMENSION_REGISTRY`), `sendSuccess(Component, boolean)`. |
 | **1.18.2** | **World-Gen Overhaul** | Java 17 | Fabric, Forge | 384-block world height ($Y=-64$ to $320$), high chunk memory pressure. |
-| **1.16.5** | **Pre-Caves Bridge** | Java 17/8 | Fabric, Forge | Transitional registry access before modern Mojmap standardization (`"fabric"` mod ID). |
+| **1.17.1** | **Caves & Cliffs Part 1** | Java 17 / 16 | Fabric | 256-block world height, initial JVM 16 requirement. |
+| **1.16.5** | **Pre-Caves Bridge** | Java 17 / 8 | Fabric, Forge | Transitional registry access before modern Mojmap standardization (`"fabric"` mod ID). |
+| **1.15.2** | **Buzzy Bees Pioneer** | Java 8 / 17 | Fabric | Modern `ServerChunkCache` stabilization and `DistanceManager` ticket system. |
+| **1.14.4** | **Village & Pillage Birth** | Java 8 / 17 | Fabric | Historical birth of modern `TicketType<ChunkPos>` and Fabric Mod Loader ecosystem. |
 | **1.12.2** | **Classic Titan** | Java 8 | MinecraftForge | **Massive technical packs** (GT:NH, SevTech). Legacy ticket and event bus models (`ChunkPos`). |
 | **1.7.10** | **Golden Age Titan** | Java 8 | MinecraftForge | **Immortal golden era** (GregTech: NH 1.7.10, Thaumcraft 4). Pre-flattening coordinates, `ChunkCoordIntPair`. |
 
@@ -99,22 +105,28 @@ master (Active Production Trunk — 1.21.1 Fabric & NeoForge, Java 21)
   ├──> release/v*        (Batched release staging — gathers work before official tagging)
   │
   ├──> ver/1.21.4        (Active Cutting-Edge Fabric — Java 21)
+  ├──> ver/1.20.6        (Armored Paws Modern Fabric — Java 21)
+  ├──> ver/1.20.4        (Trails & Tales Modern Fabric — Java 17)
   ├──> ver/1.20.1        (Modern LTS Fabric/Forge — Java 17)
+  ├──> ver/1.19.4        (Late Wild Update Fabric — Java 17)
   ├──> ver/1.19.2        (Modern LTS Bridge Fabric/Forge — Java 17)
   ├──> ver/1.18.2        (World-Gen LTS Fabric/Forge — Java 17)
+  ├──> ver/1.17.1        (Caves & Cliffs Part 1 Fabric — Java 17/16)
   ├──> ver/1.16.5        (Nether Legacy LTS Fabric/Forge — Java 17/8)
+  ├──> ver/1.15.2        (Buzzy Bees Fabric — Java 8/17)
+  ├──> ver/1.14.4        (Village & Pillage Fabric — Java 8/17)
   ├──> ver/1.12.2-forge  (Classic Titan LTS Forge — Java 8)
   └──> ver/1.7.10-forge  (Golden Age Titan LTS Forge — Java 8)
 ```
 
 ### Branch Policy Rules
 1. **`master` as Production Trunk**: The `master` branch directly targets the latest production Minecraft version (`1.21.1`) with built-in Fabric and NeoForge platform adapters.
-2. **Historical LTS-Only Branches**: Dedicated `ver/*` branches are maintained exclusively for historical versions that are officially designated **LTS** or actively supported. Non-LTS intermediate versions (e.g. `1.20.4`, `1.19.4`) do not receive branches.
+2. **Version Branches (`ver/*` and `<version>`)**: Dedicated branches are maintained for all supported Minecraft releases. Canonical branches follow `ver/<version>` for automated CI synchronization, and direct version aliases (e.g. `1.20.4`) are maintained for ecosystem tooling.
 3. **Mod Version Line Branches**: Release staging lines (`release/v*`) gather batched releases before tagging. Only officially designated LTS mod releases receive long-term maintenance branches.
 
 ### Automated Branch Synchronization
 Every push to `master` triggers [`.github/workflows/sync-version-branches.yml`](../.github/workflows/sync-version-branches.yml):
-1. Merges `master` into each historical `ver/*` branch (`ver/1.21.4`, `ver/1.20.1`, `ver/1.19.2`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`, `ver/1.7.10-forge`).
+1. Merges `master` into each historical version branch (`ver/1.21.4`, `ver/1.20.6`, `ver/1.20.4`, `ver/1.20.1`, `ver/1.19.4`, `ver/1.19.2`, `ver/1.18.2`, `ver/1.17.1`, `ver/1.16.5`, `ver/1.15.2`, `ver/1.14.4`, `ver/1.12.2-forge`, `ver/1.7.10-forge`).
 2. Executes `./gradlew test` with the branch's specific JVM target.
 3. If clean $\rightarrow$ pushes automatically.
 4. If conflict/adaptation required $\rightarrow$ automatically opens a PR labeled `needs-version-adaptation`.
