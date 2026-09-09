@@ -81,6 +81,7 @@ The security of Minecraft servers running HeapHammer is paramount.
 
 - **Batched Releases**: Handled through milestone release staging branches (`release/v*`) to protect modpacks from update churn. See **[docs/PUBLICATION.md](PUBLICATION.md)**.
 - **Release Channels**:
-  - GitHub Releases: Authoritative release tags and jars across all 5 Minecraft versions.
-  - Modrinth & CurseForge: Official mod distribution pages.
+  - GitHub Releases: Authoritative release tags and jars across all supported Minecraft versions.
+  - CurseForge: [HeapHammer on CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
+  - Modrinth: Official mod distribution page.
 - **Automated CI/CD**: Verified via GitHub Actions and Jenkins multibranch pipelines. See [docs/JENKINS_PIPELINE.md](JENKINS_PIPELINE.md).
