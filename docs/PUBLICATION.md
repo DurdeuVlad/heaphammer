@@ -117,9 +117,10 @@ git push origin release/v1.1.0
 
 ## 5. Platform Distribution Configuration
 
-| Configuration Field | GitHub Releases | Modrinth | CurseForge |
+| Configuration Field | GitHub Releases | Modrinth | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer) |
 |---|---|---|---|
-| **Project Name** | `HeapHammer` | `HeapHammer` | `HeapHammer` |
+| **Project Name / URL** | `HeapHammer` | `HeapHammer` | [`heaphammer`](https://www.curseforge.com/minecraft/mc-mods/heaphammer) |
+| **Project ID** | N/A | N/A | `1687734` |
 | **Category** | Release Tag | `Server Utility`, `Optimization` | `Server Utilities` $\to$ `Administrative` |
 | **Client / Server Side** | N/A | **Server: Required**, Client: Unsupported | **Server Only** (Client: Not Needed) |
 | **License** | LGPL-3.0 | LGPL-3.0-only | GNU LGPL v3.0 |
