@@ -14,7 +14,7 @@
 [![CurseForge](https://img.shields.io/badge/CurseForge-HeapHammer-F16436?style=flat-square&logo=curseforge&logoColor=white)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CurseForge Downloads](https://img.shields.io/curseforge/dt/1687734?style=flat-square&logo=curseforge&logoColor=white&color=F16436&label=downloads)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CI](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml/badge.svg)](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml)
-[![Minecraft](https://img.shields.io/badge/minecraft-1.12.2_--_1.21.1-brightgreen.svg?style=flat-square)](docs/MULTI_VERSION_ARCHITECTURE.md)
+[![Minecraft](https://img.shields.io/badge/minecraft-1.7.10_--_1.21.4-brightgreen.svg?style=flat-square)](docs/MULTI_VERSION_ARCHITECTURE.md)
 [![Loaders](https://img.shields.io/badge/loaders-Fabric_%7C_Forge-blue.svg?style=flat-square)](docs/MULTI_VERSION_ARCHITECTURE.md)
 [![License](https://img.shields.io/badge/license-LGPL--3.0-blueviolet.svg?style=flat-square)](LICENSE)
 [![Side](https://img.shields.io/badge/side-server--only-informational.svg?style=flat-square)](#quickstart)
@@ -303,11 +303,13 @@ HeapHammer is specifically engineered for safe execution on live staging and pro
 
 HeapHammer uses **Hexagonal Architecture (Ports & Adapters)**. The core domain, math engine, and scenario planning are pure Java with **zero Minecraft dependencies**, guaranteeing binary compatibility across all supported versions:
 
-- **1.21.1** (Fabric, Java 21) — Active production trunk (`master`)
-- **1.20.1** (Fabric & Forge, Java 17) — Modern LTS Gold Standard (`ver/1.20.1`)
-- **1.18.2** (Fabric & Forge, Java 17) — World-Gen Overhaul LTS (`ver/1.18.2`)
-- **1.16.5** (Forge & Fabric, Java 17/8) — Nether Legacy LTS (`ver/1.16.5`)
-- **1.12.2** (MinecraftForge, Java 8) — Classic Titan LTS (`ver/1.12.2-forge`)
+- **1.21.4 / 1.21.1** (Fabric & NeoForge, Java 21) — Active modern trunk and cutting-edge releases
+- **1.20.6 / 1.20.4 / 1.20.1** (Fabric & Forge, Java 21/17) — Modern Gold Standard modpacks
+- **1.19.4 / 1.19.2** (Fabric & Forge, Java 17) — Modern LTS bridge
+- **1.18.2** (Fabric & Forge, Java 17) — World-Gen Overhaul LTS
+- **1.17.1 / 1.16.5** (Fabric & Forge, Java 17/8) — Nether Legacy & Caves bridges
+- **1.15.2 / 1.14.4** (Fabric, Java 8/17) — Village & Pillage / Buzzy Bees modern chunk ticket origins
+- **1.12.2 / 1.7.10** (MinecraftForge, Java 8) — Classic & Golden Age Titans
 
 *See [docs/MULTI_VERSION_ARCHITECTURE.md](docs/MULTI_VERSION_ARCHITECTURE.md) for version-specific port implementations and adapter details.*
 
