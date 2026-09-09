@@ -2,7 +2,6 @@ package com.dwurdy.heaphammer.platform.fabric;
 
 import com.dwurdy.heaphammer.platform.ChunkTicketManager;
 import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
@@ -115,7 +114,7 @@ public class FabricChunkTicketManager implements ChunkTicketManager {
         ResourceLocation loc = ResourceLocation.tryParse(dimension);
         if (loc == null) return null;
 
-        ResourceKey<Level> key = ResourceKey.create(Registry.DIMENSION_REGISTRY, loc);
-        return server.getLevel(key);
+        net.minecraft.world.level.dimension.DimensionType dimType = net.minecraft.world.level.dimension.DimensionType.getByName(loc);
+        return dimType != null ? server.getLevel(dimType) : null;
     }
 }

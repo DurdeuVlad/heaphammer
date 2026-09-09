@@ -8,7 +8,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -82,16 +81,13 @@ public class FabricPlatformAdapter implements PlatformAdapter {
 
         MinecraftServer server = serverSupplier.get();
         long worldSeed = 0L;
-        if (server != null && server.getWorldData() != null) {
+        if (server != null) {
             try {
-                Object options = server.getWorldData().getClass().getMethod("worldGenOptions").invoke(server.getWorldData());
-                worldSeed = (long) options.getClass().getMethod("seed").invoke(options);
-            } catch (Exception e1) {
-                try {
-                    Object settings = server.getWorldData().getClass().getMethod("worldGenSettings").invoke(server.getWorldData());
-                    worldSeed = (long) settings.getClass().getMethod("seed").invoke(settings);
-                } catch (Exception ignored) {}
-            }
+                ServerLevel overworld = server.getLevel(net.minecraft.world.level.dimension.DimensionType.OVERWORLD);
+                if (overworld != null) {
+                    worldSeed = overworld.getSeed();
+                }
+            } catch (Exception ignored) {}
         }
 
         Map<String, String> mods = new TreeMap<>();
@@ -133,7 +129,14 @@ public class FabricPlatformAdapter implements PlatformAdapter {
     public int getActiveEntityCount(String dimension) {
         ServerLevel level = getLevel(dimension);
         if (level == null) return 0;
-        return Iterables.size(level.getAllEntities());
+        try {
+            java.lang.reflect.Field f = ServerLevel.class.getDeclaredField("entitiesById");
+            f.setAccessible(true);
+            java.util.Map<?, ?> map = (java.util.Map<?, ?>) f.get(level);
+            return map != null ? map.size() : 0;
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     @Override
@@ -319,7 +322,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         ResourceLocation loc = ResourceLocation.tryParse(dimension);
         if (loc == null) return null;
 
-        ResourceKey<Level> key = ResourceKey.create(Registry.DIMENSION_REGISTRY, loc);
-        return server.getLevel(key);
+        net.minecraft.world.level.dimension.DimensionType dimType = net.minecraft.world.level.dimension.DimensionType.getByName(loc);
+        return dimType != null ? server.getLevel(dimType) : null;
     }
 }

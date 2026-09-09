@@ -14,14 +14,16 @@ repositories {
 }
 
 loom {
-	if (!project.minecraft_version.startsWith("1.16") && !project.minecraft_version.startsWith("1.12")) {
+	def mcVer = project.minecraft_version
+	def supportsSplit = mcVer.startsWith("1.18") || mcVer.startsWith("1.19") || mcVer.startsWith("1.20") || mcVer.startsWith("1.21")
+	if (supportsSplit) {
 		splitEnvironmentSourceSets()
 	}
 
 	mods {
 		"heaphammer" {
 			sourceSet sourceSets.main
-			if (!project.minecraft_version.startsWith("1.16") && !project.minecraft_version.startsWith("1.12")) {
+			if (supportsSplit) {
 				sourceSet sourceSets.client
 			}
 		}
