@@ -40,7 +40,7 @@ It loads batches of chunks, spawns test entities, and exercises machine blocks u
 
 ## 3. Quick Setup (60 Seconds)
 
-1. Download the JAR matching your Minecraft version (e.g. `heaphammer-1.20.1-1.0.0.jar` or `heaphammer-1.21.1-1.0.0.jar`) from Releases and place it into your server's `mods/` folder.
+1. Download the JAR matching your Minecraft version (e.g. `heaphammer-1.20.1-1.0.0.jar` or `heaphammer-1.21.1-1.0.0.jar`) from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer) or [GitHub Releases](https://github.com/DurdeuVlad/heaphammer/releases) and place it into your server's `mods/` folder.
 2. Restart the server.
 3. Done.
 
