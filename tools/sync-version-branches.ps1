@@ -2,7 +2,12 @@
 # Local companion script to synchronize master into version branches and verify tests
 
 param (
-    [string[]]$TargetBranches = @("ver/1.21.4", "ver/1.20.1", "ver/1.19.2", "ver/1.18.2", "ver/1.16.5", "ver/1.12.2-forge", "ver/1.7.10-forge"),
+    [string[]]$TargetBranches = @(
+        "ver/1.21.4", "ver/1.20.6", "ver/1.20.4", "ver/1.20.1",
+        "ver/1.19.4", "ver/1.19.2", "ver/1.18.2", "ver/1.17.1",
+        "ver/1.16.5", "ver/1.15.2", "ver/1.14.4",
+        "ver/1.12.2-forge", "ver/1.7.10-forge"
+    ),
     [switch]$Push,
     [switch]$DryRun
 )
