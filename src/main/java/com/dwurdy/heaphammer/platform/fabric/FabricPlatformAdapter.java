@@ -214,7 +214,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         if ("KILL".equalsIgnoreCase(removeMode)) {
             entity.kill();
         } else {
-            entity.remove();
+            entity.discard();
         }
         return true;
     }
@@ -231,7 +231,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         for (UUID uuid : set) {
             Entity entity = level.getEntity(uuid);
             if (entity != null) {
-                entity.remove();
+                entity.discard();
                 count++;
             }
         }
@@ -263,7 +263,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         BlockState validState = null;
         for (net.minecraft.world.level.block.Block block : Registry.BLOCK) {
             BlockState defaultState = block.defaultBlockState();
-            if (type.isValid(block)) {
+            if (type.isValid(defaultState)) {
                 validState = defaultState;
                 break;
             }
