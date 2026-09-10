@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Canonical 5 supported versions from docs/PUBLICATION.md §2
+          # Canonical 6 supported versions from docs/PUBLICATION.md §2
           - branch: master
             mc-version: '1.21.1'
             java-version: '21'
@@ -46,6 +46,10 @@ jobs:
             mc-version: '1.12.2'
             java-version: '17'
             artifact-name: heaphammer-1.12.2
+          - branch: ver/1.7.10-forge
+            mc-version: '1.7.10'
+            java-version: '17'
+            artifact-name: heaphammer-1.7.10
     steps:
       - name: Checkout ${{ matrix.branch }}
         uses: actions/checkout@v4
@@ -163,6 +167,7 @@ jobs:
             echo "| **1.18.2** | Fabric & Forge | \`heaphammer-1.18.2-${{ steps.release.outputs.version }}.jar\` |"
             echo "| **1.16.5** | Forge & Fabric | \`heaphammer-1.16.5-${{ steps.release.outputs.version }}.jar\` |"
             echo "| **1.12.2** | Forge | \`heaphammer-1.12.2-${{ steps.release.outputs.version }}.jar\` |"
+            echo "| **1.7.10** | Forge | \`heaphammer-1.7.10-${{ steps.release.outputs.version }}.jar\` |"
             echo ""
             echo "### Changes"
             echo ""
