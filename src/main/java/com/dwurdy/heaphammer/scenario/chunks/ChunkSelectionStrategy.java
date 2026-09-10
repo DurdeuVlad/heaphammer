@@ -1,6 +1,7 @@
 package com.dwurdy.heaphammer.scenario.chunks;
 
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
+import com.github.bsideup.jabel.Desugar;
 
 import java.util.List;
 
@@ -8,6 +9,7 @@ import java.util.List;
  * Strategy interface for generating candidate chunk coordinate offsets (relative to center).
  */
 public interface ChunkSelectionStrategy {
+    @Desugar
     record ChunkCoord(int x, int z) {}
 
     /**

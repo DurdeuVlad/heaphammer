@@ -7,6 +7,7 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -87,8 +88,8 @@ public class ClassHistogramCollector {
      * @return parsed ClassHistogram
      */
     public static ClassHistogram parse(String rawText, int limit) {
-        if (rawText == null || rawText.isBlank()) {
-            return new ClassHistogram(System.currentTimeMillis(), 0L, 0L, List.of());
+        if (rawText == null || rawText.trim().isEmpty()) {
+            return new ClassHistogram(System.currentTimeMillis(), 0L, 0L, Collections.emptyList());
         }
 
         List<ClassHistogramEntry> entries = new ArrayList<>();

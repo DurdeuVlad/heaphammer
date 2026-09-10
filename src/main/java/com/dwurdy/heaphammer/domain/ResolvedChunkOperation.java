@@ -1,10 +1,13 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Objects;
 
 /**
  * An individual resolved chunk operation in an experiment plan.
  */
+@Desugar
 public record ResolvedChunkOperation(
         int iteration,
         int stepIndex,

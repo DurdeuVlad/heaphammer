@@ -301,7 +301,7 @@ public class HeapHammerCommands {
 
     private int cmdStatus(CommandContext<CommandSourceStack> ctx) {
         Optional<ScenarioExecutor> opt = experimentService.getActiveExecutor();
-        if (opt.isEmpty() || !opt.get().getStateMachine().getState().isActive()) {
+        if (!opt.isPresent() || !opt.get().getStateMachine().getState().isActive()) {
             ctx.getSource().sendSuccess(() -> Component.literal("No experiment currently active.").withStyle(ChatFormatting.GRAY), false);
             return 1;
         }
@@ -400,7 +400,7 @@ public class HeapHammerCommands {
         int chunkX = ((int) Math.floor(pos.x)) >> 4;
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
-        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        String[] rawTokens = flagsString.trim().isEmpty() ? new String[0] : flagsString.split("\\s+");
         ExperimentSpec spec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
 
         ExperimentPlan plan = planner.plan(spec);
@@ -428,7 +428,7 @@ public class HeapHammerCommands {
         int chunkX = ((int) Math.floor(pos.x)) >> 4;
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
-        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        String[] rawTokens = flagsString.trim().isEmpty() ? new String[0] : flagsString.split("\\s+");
         ExperimentSpec spec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
 
         checkpointService.clear();
@@ -450,7 +450,7 @@ public class HeapHammerCommands {
         int chunkX = ((int) Math.floor(pos.x)) >> 4;
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
-        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        String[] rawTokens = flagsString.trim().isEmpty() ? new String[0] : flagsString.split("\\s+");
         ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
         ExperimentSpec spec = ExperimentSpec.builder()
                 .scenarioId(ScenarioId.ENTITIES)
@@ -495,7 +495,7 @@ public class HeapHammerCommands {
         int chunkX = ((int) Math.floor(pos.x)) >> 4;
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
-        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        String[] rawTokens = flagsString.trim().isEmpty() ? new String[0] : flagsString.split("\\s+");
         ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
         ExperimentSpec spec = ExperimentSpec.builder()
                 .scenarioId(ScenarioId.ENTITIES)
@@ -534,7 +534,7 @@ public class HeapHammerCommands {
         int chunkX = ((int) Math.floor(pos.x)) >> 4;
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
-        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        String[] rawTokens = flagsString.trim().isEmpty() ? new String[0] : flagsString.split("\\s+");
         ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
         ExperimentSpec spec = ExperimentSpec.builder()
                 .scenarioId(ScenarioId.BLOCK_ENTITIES)
@@ -579,7 +579,7 @@ public class HeapHammerCommands {
         int chunkX = ((int) Math.floor(pos.x)) >> 4;
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
-        String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
+        String[] rawTokens = flagsString.trim().isEmpty() ? new String[0] : flagsString.split("\\s+");
         ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
         ExperimentSpec spec = ExperimentSpec.builder()
                 .scenarioId(ScenarioId.BLOCK_ENTITIES)
@@ -642,7 +642,7 @@ public class HeapHammerCommands {
                 ctx.getSource().sendSuccess(() -> Component.literal("No reports found.").withStyle(ChatFormatting.GRAY), false);
             } else {
                 ctx.getSource().sendSuccess(() -> Component.literal("Saved Reports (" + reports.size() + "):\n- " +
-                        String.join("\n- ", reports.stream().limit(10).toList())).withStyle(ChatFormatting.YELLOW), false);
+                        String.join("\n- ", reports.stream().limit(10).collect(java.util.stream.Collectors.toList()))).withStyle(ChatFormatting.YELLOW), false);
             }
         } catch (IOException e) {
             ctx.getSource().sendFailure(Component.literal("Error listing reports: " + e.getMessage()));
@@ -654,7 +654,7 @@ public class HeapHammerCommands {
         try {
             Optional<ExperimentReport> repOpt = "last".equalsIgnoreCase(target) ?
                     reportService.loadLatestReport() : reportService.loadReport(ExperimentId.of(target));
-            if (repOpt.isEmpty()) {
+            if (!repOpt.isPresent()) {
                 ctx.getSource().sendFailure(Component.literal("Report not found: " + target));
             } else {
                 String summary = reportService.formatSummary(repOpt.get());
@@ -737,7 +737,7 @@ public class HeapHammerCommands {
         }
         ctx.getSource().sendSuccess(() -> Component.literal("Capturing JVM class histogram...").withStyle(ChatFormatting.GRAY), false);
         Optional<ClassHistogram> histOpt = histogramCollector.capture(10);
-        if (histOpt.isEmpty() || histOpt.get().entries().isEmpty()) {
+        if (!histOpt.isPresent() || histOpt.get().entries().isEmpty()) {
             ctx.getSource().sendFailure(Component.literal("Failed to capture class histogram."));
             return 0;
         }
@@ -815,7 +815,7 @@ public class HeapHammerCommands {
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "Installed Mods (" + env.installedMods().size() + "):\n" +
                 "Hash: " + env.modpackHash() + "\n" +
-                String.join(", ", env.installedMods().keySet().stream().limit(15).toList()) + "..."
+                String.join(", ", env.installedMods().keySet().stream().limit(15).collect(java.util.stream.Collectors.toList())) + "..."
         ).withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
@@ -837,7 +837,7 @@ public class HeapHammerCommands {
                 cps,
                 detection,
                 canonical,
-                List.of()
+                Collections.emptyList()
         );
 
         try {

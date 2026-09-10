@@ -1,10 +1,13 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Objects;
 
 /**
  * Result produced by the detection analysis engine.
  */
+@Desugar
 public record DetectionResult(
         DetectionClassification classification,
         double confidence,

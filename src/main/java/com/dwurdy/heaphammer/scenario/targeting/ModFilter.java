@@ -1,5 +1,7 @@
 package com.dwurdy.heaphammer.scenario.targeting;
 
+import java.util.ArrayList;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -14,12 +16,12 @@ public class ModFilter {
     private final List<String> excludedMods;
 
     public ModFilter(List<String> includedMods, List<String> excludedMods) {
-        this.includedMods = (includedMods == null) ? List.of() : List.copyOf(includedMods);
-        this.excludedMods = (excludedMods == null) ? List.of() : List.copyOf(excludedMods);
+        this.includedMods = (includedMods == null) ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(includedMods));
+        this.excludedMods = (excludedMods == null) ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(excludedMods));
     }
 
     public static ModFilter all() {
-        return new ModFilter(List.of(), List.of());
+        return new ModFilter(Collections.emptyList(), Collections.emptyList());
     }
 
     public List<String> getIncludedMods() {
@@ -31,7 +33,7 @@ public class ModFilter {
     }
 
     public boolean matches(String entry) {
-        if (entry == null || entry.isBlank()) {
+        if (entry == null || entry.trim().isEmpty()) {
             return false;
         }
 

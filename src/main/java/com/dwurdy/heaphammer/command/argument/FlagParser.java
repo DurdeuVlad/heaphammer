@@ -97,12 +97,12 @@ public class FlagParser {
         }
         if (flags.containsKey("include-mod") || flags.containsKey("include")) {
             String val = flags.getOrDefault("include-mod", flags.get("include"));
-            List<String> list = Arrays.stream(val.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+            List<String> list = Arrays.stream(val.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toList());
             builder.includeMods(list);
         }
         if (flags.containsKey("exclude-mod") || flags.containsKey("exclude")) {
             String val = flags.getOrDefault("exclude-mod", flags.get("exclude"));
-            List<String> list = Arrays.stream(val.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+            List<String> list = Arrays.stream(val.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toList());
             builder.excludeMods(list);
         }
 

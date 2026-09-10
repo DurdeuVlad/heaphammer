@@ -1,10 +1,13 @@
 package com.dwurdy.heaphammer.scenario.entities;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Objects;
 
 /**
  * Resolved deterministic operation on an entity instance (Section 11.2, Issue #16).
  */
+@Desugar
 public record ResolvedEntityOperation(
         int iteration,
         int stepIndex,

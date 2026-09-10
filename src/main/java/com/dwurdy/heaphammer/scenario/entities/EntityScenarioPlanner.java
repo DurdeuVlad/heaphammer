@@ -11,14 +11,14 @@ import java.util.*;
  */
 public class EntityScenarioPlanner {
 
-    private static final List<String> DEFAULT_FALLBACK_TYPES = List.of(
+    private static final List<String> DEFAULT_FALLBACK_TYPES = Collections.unmodifiableList(Arrays.asList(
             "minecraft:pig",
             "minecraft:cow",
             "minecraft:sheep",
             "minecraft:chicken",
             "minecraft:zombie",
             "minecraft:skeleton"
-    );
+    ));
 
     public ExperimentPlan plan(ExperimentSpec spec, List<String> availableEntityTypes) {
         return plan(ExperimentId.generate(), spec, availableEntityTypes);

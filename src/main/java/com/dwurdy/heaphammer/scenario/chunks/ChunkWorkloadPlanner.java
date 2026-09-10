@@ -24,7 +24,7 @@ public class ChunkWorkloadPlanner {
         List<ChunkSelectionStrategy.ChunkCoord> relativeCoords = strategy.generateCoords(spec);
 
         if (relativeCoords.isEmpty()) {
-            relativeCoords = List.of(new ChunkSelectionStrategy.ChunkCoord(0, 0));
+            relativeCoords = Collections.unmodifiableList(Arrays.asList(new ChunkSelectionStrategy.ChunkCoord(0, 0)));
         }
 
         List<ResolvedChunkOperation> operations = new ArrayList<>();

@@ -24,7 +24,7 @@ public final class FileStorage {
                 .resolve(targetFile.getFileName().toString() + ".tmp." + System.nanoTime());
 
         try {
-            Files.writeString(tempFile, content, StandardCharsets.UTF_8,
+            java.nio.file.Files.write(tempFile, content.getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
 
             try {
@@ -41,6 +41,6 @@ public final class FileStorage {
     }
 
     public static String readString(Path path) throws IOException {
-        return Files.readString(path, StandardCharsets.UTF_8);
+        return new String(java.nio.file.Files.readAllBytes(path), StandardCharsets.UTF_8);
     }
 }

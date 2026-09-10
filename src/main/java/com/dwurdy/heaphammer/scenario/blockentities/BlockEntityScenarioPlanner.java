@@ -11,7 +11,7 @@ import java.util.*;
  */
 public class BlockEntityScenarioPlanner {
 
-    private static final List<String> DEFAULT_FALLBACK_TYPES = List.of(
+    private static final List<String> DEFAULT_FALLBACK_TYPES = Collections.unmodifiableList(Arrays.asList(
             "minecraft:chest",
             "minecraft:furnace",
             "minecraft:hopper",
@@ -19,7 +19,7 @@ public class BlockEntityScenarioPlanner {
             "minecraft:dispenser",
             "minecraft:dropper",
             "minecraft:brewing_stand"
-    );
+    ));
 
     public ExperimentPlan plan(ExperimentSpec spec, List<String> availableBlockEntityTypes) {
         return plan(ExperimentId.generate(), spec, availableBlockEntityTypes);

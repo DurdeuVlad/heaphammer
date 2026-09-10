@@ -57,9 +57,11 @@ public class HeapDumpService {
      */
     public CompletableFuture<Path> dumpHeapAsync(Path targetDir, String filename, boolean liveOnly) {
         if (!isSupported()) {
-            return CompletableFuture.failedFuture(new UnsupportedOperationException(
+            CompletableFuture<Path> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new UnsupportedOperationException(
                     "Heap dumping is not supported on this JVM (HotSpotDiagnosticMXBean missing)."
             ));
+            return failed;
         }
 
         return CompletableFuture.supplyAsync(() -> {

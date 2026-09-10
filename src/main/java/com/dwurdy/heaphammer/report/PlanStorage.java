@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -63,13 +64,13 @@ public class PlanStorage {
     }
 
     public List<String> listPlanIds() throws IOException {
-        if (!Files.exists(rootDir)) return List.of();
+        if (!Files.exists(rootDir)) return Collections.emptyList();
         try (Stream<Path> stream = Files.list(rootDir)) {
             return stream
                     .filter(p -> p.toString().endsWith(".json"))
                     .map(p -> p.getFileName().toString().replace(".json", ""))
                     .sorted(Comparator.reverseOrder())
-                    .toList();
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 }

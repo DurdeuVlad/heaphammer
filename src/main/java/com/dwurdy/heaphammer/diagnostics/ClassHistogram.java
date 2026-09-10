@@ -1,10 +1,13 @@
 package com.dwurdy.heaphammer.diagnostics;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.*;
 
 /**
  * An immutable snapshot of JVM class instances and memory footprint.
  */
+@Desugar
 public record ClassHistogram(
         long timestamp,
         long totalInstances,
@@ -28,7 +31,7 @@ public record ClassHistogram(
             List<HistogramDiffEntry> diffs = entries.stream()
                     .limit(limit)
                     .map(e -> new HistogramDiffEntry(e.className(), e.instances(), e.bytes()))
-                    .toList();
+                    .collect(java.util.stream.Collectors.toList());
             return new HistogramDiff(diffs, totalInstances, totalBytes);
         }
 
@@ -56,7 +59,7 @@ public record ClassHistogram(
 
         List<HistogramDiffEntry> topDiffs = diffEntries.stream()
                 .limit(limit > 0 ? limit : 20)
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
         long netInstances = this.totalInstances - baseline.totalInstances();
         long netBytes = this.totalBytes - baseline.totalBytes();

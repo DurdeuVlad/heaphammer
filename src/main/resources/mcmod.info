@@ -1,0 +1,13 @@
+﻿[
+  {
+    "modid": "heaphammer",
+    "name": "HeapHammer",
+    "description": "Deterministic stress-testing and retained-memory regression framework for modded Minecraft.",
+    "version": "${mod_version}",
+    "mcversion": "1.12.2",
+    "url": "https://github.com/DurdeuVlad/heaphammer",
+    "authorList": ["dwurdy"],
+    "logoFile": "assets/heaphammer/icon.png",
+    "dependencies": []
+  }
+]

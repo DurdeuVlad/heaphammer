@@ -1,8 +1,11 @@
 package com.dwurdy.heaphammer.detection;
 
+import com.github.bsideup.jabel.Desugar;
+
 /**
  * Ordinary Least Squares (OLS) linear regression model.
  */
+@Desugar
 public record LinearRegression(double slope, double intercept, double rSquared, double standardError) {
 
     public LinearRegression(double slope, double intercept, double rSquared) {

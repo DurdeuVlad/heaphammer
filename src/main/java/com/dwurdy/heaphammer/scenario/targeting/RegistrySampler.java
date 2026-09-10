@@ -33,7 +33,7 @@ public class RegistrySampler {
                     coverage,
                     effectiveFilter.getIncludedMods(),
                     effectiveFilter.getExcludedMods(),
-                    List.of(),
+                    Collections.emptyList(),
                     allEntries.size()
             );
         }

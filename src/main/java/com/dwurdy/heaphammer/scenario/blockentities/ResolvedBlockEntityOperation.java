@@ -1,10 +1,13 @@
 package com.dwurdy.heaphammer.scenario.blockentities;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Objects;
 
 /**
  * Resolved deterministic operation on a block entity lifecycle (Section 11.3, Issue #17).
  */
+@Desugar
 public record ResolvedBlockEntityOperation(
         int iteration,
         int stepIndex,

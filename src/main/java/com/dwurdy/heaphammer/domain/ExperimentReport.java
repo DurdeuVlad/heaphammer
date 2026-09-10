@@ -1,5 +1,9 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.github.bsideup.jabel.Desugar;
+
+import java.util.ArrayList;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -7,6 +11,7 @@ import java.util.Objects;
 /**
  * Immutable report generated for an experiment run (BR-011, Section 14).
  */
+@Desugar
 public record ExperimentReport(
         ExperimentId runId,
         long startTimeEpochMs,
@@ -27,8 +32,8 @@ public record ExperimentReport(
         Objects.requireNonNull(environment, "environment must not be null");
         Objects.requireNonNull(detection, "detection must not be null");
         diagnostics = (diagnostics == null) ? DiagnosticRefs.EMPTY : diagnostics;
-        checkpoints = (checkpoints == null) ? List.of() : Collections.unmodifiableList(List.copyOf(checkpoints));
-        warnings = (warnings == null) ? List.of() : Collections.unmodifiableList(List.copyOf(warnings));
+        checkpoints = (checkpoints == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(checkpoints)));
+        warnings = (warnings == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(warnings)));
     }
 
     public ExperimentReport(
