@@ -195,7 +195,7 @@ jobs:
             --notes-file RELEASE_NOTES.md \
             --verify-tag
 
-      - name: Publish to Modrinth & CurseForge
+      - name: Publish Fabric JARs to Modrinth & CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           # Modrinth
@@ -217,12 +217,40 @@ jobs:
           version-type: release
           changelog-file: RELEASE_NOTES.md
 
-          # Files — mc-publish auto-detects game-version & loaders
-          # from each JAR's embedded fabric.mod.json
-          files: dist/production/*.jar
+          # Fabric JARs (auto-detected from fabric.mod.json)
+          files: |
+            dist/production/heaphammer-1.21*.jar
+            dist/production/heaphammer-1.20*.jar
+            dist/production/heaphammer-1.18*.jar
+            dist/production/heaphammer-1.16*.jar
 
-          # Dependencies auto-detected from fabric.mod.json
-          # (fabricloader, minecraft, java, fabric-api)
+      - name: Publish Forge JARs to Modrinth & CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          # Modrinth
+          modrinth-id: heaphammer
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: false
+          modrinth-unfeature-mode: subset
+
+          # CurseForge
+          curseforge-id: '1687734'
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+          # GitHub (links the release created above)
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Release metadata
+          name: HeapHammer ${{ steps.release.outputs.version }}
+          version: ${{ steps.release.outputs.version }}-forge
+          version-type: release
+          changelog-file: RELEASE_NOTES.md
+
+          # Forge JARs — explicit loader specification
+          files: |
+            dist/production/heaphammer-1.12*.jar
+            dist/production/heaphammer-1.7*.jar
+          loaders: forge
 
       - name: Summary
         run: |
