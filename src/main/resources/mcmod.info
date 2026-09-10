@@ -1,0 +1,1 @@
+[{"modid": "heaphammer", "name": "HeapHammer", "description": "Deterministic server workload and retained-memory regression framework for modded Minecraft.", "version": "${mod_version}", "mcversion": "1.7.10", "authorList": ["DurdeuVlad"], "credits": "Built with RetroFuturaGradle", "logoFile": "assets/heaphammer/icon.png", "dependencies": []}]

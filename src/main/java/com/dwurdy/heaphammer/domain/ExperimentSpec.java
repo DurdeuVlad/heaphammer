@@ -1,5 +1,7 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -8,6 +10,7 @@ import java.util.Objects;
 /**
  * Immutable specification defining an experiment run or plan.
  */
+@Desugar
 public record ExperimentSpec(
         ScenarioId scenarioId,
         long seed,
@@ -44,8 +47,8 @@ public record ExperimentSpec(
         if (holdTicks < 0) throw new IllegalArgumentException("holdTicks must be >= 0");
         if (settleTicks < 0) throw new IllegalArgumentException("settleTicks must be >= 0");
         if (coverage <= 0.0 || coverage > 1.0) coverage = 1.0;
-        includeMods = (includeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(includeMods));
-        excludeMods = (excludeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(excludeMods));
+        includeMods = (includeMods == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(includeMods)));
+        excludeMods = (excludeMods == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(excludeMods)));
     }
 
     public ExperimentSpec(
@@ -67,7 +70,7 @@ public record ExperimentSpec(
     ) {
         this(scenarioId, seed, dimension, centerX, centerZ, radius, iterations, batchSize,
                 strategy, warmupIterations, holdTicks, settleTicks, maxOperationsPerTick,
-                maxMillisPerTick, explicitGc, 1.0, List.of(), List.of());
+                maxMillisPerTick, explicitGc, 1.0, Collections.emptyList(), Collections.emptyList());
     }
 
     public static Builder builder() {

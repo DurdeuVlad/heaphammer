@@ -1,6 +1,8 @@
 plugins {
+    id 'java'
     id 'java-library'
     id 'maven-publish'
+    id 'com.gtnewhorizons.retrofuturagradle' version '1.4.9'
 }
 
 version = project.mod_version
@@ -9,32 +11,59 @@ base.archivesName = project.archives_base_name
 
 repositories {
     mavenCentral()
+    maven {
+        name 'CleanroomMC Maven'
+        url 'https://maven.cleanroommc.com'
+    }
+}
+
+minecraft {
+    mcVersion.set('1.7.10')
+
+    // 1.7.10 uses Forge embedded mappings by default
+    useForgeEmbeddedMappings.set(true)
+
+    username.set('Developer')
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+// Compile Java 17 syntax (records, var, etc.) down to Java 8 bytecode using Jabel
+compileJava {
+    sourceCompatibility = 17
+    options.release = 8
 }
 
 sourceSets {
     main {
         java {
             srcDirs = ['src/main/java']
-            // Exclude modern Fabric-specific classes on Forge 1.12.2 branch
+            // Exclude modern Fabric-specific classes on Forge 1.7.10 branch
             exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+            exclude 'com/dwurdy/heaphammer/platform/forge/**'
             exclude 'com/dwurdy/heaphammer/HeapHammer.java'
+            exclude 'com/dwurdy/heaphammer/HeapHammerForge.java'
             exclude 'com/dwurdy/heaphammer/command/HeapHammerCommands.java'
             exclude 'com/dwurdy/heaphammer/mixin/**'
+            exclude 'com/dwurdy/heaphammer/diagnostics/JfrTrigger.java'
         }
         resources {
             srcDirs = ['src/main/resources']
+            // Exclude Fabric-specific resources
+            exclude 'fabric.mod.json'
+            exclude 'heaphammer.mixins.json'
+            exclude 'heaphammer.client.mixins.json'
         }
     }
     test {
         java {
             srcDirs = ['src/test/java']
-            // Exclude Fabric-specific tests
             exclude 'com/dwurdy/heaphammer/ModMatrixVerificationTest.java'
+            exclude 'com/dwurdy/heaphammer/platform/forge/**'
         }
         resources {
             srcDirs = ['src/test/resources']
@@ -46,6 +75,18 @@ dependencies {
     implementation "com.google.code.gson:gson:2.11.0"
     implementation "org.slf4j:slf4j-api:2.0.13"
 
+    // Jabel: compile Java 17 syntax to Java 8 bytecode
+    annotationProcessor 'com.github.bsideup.jabel:jabel-javac-plugin:0.4.2'
+    compileOnly('com.github.bsideup.jabel:jabel-javac-plugin:0.4.2') {
+        transitive = false
+    }
+
+    // Jabel: compile Java 17 syntax to Java 8 bytecode
+    annotationProcessor 'com.github.bsideup.jabel:jabel-javac-plugin:0.4.2'
+    compileOnly('com.github.bsideup.jabel:jabel-javac-plugin:0.4.2') {
+        transitive = false
+    }
+
     testImplementation platform("org.junit:junit-bom:5.10.2")
     testImplementation "org.junit.jupiter:junit-jupiter"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
@@ -55,8 +96,24 @@ test {
     useJUnitPlatform()
 }
 
+processResources {
+    inputs.property "mod_version", project.mod_version
+
+    filesMatching("mcmod.info") {
+        expand "mod_version": project.mod_version
+    }
+}
+
 // Stub task for Jenkins pipeline compatibility across version branches
 task buildTestmods {
     description = 'Stub task for testmod packaging on Forge 1.7.10 branch'
 }
 
+// RFG's patched MC and launcher sources require Java 8 (package-private access)
+tasks.withType(JavaCompile).configureEach {
+    if (name == 'compilePatchedMcJava' || name == 'compileMcLauncherJava' || name == 'compileInjectedTagsJava') {
+        javaCompiler = javaToolchains.compilerFor {
+            languageVersion.set(JavaLanguageVersion.of(8))
+        }
+    }
+}

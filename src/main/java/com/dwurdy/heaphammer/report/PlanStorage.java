@@ -1,5 +1,8 @@
 package com.dwurdy.heaphammer.report;
 
+import java.util.Collections;
+
+
 import com.dwurdy.heaphammer.domain.ExperimentId;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.infrastructure.FileStorage;
@@ -63,13 +66,13 @@ public class PlanStorage {
     }
 
     public List<String> listPlanIds() throws IOException {
-        if (!Files.exists(rootDir)) return List.of();
+        if (!Files.exists(rootDir)) return Collections.emptyList();
         try (Stream<Path> stream = Files.list(rootDir)) {
             return stream
                     .filter(p -> p.toString().endsWith(".json"))
                     .map(p -> p.getFileName().toString().replace(".json", ""))
                     .sorted(Comparator.reverseOrder())
-                    .toList();
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 }

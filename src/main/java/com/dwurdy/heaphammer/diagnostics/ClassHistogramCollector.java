@@ -1,5 +1,8 @@
 package com.dwurdy.heaphammer.diagnostics;
 
+import java.util.Collections;
+
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,8 +90,8 @@ public class ClassHistogramCollector {
      * @return parsed ClassHistogram
      */
     public static ClassHistogram parse(String rawText, int limit) {
-        if (rawText == null || rawText.isBlank()) {
-            return new ClassHistogram(System.currentTimeMillis(), 0L, 0L, List.of());
+        if (rawText == null || rawText.trim().isEmpty()) {
+            return new ClassHistogram(System.currentTimeMillis(), 0L, 0L, Collections.emptyList());
         }
 
         List<ClassHistogramEntry> entries = new ArrayList<>();

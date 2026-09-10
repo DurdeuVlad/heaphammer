@@ -1,5 +1,10 @@
 package com.dwurdy.heaphammer.report;
 
+import java.util.ArrayList;
+
+
+import com.github.bsideup.jabel.Desugar;
+
 import com.dwurdy.heaphammer.domain.DetectionClassification;
 import com.dwurdy.heaphammer.domain.ExperimentId;
 
@@ -10,6 +15,7 @@ import java.util.Objects;
 /**
  * Comparative differential analysis between two experiment reports (Section 27).
  */
+@Desugar
 public record ReportDiff(
         ExperimentId runA,
         ExperimentId runB,
@@ -37,7 +43,7 @@ public record ReportDiff(
         Objects.requireNonNull(classificationA, "classificationA must not be null");
         Objects.requireNonNull(classificationB, "classificationB must not be null");
         Objects.requireNonNull(summary, "summary must not be null");
-        warnings = (warnings == null) ? List.of() : Collections.unmodifiableList(List.copyOf(warnings));
+        warnings = (warnings == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(warnings)));
     }
 
     public double netDeltaDiffMb() {

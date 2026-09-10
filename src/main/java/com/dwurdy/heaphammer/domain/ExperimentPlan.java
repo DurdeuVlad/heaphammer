@@ -1,5 +1,10 @@
 package com.dwurdy.heaphammer.domain;
 
+import java.util.ArrayList;
+
+
+import com.github.bsideup.jabel.Desugar;
+
 import com.dwurdy.heaphammer.scenario.blockentities.ResolvedBlockEntityOperation;
 import com.dwurdy.heaphammer.scenario.entities.ResolvedEntityOperation;
 import com.dwurdy.heaphammer.scenario.targeting.TargetPartition;
@@ -12,6 +17,7 @@ import java.util.Optional;
 /**
  * Persisted execution plan containing deterministic resolved operations.
  */
+@Desugar
 public record ExperimentPlan(
         ExperimentId id,
         long createdAtEpochMs,
@@ -26,9 +32,9 @@ public record ExperimentPlan(
     public ExperimentPlan {
         Objects.requireNonNull(id, "id must not be null");
         Objects.requireNonNull(spec, "spec must not be null");
-        operations = (operations == null) ? List.of() : Collections.unmodifiableList(List.copyOf(operations));
-        entityOperations = (entityOperations == null) ? List.of() : Collections.unmodifiableList(List.copyOf(entityOperations));
-        blockEntityOperations = (blockEntityOperations == null) ? List.of() : Collections.unmodifiableList(List.copyOf(blockEntityOperations));
+        operations = (operations == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(operations)));
+        entityOperations = (entityOperations == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(entityOperations)));
+        blockEntityOperations = (blockEntityOperations == null) ? Collections.emptyList() : Collections.unmodifiableList(Collections.unmodifiableList(new ArrayList<>(blockEntityOperations)));
     }
 
     public ExperimentPlan(
@@ -52,7 +58,7 @@ public record ExperimentPlan(
             int estimatedDurationTicks,
             int uniqueChunksCount
     ) {
-        this(id, createdAtEpochMs, spec, operations, List.of(), List.of(), null, estimatedDurationTicks, uniqueChunksCount);
+        this(id, createdAtEpochMs, spec, operations, Collections.emptyList(), Collections.emptyList(), null, estimatedDurationTicks, uniqueChunksCount);
     }
 
     public static ExperimentPlan forEntities(
@@ -63,7 +69,7 @@ public record ExperimentPlan(
             TargetPartition targetPartition,
             int estimatedDurationTicks
     ) {
-        return new ExperimentPlan(id, createdAtEpochMs, spec, List.of(), entityOperations, List.of(), targetPartition, estimatedDurationTicks, 0);
+        return new ExperimentPlan(id, createdAtEpochMs, spec, Collections.emptyList(), entityOperations, Collections.emptyList(), targetPartition, estimatedDurationTicks, 0);
     }
 
     public static ExperimentPlan forEntities(
@@ -84,7 +90,7 @@ public record ExperimentPlan(
             TargetPartition targetPartition,
             int estimatedDurationTicks
     ) {
-        return new ExperimentPlan(id, createdAtEpochMs, spec, List.of(), List.of(), blockEntityOperations, targetPartition, estimatedDurationTicks, 0);
+        return new ExperimentPlan(id, createdAtEpochMs, spec, Collections.emptyList(), Collections.emptyList(), blockEntityOperations, targetPartition, estimatedDurationTicks, 0);
     }
 
     public static ExperimentPlan forBlockEntities(

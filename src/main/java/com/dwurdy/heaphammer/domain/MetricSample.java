@@ -1,8 +1,11 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.github.bsideup.jabel.Desugar;
+
 /**
  * Metric readings sampled at a specific instant in time.
  */
+@Desugar
 public record MetricSample(
         long timestampEpochMs,
         long tick,

@@ -39,7 +39,7 @@ public class ReplayService {
         Optional<ExperimentPlan> planOpt;
         if ("last".equalsIgnoreCase(planOrRunId)) {
             planOpt = planStorage.loadLatestPlan();
-            if (planOpt.isEmpty()) {
+            if (!planOpt.isPresent()) {
                 Optional<ExperimentReport> reportOpt = reportService.loadLatestReport();
                 if (reportOpt.isPresent()) {
                     planOpt = planStorage.loadPlan(reportOpt.get().runId());
@@ -49,7 +49,7 @@ public class ReplayService {
             planOpt = planStorage.loadPlan(ExperimentId.of(planOrRunId));
         }
 
-        if (planOpt.isEmpty()) {
+        if (!planOpt.isPresent()) {
             throw new IllegalArgumentException("No saved plan found for identifier: " + planOrRunId);
         }
 
@@ -80,7 +80,7 @@ public class ReplayService {
             reportOpt = reportService.loadReport(ExperimentId.of(runId));
         }
 
-        if (reportOpt.isEmpty()) {
+        if (!reportOpt.isPresent()) {
             throw new IllegalArgumentException("No saved report found for rerun identifier: " + runId);
         }
 

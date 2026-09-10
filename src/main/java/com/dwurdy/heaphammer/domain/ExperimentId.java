@@ -1,5 +1,7 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -9,12 +11,13 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Immutable identifier for an experiment run or plan.
  */
+@Desugar
 public record ExperimentId(String value) {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
     public ExperimentId {
         Objects.requireNonNull(value, "value must not be null");
-        if (value.isBlank()) {
+        if (value.trim().isEmpty()) {
             throw new IllegalArgumentException("value must not be blank");
         }
     }

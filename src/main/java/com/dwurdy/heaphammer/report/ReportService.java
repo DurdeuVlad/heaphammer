@@ -57,13 +57,13 @@ public class ReportService {
     }
 
     public List<String> listReportIds() throws IOException {
-        if (!Files.exists(reportsDir)) return List.of();
+        if (!Files.exists(reportsDir)) return Collections.emptyList();
         try (Stream<Path> stream = Files.list(reportsDir)) {
             return stream
                     .filter(p -> p.toString().endsWith(".json"))
                     .map(p -> p.getFileName().toString().replace(".json", ""))
                     .sorted(Comparator.reverseOrder())
-                    .toList();
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 
@@ -81,7 +81,7 @@ public class ReportService {
         sb.append("=== HeapHammer Report: ").append(report.runId().value()).append(" ===\n");
         sb.append("Status: ").append(report.status()).append(" | Verdict: ").append(report.detection().classification()).append("\n");
         sb.append("Duration: ").append(report.durationMs() / 1000).append("s | Checkpoints: ").append(report.checkpoints().size()).append("\n");
-        sb.append("Slope: ").append(String.format(Locale.ROOT, "%.2f MB/cycle (R² = %.2f)", report.detection().slopeMbPerCycle(), report.detection().rSquared())).append("\n");
+        sb.append("Slope: ").append(String.format(Locale.ROOT, "%.2f MB/cycle (RÂ² = %.2f)", report.detection().slopeMbPerCycle(), report.detection().rSquared())).append("\n");
         sb.append("Net Delta: ").append(String.format(Locale.ROOT, "%.2f MB", report.detection().netDeltaMb())).append("\n");
         sb.append("Rationale: ").append(report.detection().rationale()).append("\n");
         sb.append("Canonical Replay: ").append(report.canonicalCommand()).append("\n");

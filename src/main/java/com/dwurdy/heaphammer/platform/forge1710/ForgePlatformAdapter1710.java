@@ -42,7 +42,7 @@ public class ForgePlatformAdapter1710 implements PlatformAdapter {
 
     @Override
     public EnvironmentFingerprint captureFingerprint() {
-        String heapHammerVersion = "1.0.0";
+        String heapHammerVersion = "1.0.1";
         String mcVersion = "1.7.10";
         String loaderVersion = "forge-10.13.4.1614";
         String javaVersion = System.getProperty("java.version", "8");

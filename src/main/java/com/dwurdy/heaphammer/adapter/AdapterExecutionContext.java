@@ -1,5 +1,7 @@
 package com.dwurdy.heaphammer.adapter;
 
+import com.github.bsideup.jabel.Desugar;
+
 import com.dwurdy.heaphammer.domain.CheckpointPhase;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.domain.ExperimentState;
@@ -12,6 +14,7 @@ import java.util.function.Consumer;
 /**
  * Execution context provided to workload adapters during scenario runs (Section 15.7).
  */
+@Desugar
 public record AdapterExecutionContext(
         ExperimentPlan plan,
         PlatformAdapter platform,
