@@ -11,7 +11,7 @@ HeapHammer is a **deterministic server workload and retained-memory regression f
 - **Hexagonal Architecture (Ports & Adapters)**:
   - The core domain (`domain`, `scenario`, `detection`, `reporting`, `storage`, `infrastructure`) is **100% pure Java** with **zero** Minecraft (`net.minecraft.*`) or mod loader imports.
   - All game interactions pass through explicit port interfaces in `com.dwurdy.heaphammer.platform` (`PlatformAdapter`, `ChunkTicketManager`).
-  - This guarantees binary portability across all 5 supported Minecraft version branches (`master` / `1.21.1`, `1.20.1`, `1.18.2`, `1.16.5`, `1.12.2-forge`).
+  - This guarantees binary portability across all 6 supported Minecraft version branches (`master` / `1.21.1`, `1.20.1`, `1.18.2`, `1.16.5`, `1.12.2-forge`, `1.7.10-forge`).
 
 ---
 
@@ -49,6 +49,10 @@ HeapHammer is a **deterministic server workload and retained-memory regression f
 7. **Cross-Version Java Compatibility**:
    - Shared domain code must remain compatible with Java 17 and Java 8 backports.
    - Isolate loader-specific code inside `platform.fabric` or `platform.forge`.
+   - Forge 1.12.2 and 1.7.10 branches use [RetroFuturaGradle](https://github.com/GTNewHorizons/RetroFuturaGradle) 1.4.9 with Gradle 8.8.
+   - Forge branches use [Jabel](https://github.com/bsideup/jabel) 0.4.2 to compile Java 17 records down to Java 8 bytecode (`@Desugar` annotation required on all record types).
+   - Java 9+ APIs (`List.of()`, `Map.of()`, `String.isBlank()`, `Stream.toList()`, `Optional.isEmpty()`, `Files.writeString/readString`, `CompletableFuture.failedFuture`) must be replaced with Java 8 equivalents on Forge branches.
+   - Live server verification: `powershell -ExecutionPolicy Bypass -File tools/verify-live-server-commands.ps1`
 
 ---
 
