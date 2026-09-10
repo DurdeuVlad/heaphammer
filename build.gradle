@@ -45,6 +45,8 @@ dependencies {
 }
 
 test {
+	dependsOn tasks.named("remapJar")
+	systemProperty "heaphammer.jar", project.findProperty("heaphammerJar") ?: file("build/libs/${archives_base_name}-${version}.jar").absolutePath
 	useJUnitPlatform {
 		excludeTags 'integration'
 	}

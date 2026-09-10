@@ -2,8 +2,8 @@
 # Multi-version production packaging, checksum generation, and GitHub release deployment tool
 
 param (
-    [string]$Tag = "v1.0.0",
-    [string]$Title = "HeapHammer v1.0.0 - Production Release",
+    [string]$Tag = "v1.0.1",
+    [string]$Title = "HeapHammer v1.0.1 - Production Release",
     [switch]$BuildAll,
     [switch]$SkipGitHub,
     [switch]$Draft
@@ -28,17 +28,76 @@ $modVersion = $props['mod_version']
 $mcVersion = $props['minecraft_version']
 Write-Host "Target Primary Minecraft: $mcVersion | Mod Version: $modVersion" -ForegroundColor Yellow
 
-# 2. Build primary production mod if needed
+# 2. Build the primary production mod from a clean output directory.
+#
+# Every version branch emits the same filename (heaphammer-<version>.jar).
+# Reusing an existing file here can therefore relabel a jar built from another
+# branch as the 1.21.1 Fabric/NeoForge artifact. This is especially dangerous
+# for legacy branches whose build.gradle intentionally excludes Fabric classes.
 $primaryJar = "$WorkspaceRoot/build/libs/heaphammer-$modVersion.jar"
-if (-not (Test-Path $primaryJar)) {
-    Write-Host "`nBuilding primary production artifacts via Gradle..." -ForegroundColor Cyan
-    ./gradlew build --no-daemon
+if (Test-Path $primaryJar) {
+    Remove-Item -Path $primaryJar -Force
+}
+
+Write-Host "`nBuilding primary production artifacts from a clean Gradle output..." -ForegroundColor Cyan
+./gradlew clean build --no-daemon
+if ($LASTEXITCODE -ne 0) {
+    throw "Primary Gradle build failed with exit code $LASTEXITCODE"
 }
 
 if (-not (Test-Path $primaryJar)) {
     Write-Error "Production JAR not found at: $primaryJar"
     exit 1
 }
+
+function Assert-PrimaryJar {
+    param (
+        [Parameter(Mandatory = $true)][string]$JarPath,
+        [Parameter(Mandatory = $true)][string]$ExpectedMinecraft,
+        [Parameter(Mandatory = $true)][string]$ExpectedVersion
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($JarPath)
+    try {
+        $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+        $requiredEntries = @(
+            "fabric.mod.json",
+            "heaphammer.mixins.json",
+            "com/dwurdy/heaphammer/HeapHammer.class",
+            "com/dwurdy/heaphammer/mixin/ExampleMixin.class"
+        )
+
+        foreach ($requiredEntry in $requiredEntries) {
+            if ($entries -notcontains $requiredEntry) {
+                throw "Primary jar is missing required entry '$requiredEntry': $JarPath"
+            }
+        }
+
+        $manifestEntry = $archive.GetEntry("fabric.mod.json")
+        $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
+        try {
+            $manifest = $reader.ReadToEnd()
+        } finally {
+            $reader.Dispose()
+        }
+
+        $minecraftPattern = '"minecraft"\s*:\s*"~' + [regex]::Escape($ExpectedMinecraft) + '"'
+        $versionPattern = '"version"\s*:\s*"' + [regex]::Escape($ExpectedVersion) + '"'
+        if ($manifest -notmatch $minecraftPattern) {
+            throw "Primary jar does not target Minecraft ${ExpectedMinecraft}: $JarPath"
+        }
+        if ($manifest -notmatch $versionPattern) {
+            throw "Primary jar does not contain mod version ${ExpectedVersion}: $JarPath"
+        }
+    } finally {
+        $archive.Dispose()
+    }
+
+    Write-Host "  [OK] Verified primary Fabric/NeoForge entrypoints and mixin in $JarPath" -ForegroundColor Green
+}
+
+Assert-PrimaryJar -JarPath $primaryJar -ExpectedMinecraft $mcVersion -ExpectedVersion $modVersion
 
 # 3. Setup production staging directory
 $prodDir = "$WorkspaceRoot/dist/production"
@@ -174,6 +233,7 @@ $notesLines = @(
     "| **1.7.10** | Forge | Java 8 | ``heaphammer-1.7.10-$modVersion.jar`` |",
     "",
     "### Release Highlights",
+    "- **Packaging Fix**: The 1.21.1 Fabric/NeoForge release is clean-built and validated so its entrypoint and required mixin cannot be replaced by a stale legacy-branch jar.",
     "- **Hexagonal Core Architecture**: 100% pure Java domain engine with zero ``net.minecraft.*`` runtime coupling.",
     "- **Statistical OLS Regression**: Ordinary Least Squares (y = mx + b) trend slope and plateau pattern detection vs GC noise.",
     "- **Production Safety**: Safety ceilings (``config/heaphammer.json``), tick budgets (15ms max), and automated crash recovery journal.",
