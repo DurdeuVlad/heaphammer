@@ -187,13 +187,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.release.outputs.tag }}"
-          echo "Creating GitHub Release ${TAG}..."
-          gh release create "${TAG}" \
-            dist/production/*.jar \
-            dist/production/SHA256SUMS.txt \
-            --title "HeapHammer ${TAG}" \
-            --notes-file RELEASE_NOTES.md \
-            --verify-tag
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} already exists — uploading any missing assets."
+            gh release upload "${TAG}" dist/production/*.jar dist/production/SHA256SUMS.txt --clobber
+          else
+            echo "Creating GitHub Release ${TAG}..."
+            gh release create "${TAG}" \
+              dist/production/*.jar \
+              dist/production/SHA256SUMS.txt \
+              --title "HeapHammer ${TAG}" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag
+          fi
 
       - name: Publish Fabric JARs to Modrinth & CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
@@ -203,13 +208,16 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-featured: true
           modrinth-unfeature-mode: subset
+          modrinth-fail-mode: warn
 
           # CurseForge
           curseforge-id: '1687734'
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-fail-mode: warn
 
           # GitHub (links the release created above)
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-fail-mode: warn
 
           # Release metadata
           name: HeapHammer ${{ steps.release.outputs.version }}
