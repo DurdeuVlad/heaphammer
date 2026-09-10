@@ -134,3 +134,17 @@ git push origin release/v1.1.0
 
 - **Pushes to `master` / `ver/*`**: Run continuous integration (compile, test, archive artifacts). **Never deploy**.
 - **Tags matching `v*.*.*` or pushes to `release/*`**: Trigger the `Release Deployment Gate` stage in `Jenkinsfile`, publishing verified production jars.
+
+### GitHub Actions Auto-Deployment (`release.yml`)
+
+Production releases are now deployed automatically via `.github/workflows/release.yml`:
+
+- **Trigger**: Pushing a `v*.*.*` tag (e.g. `git tag v1.0.0 && git push origin v1.0.0`), or manual `workflow_dispatch`.
+- **Build**: Parallel matrix builds across all 5 supported Minecraft version branches (`master`, `ver/1.20.1`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`).
+- **Publish**: Single `Kir-Antipov/mc-publish@v3.3` step publishes all JARs to GitHub Releases, Modrinth, and CurseForge simultaneously. Game versions and loaders are auto-detected from each JAR's embedded `fabric.mod.json`.
+- **Secrets required** (configured in repo Settings → Secrets and variables → Actions):
+  - `CURSEFORGE_TOKEN` — CurseForge API token (upload scope on project `1687734`)
+  - `MODRINTH_TOKEN` — Modrinth API token (write-version scope on the `heaphammer` project)
+  - `GITHUB_TOKEN` — auto-provided by GitHub Actions
+
+The Jenkins `Production Release & Deployment` stage is deprecated for tag-triggered releases; `tools/publish-release.ps1` remains available for local/manual staging.
