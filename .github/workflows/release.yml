@@ -200,7 +200,7 @@ jobs:
               --verify-tag
           fi
 
-      - name: Publish Fabric JARs to Modrinth & CurseForge
+      - name: Publish all JARs to Modrinth & CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           # Modrinth
@@ -225,43 +225,21 @@ jobs:
           version-type: release
           changelog-file: RELEASE_NOTES.md
 
-          # Fabric JARs (auto-detected from fabric.mod.json)
+          # All 6 JARs — loaders auto-detected per file:
+          #  - Fabric JARs: from fabric.mod.json
+          #  - Forge JARs: from mcmod.info / mods.toml
           files: |
             dist/production/heaphammer-1.21*.jar
             dist/production/heaphammer-1.20*.jar
             dist/production/heaphammer-1.18*.jar
             dist/production/heaphammer-1.16*.jar
-
-      - name: Publish Forge JARs to Modrinth & CurseForge
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          # Modrinth
-          modrinth-id: heaphammer
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-featured: false
-          modrinth-unfeature-mode: subset
-          modrinth-fail-mode: warn
-
-          # CurseForge
-          curseforge-id: '1687734'
-          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          curseforge-fail-mode: warn
-
-          # GitHub (links the release created above)
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-fail-mode: warn
-
-          # Release metadata
-          name: HeapHammer ${{ steps.release.outputs.version }}
-          version: ${{ steps.release.outputs.version }}
-          version-type: release
-          changelog-file: RELEASE_NOTES.md
-
-          # Forge JARs — explicit loader specification
-          files: |
             dist/production/heaphammer-1.12*.jar
             dist/production/heaphammer-1.7*.jar
-          loaders: forge
+          game-version-filter: any
+          java: |
+            21
+            17
+            8
 
       - name: Summary
         run: |
