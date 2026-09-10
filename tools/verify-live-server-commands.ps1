@@ -25,7 +25,7 @@ if (Test-Path $RunModsDir) {
 $TestCommands = @(
     @{
         Cmd = "hh version";
-        Pattern = "HeapHammer v1\.0\.0";
+        Pattern = "HeapHammer v[0-9]+\.[0-9]+\.[0-9]+";
         Description = "Version information display";
         Timeout = $CommandTimeoutSeconds
     },
