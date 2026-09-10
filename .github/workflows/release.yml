@@ -232,17 +232,20 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-featured: false
           modrinth-unfeature-mode: subset
+          modrinth-fail-mode: warn
 
           # CurseForge
           curseforge-id: '1687734'
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-fail-mode: warn
 
           # GitHub (links the release created above)
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-fail-mode: warn
 
           # Release metadata
           name: HeapHammer ${{ steps.release.outputs.version }}
-          version: ${{ steps.release.outputs.version }}-forge
+          version: ${{ steps.release.outputs.version }}
           version-type: release
           changelog-file: RELEASE_NOTES.md
 
