@@ -1,0 +1,16 @@
+[
+  {
+    "modid": "hhleak1710",
+    "name": "HeapHammer Forge Leak Fixture",
+    "description": "Disposable test fixture that retains loaded chunks for live leak detection.",
+    "version": "1.0.0",
+    "mcversion": "1.7.10",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["HeapHammer"],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
