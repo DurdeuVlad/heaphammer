@@ -1,5 +1,6 @@
 package com.dwurdy.heaphammer.application;
 
+import com.github.bsideup.jabel.Desugar;
 import com.dwurdy.heaphammer.infrastructure.config.ConfigManager;
 import com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig;
 
@@ -31,6 +32,7 @@ public class SafetyCircuitBreaker {
         }
     }
 
+    @Desugar
     public record TripResult(boolean tripped, String reason) {}
 
     private final MemoryProvider memoryProvider;

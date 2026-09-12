@@ -35,6 +35,26 @@ public class ForgePlatformAdapter1710 implements PlatformAdapter {
         this.ticketManager = Objects.requireNonNull(ticketManager, "ticketManager must not be null");
     }
 
+    /**
+     * Reads the build-time HeapHammer version filtered into
+     * heaphammer-version.properties so it can never drift from mod_version.
+     */
+    private static String heapHammerVersion() {
+        Properties props = new Properties();
+        try (java.io.InputStream in = ForgePlatformAdapter1710.class
+                .getResourceAsStream("/heaphammer-version.properties")) {
+            if (in != null) {
+                props.load(in);
+                String v = props.getProperty("mod_version");
+                if (v != null && !v.trim().isEmpty() && !v.contains("${")) {
+                    return v.trim();
+                }
+            }
+        } catch (java.io.IOException ignored) {
+        }
+        return "dev";
+    }
+
     @Override
     public ChunkTicketManager getChunkTicketManager() {
         return ticketManager;
@@ -42,7 +62,7 @@ public class ForgePlatformAdapter1710 implements PlatformAdapter {
 
     @Override
     public EnvironmentFingerprint captureFingerprint() {
-        String heapHammerVersion = "1.0.1";
+        String heapHammerVersion = heapHammerVersion();
         String mcVersion = "1.7.10";
         String loaderVersion = "forge-10.13.4.1614";
         String javaVersion = System.getProperty("java.version", "8");

@@ -14,6 +14,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ForgePlatformAdapter1710Test {
 
+    private static String expectedHeapHammerVersion() {
+        java.util.Properties props = new java.util.Properties();
+        try (java.io.InputStream in = ForgePlatformAdapter1710Test.class
+                .getResourceAsStream("/heaphammer-version.properties")) {
+            if (in != null) {
+                props.load(in);
+            }
+        } catch (java.io.IOException ignored) {
+        }
+        return props.getProperty("mod_version", "dev").trim();
+    }
+
     private ForgePlatformAdapter1710 adapter;
     private MockForgeTicketBridge1710 mockBridge;
 
@@ -31,7 +43,7 @@ public class ForgePlatformAdapter1710Test {
         assertNotNull(fp);
         assertEquals("1.7.10", fp.minecraftVersion());
         assertTrue(fp.loaderVersion().contains("forge-10.13.4.1614"));
-        assertEquals("1.0.0", fp.heapHammerVersion());
+        assertEquals(expectedHeapHammerVersion(), fp.heapHammerVersion());
         assertTrue(fp.installedMods().containsKey("forge"));
         assertTrue(fp.installedMods().containsKey("minecraft"));
         assertTrue(fp.installedMods().containsKey("heaphammer"));
