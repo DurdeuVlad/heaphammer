@@ -25,30 +25,77 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Canonical 6 supported versions from docs/PUBLICATION.md §2
+          # Every supported Minecraft version line. primary-loader is the loader
+          # produced by the ROOT build; nested loaders/ builds add more jars.
           - branch: master
             mc-version: '1.21.1'
             java-version: '21'
+            primary-loader: fabric
             artifact-name: heaphammer-1.21.1
+          - branch: ver/1.21.4
+            mc-version: '1.21.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.21.4
+          - branch: ver/1.20.6
+            mc-version: '1.20.6'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.20.6
+          - branch: ver/1.20.4
+            mc-version: '1.20.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.20.4
           - branch: ver/1.20.1
             mc-version: '1.20.1'
             java-version: '21'
+            primary-loader: fabric
             artifact-name: heaphammer-1.20.1
+          - branch: ver/1.19.4
+            mc-version: '1.19.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.19.4
+          - branch: ver/1.19.2
+            mc-version: '1.19.2'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.19.2
           - branch: ver/1.18.2
             mc-version: '1.18.2'
             java-version: '21'
+            primary-loader: fabric
             artifact-name: heaphammer-1.18.2
+          - branch: ver/1.17.1
+            mc-version: '1.17.1'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.17.1
           - branch: ver/1.16.5
             mc-version: '1.16.5'
             java-version: '21'
+            primary-loader: fabric
             artifact-name: heaphammer-1.16.5
+          - branch: ver/1.15.2
+            mc-version: '1.15.2'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.15.2
+          - branch: ver/1.14.4
+            mc-version: '1.14.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.14.4
           - branch: ver/1.12.2-forge
             mc-version: '1.12.2'
             java-version: '17'
+            primary-loader: forge
             artifact-name: heaphammer-1.12.2
           - branch: ver/1.7.10-forge
             mc-version: '1.7.10'
             java-version: '17'
+            primary-loader: forge
             artifact-name: heaphammer-1.7.10
     steps:
       - name: Checkout ${{ matrix.branch }}
@@ -69,29 +116,69 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Read mod version
-        id: modver
+      - name: Resolve release version
+        id: relver
         run: |
-          MOD_VERSION=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
-          echo "version=${MOD_VERSION:-1.0.0}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION} (all artifacts are built with -Pmod_version to stay uniform)"
 
-      - name: Build mod JAR
-        run: ./gradlew build -x test --no-daemon
+      # The release build runs the FULL unit suite (build -> check -> test) so a
+      # release can only ever ship code that passed tests on every version.
+      - name: Build & test primary mod JAR
+        run: ./gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon
 
-      - name: Stage & rename JAR with MC version
+      - name: Build & test nested loader JARs
+        run: |
+          for d in loaders/*/; do
+            if [ -f "${d}settings.gradle" ]; then
+              echo "=== Nested loader build: ${d} ==="
+              # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+              # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+              if [ -f "${d}gradlew" ]; then
+                (cd "$d" && chmod +x gradlew && ./gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon)
+              else
+                (cd "$d" && ../../gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon)
+              fi
+            fi
+          done
+
+      - name: Stage JARs as heaphammer-<mc>-<loader>-<version>
         run: |
           mkdir -p staging
-          MOD_VERSION="${{ steps.modver.outputs.version }}"
+          MOD_VERSION="${{ steps.relver.outputs.version }}"
           MC_VERSION="${{ matrix.mc-version }}"
-          # Find the primary (non-sources, non-dev) JAR
+          PRIMARY_LOADER="${{ matrix.primary-loader }}"
+
+          # Root build jar -> primary loader label
           JAR=$(find build/libs -name "heaphammer-*.jar" ! -name "*sources*" ! -name "*dev*" | head -1)
           if [ -z "$JAR" ]; then
             echo "ERROR: No primary JAR found in build/libs/"
-            ls -la build/libs/
+            ls -la build/libs/ || true
             exit 1
           fi
-          cp "$JAR" "staging/heaphammer-${MC_VERSION}-${MOD_VERSION}.jar"
-          echo "Staged: heaphammer-${MC_VERSION}-${MOD_VERSION}.jar"
+          cp "$JAR" "staging/heaphammer-${MC_VERSION}-${PRIMARY_LOADER}-${MOD_VERSION}.jar"
+          echo "Staged: heaphammer-${MC_VERSION}-${PRIMARY_LOADER}-${MOD_VERSION}.jar"
+
+          # Nested loader jars -> loader label = directory name
+          for d in loaders/*/; do
+            [ -f "${d}settings.gradle" ] || continue
+            LOADER=$(basename "$d")
+            LJAR=$(find "${d}build/libs" -name "*.jar" ! -name "*sources*" ! -name "*dev*" | head -1)
+            if [ -z "$LJAR" ]; then
+              # Loader builds no-op on branches where the loader cannot exist
+              # (e.g. loaders/neoforge synced to a pre-1.20.2 branch) — skip.
+              echo "NOTICE: no JAR produced by ${d} — loader not supported on this branch, skipping."
+              continue
+            fi
+            cp "$LJAR" "staging/heaphammer-${MC_VERSION}-${LOADER}-${MOD_VERSION}.jar"
+            echo "Staged: heaphammer-${MC_VERSION}-${LOADER}-${MOD_VERSION}.jar"
+          done
           ls -la staging/
 
       - name: Upload build artifact
@@ -152,7 +239,9 @@ jobs:
             echo "No previous tag found. Generating full changelog..."
             git log --pretty=format:"- %s" HEAD > CHANGELOG.md
           fi
-          # Prepend header
+          # The supported-targets table is generated from the actual staged
+          # artifacts (heaphammer-<mc>-<loader>-<ver>.jar) so it can never
+          # overstate loader coverage.
           {
             echo "# HeapHammer ${TAG}"
             echo ""
@@ -162,12 +251,14 @@ jobs:
             echo ""
             echo "| Minecraft Version | Loader | Release Binary |"
             echo "|---|---|---|"
-            echo "| **1.21.1** | Fabric | \`heaphammer-1.21.1-${{ steps.release.outputs.version }}.jar\` |"
-            echo "| **1.20.1** | Fabric & Forge | \`heaphammer-1.20.1-${{ steps.release.outputs.version }}.jar\` |"
-            echo "| **1.18.2** | Fabric & Forge | \`heaphammer-1.18.2-${{ steps.release.outputs.version }}.jar\` |"
-            echo "| **1.16.5** | Forge & Fabric | \`heaphammer-1.16.5-${{ steps.release.outputs.version }}.jar\` |"
-            echo "| **1.12.2** | Forge | \`heaphammer-1.12.2-${{ steps.release.outputs.version }}.jar\` |"
-            echo "| **1.7.10** | Forge | \`heaphammer-1.7.10-${{ steps.release.outputs.version }}.jar\` |"
+            for jar in $(ls dist/production/heaphammer-*.jar | sort -V -r); do
+              base=$(basename "$jar" .jar)              # heaphammer-<mc>-<loader>-<ver>
+              rest="${base#heaphammer-}"
+              mc_loader="${rest%-*}"
+              loader="${mc_loader##*-}"
+              mc="${mc_loader%-*}"
+              echo "| **${mc}** | ${loader} | \`${base}.jar\` |"
+            done
             echo ""
             echo "### Changes"
             echo ""
@@ -225,16 +316,12 @@ jobs:
           version-type: release
           changelog-file: RELEASE_NOTES.md
 
-          # All 6 JARs — loaders auto-detected per file:
+          # All jars — loaders auto-detected per file:
           #  - Fabric JARs: from fabric.mod.json
-          #  - Forge JARs: from mcmod.info / mods.toml
+          #  - NeoForge JARs: from META-INF/neoforge.mods.toml
+          #  - Forge JARs: from META-INF/mods.toml / mcmod.info
           files: |
-            dist/production/heaphammer-1.21*.jar
-            dist/production/heaphammer-1.20*.jar
-            dist/production/heaphammer-1.18*.jar
-            dist/production/heaphammer-1.16*.jar
-            dist/production/heaphammer-1.12*.jar
-            dist/production/heaphammer-1.7*.jar
+            dist/production/heaphammer-*.jar
           game-version-filter: any
           java: |
             21
