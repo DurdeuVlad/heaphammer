@@ -74,6 +74,7 @@ sourceSets {
 		java {
 			srcDir '../../src/test/java'
 			exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+			exclude 'com/dwurdy/heaphammer/command/CommandPermissionsTest.java'
 		}
 	}
 }
