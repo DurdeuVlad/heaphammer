@@ -63,7 +63,10 @@ function Invoke-NestedLoaderBuilds {
             Write-Host "  Building nested loader: $loader" -ForegroundColor Cyan
             Push-Location $_.FullName
             try {
-                & "$Root/gradlew.bat" build -x test --no-daemon
+                # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+                # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+                $gradlew = if (Test-Path "$($_.FullName)/gradlew.bat") { "$($_.FullName)/gradlew.bat" } else { "$Root/gradlew.bat" }
+                & $gradlew build -x test --no-daemon
                 if ($LASTEXITCODE -ne 0) { Write-Warning "  Nested loader build failed: $loader"; return }
             } finally {
                 Pop-Location

@@ -138,7 +138,13 @@ jobs:
           for d in loaders/*/; do
             if [ -f "${d}settings.gradle" ]; then
               echo "=== Nested loader build: ${d} ==="
-              (cd "$d" && ../../gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon)
+              # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+              # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+              if [ -f "${d}gradlew" ]; then
+                (cd "$d" && chmod +x gradlew && ./gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon)
+              else
+                (cd "$d" && ../../gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon)
+              fi
             fi
           done
 

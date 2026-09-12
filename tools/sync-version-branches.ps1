@@ -114,7 +114,10 @@ try {
                     Write-Host "  Running nested loader tests: loaders/$($_.Name)..." -ForegroundColor Cyan
                     Push-Location $_.FullName
                     try {
-                        & "$WorkspaceRoot/gradlew.bat" test --no-daemon
+                        # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+                        # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+                        $gradlew = if (Test-Path "$($_.FullName)/gradlew.bat") { "$($_.FullName)/gradlew.bat" } else { "$WorkspaceRoot/gradlew.bat" }
+                        & $gradlew test --no-daemon
                         if ($LASTEXITCODE -ne 0) { $testsOk = $false }
                     } finally {
                         Pop-Location
