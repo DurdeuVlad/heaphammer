@@ -9,6 +9,7 @@ public record ScenarioId(String value) {
     public static final ScenarioId CHUNKS = new ScenarioId("chunks");
     public static final ScenarioId ENTITIES = new ScenarioId("entities");
     public static final ScenarioId BLOCK_ENTITIES = new ScenarioId("blockentities");
+    public static final ScenarioId PLAYERS = new ScenarioId("players");
 
     public static ScenarioId of(String value) {
         return new ScenarioId(value);
