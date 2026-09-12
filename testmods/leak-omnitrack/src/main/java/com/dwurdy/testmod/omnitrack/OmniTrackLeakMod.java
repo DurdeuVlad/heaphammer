@@ -2,13 +2,13 @@ package com.dwurdy.testmod.omnitrack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +46,8 @@ public class OmniTrackLeakMod implements ModInitializer {
 
         // Subsystem 1: Chunk Load hook (omits CHUNK_UNLOAD)
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
-            if (LEAK_ENABLED.get() && chunk instanceof LevelChunk levelChunk) {
+            if (LEAK_ENABLED.get() && chunk instanceof LevelChunk) {
+                LevelChunk levelChunk = (LevelChunk) chunk;
                 CHUNK_AUDIT_LOG.add(new ChunkAuditRecord(levelChunk.getPos(), world.dimension(), levelChunk));
             }
         });
@@ -66,7 +67,7 @@ public class OmniTrackLeakMod implements ModInitializer {
             }
         });
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
             registerCommands(dispatcher);
         });
     }
@@ -81,19 +82,19 @@ public class OmniTrackLeakMod implements ModInitializer {
                     int ticks = TICK_BUFFER.size();
                     boolean enabled = LEAK_ENABLED.get();
 
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(new TextComponent(
                         String.format("[TestMod-OmniTrack] Status: enabled=%b, chunks=%d, entities=%d, ticks=%d",
                             enabled, chunks, entities, ticks)), false);
                     return chunks + entities + ticks;
                 }))
                 .then(Commands.literal("enable").executes(ctx -> {
                     LEAK_ENABLED.set(true);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-OmniTrack] Leak ENABLED"), false);
+                    ctx.getSource().sendSuccess(new TextComponent("[TestMod-OmniTrack] Leak ENABLED"), false);
                     return 1;
                 }))
                 .then(Commands.literal("disable").executes(ctx -> {
                     LEAK_ENABLED.set(false);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-OmniTrack] Leak DISABLED"), false);
+                    ctx.getSource().sendSuccess(new TextComponent("[TestMod-OmniTrack] Leak DISABLED"), false);
                     return 0;
                 }))
                 .then(Commands.literal("clear").executes(ctx -> {
@@ -103,7 +104,7 @@ public class OmniTrackLeakMod implements ModInitializer {
                     CHUNK_AUDIT_LOG.clear();
                     ENTITY_TRACKER.clear();
                     TICK_BUFFER.clear();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(new TextComponent(
                         String.format("[TestMod-OmniTrack] Cleared records (chunks=%d, entities=%d, ticks=%d)",
                             chunks, entities, ticks)), false);
                     return chunks + entities + ticks;
