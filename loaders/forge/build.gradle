@@ -1,0 +1,90 @@
+plugins {
+	// ForgeGradle only supports Gradle 8.x — this nested build ships its own
+	// wrapper (loaders/forge/gradlew, pinned to 8.14.3) because the repo-root
+	// wrapper is Gradle 9.5.1. CI/release prefer a local wrapper when present.
+	id 'net.minecraftforge.gradle' version '6.0.46'
+}
+
+// Shared mod metadata is read from the root gradle.properties so this nested
+// build can never diverge from the primary Fabric build's version/group/name.
+def rootProps = new Properties()
+file('../../gradle.properties').withReader('UTF-8') { rootProps.load(it) }
+
+version = project.findProperty('mod_version') ?: rootProps['mod_version']
+group = project.findProperty('maven_group') ?: rootProps['maven_group']
+base.archivesName = project.findProperty('archives_base_name') ?: rootProps['archives_base_name']
+
+java {
+	toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+// Branch convention: this branch's Fabric jar already ships Java 17 bytecode.
+// Scoped to our own compile tasks — ForgeGradle's internal MCP recompile runs
+// on a Java 8 toolchain where --release is not a valid javac flag.
+['compileJava', 'compileTestJava'].each { name ->
+	tasks.named(name) { it.options.release = 17; it.options.encoding = "UTF-8" }
+}
+
+minecraft {
+	mappings channel: 'official', version: '1.16.5'
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	minecraft "net.minecraftforge:forge:${project.forge_version}"
+
+	compileOnly "com.google.code.gson:gson:2.10.1"
+	compileOnly "org.slf4j:slf4j-api:2.0.9"
+
+	testImplementation "com.google.code.gson:gson:2.10.1"
+	testImplementation "org.slf4j:slf4j-api:2.0.9"
+	testRuntimeOnly "org.slf4j:slf4j-simple:2.0.9"
+	testImplementation platform("org.junit:junit-bom:5.10.2")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+// The shared source tree contains Fabric-specific code (entrypoint, mixins,
+// platform/fabric) that must not be compiled into the Forge artifact.
+sourceSets {
+	main {
+		java {
+			srcDir '../../src/main/java'
+			exclude 'com/dwurdy/heaphammer/HeapHammer.java'
+			exclude 'com/dwurdy/heaphammer/mixin/**'
+			exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+			// FG 1.16.5 'official' mappings rename members only — class names stay
+			// SRG (ForgeGradle#795), so the shared Mojmap-named command tree cannot
+			// compile here. ForgeHeapHammerCommands is the SRG-named equivalent.
+			exclude 'com/dwurdy/heaphammer/command/HeapHammerCommands.java'
+		}
+		resources {
+			srcDir '../../src/main/resources'
+			exclude 'fabric.mod.json'
+			exclude 'heaphammer.mixins.json'
+		}
+	}
+	test {
+		java {
+			srcDir '../../src/test/java'
+			exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+		}
+	}
+}
+
+processResources {
+	filesMatching('META-INF/mods.toml') {
+		expand 'version': project.version
+	}
+}
+
+test {
+	dependsOn tasks.named('jar')
+	systemProperty "heaphammer.jar", tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+	useJUnitPlatform {
+		excludeTags 'integration'
+	}
+}
