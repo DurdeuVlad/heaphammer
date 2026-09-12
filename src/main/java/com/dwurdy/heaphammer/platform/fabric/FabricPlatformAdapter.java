@@ -335,14 +335,27 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         }
 
         // 4. Sweep all server levels for any orphaned entity bearing TEST_ENTITY_TAG
+        // (MC 1.14.4 has no public all-entities view — reuse the entitiesById
+        // reflective read used by getActiveEntityCount above.)
         MinecraftServer server = serverSupplier.get();
         if (server != null) {
             for (ServerLevel level : server.getAllLevels()) {
-                for (Entity entity : level.getAllEntities()) {
-                    if (entity.getTags().contains(TEST_ENTITY_TAG)) {
-                        entity.discard();
-                        cleaned++;
+                try {
+                    java.lang.reflect.Field f = ServerLevel.class.getDeclaredField("entitiesById");
+                    f.setAccessible(true);
+                    java.util.Map<?, ?> map = (java.util.Map<?, ?>) f.get(level);
+                    if (map == null) continue;
+                    for (Object o : new ArrayList<>(map.values())) {
+                        if (o instanceof Entity) {
+                            Entity entity = (Entity) o;
+                            if (entity.getTags().contains(TEST_ENTITY_TAG)) {
+                                entity.remove();
+                                cleaned++;
+                            }
+                        }
                     }
+                } catch (Exception ignored) {
+                    // Entity sweep is best-effort; tracked-entity removal above is authoritative.
                 }
             }
         }

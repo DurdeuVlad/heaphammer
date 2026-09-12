@@ -1,6 +1,7 @@
 package com.dwurdy.testmod.omnitrack;
 
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.dimension.DimensionType;
 
 import java.util.Objects;
 import java.util.UUID;
