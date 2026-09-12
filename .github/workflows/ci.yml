@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - master
+      - 'release/**'
       - 'ver/**'
   pull_request:
     branches:
       - master
+      - 'release/**'
       - 'ver/**'
 
 permissions:
@@ -15,16 +17,31 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Build & Test (Java 21)
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Resolve Target Java Version
+        id: java_target
+        run: |
+          TARGET_JAVA=$(grep '^java_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          # java_version is the bytecode target (--release). Loom and MDG both
+          # require running Gradle itself on JDK 21+, so the runner JVM differs
+          # from the target on branches like 1.20.1 (java_version=17).
+          if grep -qE '^(loom_version|mdg_version)=' gradle.properties; then
+            RUNNER_JAVA=21
+          else
+            RUNNER_JAVA=${TARGET_JAVA:-21}
+          fi
+          echo "version=${RUNNER_JAVA}" >> $GITHUB_OUTPUT
+          echo "Bytecode target: ${TARGET_JAVA:-21} — Gradle runner JDK: ${RUNNER_JAVA}"
+
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: ${{ steps.java_target.outputs.version }}
           distribution: 'temurin'
 
       - name: Setup Gradle
@@ -38,6 +55,21 @@ jobs:
 
       - name: Build Mod & Synthetic Testmod Jars
         run: ./gradlew build buildTestmods --no-daemon
+
+      - name: Build & Test Nested Loader JARs
+        run: |
+          for d in loaders/*/; do
+            if [ -f "${d}settings.gradle" ]; then
+              echo "=== Nested loader build: ${d} ==="
+              # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+              # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+              if [ -f "${d}gradlew" ]; then
+                (cd "$d" && chmod +x gradlew && ./gradlew build --no-daemon)
+              else
+                (cd "$d" && ../../gradlew build --no-daemon)
+              fi
+            fi
+          done
 
       - name: Upload Test Results
         if: always()
