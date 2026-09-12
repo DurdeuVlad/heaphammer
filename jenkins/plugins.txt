@@ -1,8 +1,0 @@
-git:latest
-workflow-aggregator:latest
-workflow-multibranch:latest
-pipeline-utility-steps:latest
-junit:latest
-configuration-as-code:latest
-job-dsl:latest
-timestamper:latest

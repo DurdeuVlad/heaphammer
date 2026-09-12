@@ -28,6 +28,10 @@ bin/
 run/
 /heaphammer/
 /config/
+# nested loader build runtime dirs (loaders/<name>/ run artifacts)
+loaders/*/run/
+loaders/*/heaphammer/
+loaders/*/config/
 
 # nested loader build runtime dirs (loaders/<name>/ run artifacts)
 loaders/*/run/

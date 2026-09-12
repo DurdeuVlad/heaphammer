@@ -84,4 +84,4 @@ The security of Minecraft servers running HeapHammer is paramount.
   - GitHub Releases: Authoritative release tags and jars across all supported Minecraft versions.
   - CurseForge: [HeapHammer on CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
   - Modrinth: Official mod distribution page (planned).
-- **Automated CI/CD**: Verified via GitHub Actions and Jenkins multibranch pipelines. See [docs/JENKINS_PIPELINE.md](JENKINS_PIPELINE.md).
+- **Automated CI/CD**: Verified via GitHub Actions (`ci.yml`, `sync-version-branches.yml`, `release.yml`). See [docs/BUILD_TARGETS.md](BUILD_TARGETS.md) for the full build target matrix.

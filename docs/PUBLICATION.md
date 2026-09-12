@@ -57,15 +57,26 @@ HeapHammer adheres to a strict, production-oriented Semantic Versioning standard
 
 ## 2. Multi-Version Artifact Matrix
 
-When a release branch is tagged and deployed, artifacts are built across the 5 supported version lines:
+When a release is tagged and deployed, artifacts are built across **every** supported version branch. Each branch produces one jar per loader it supports: the root build produces the branch's *primary* loader jar, and each `loaders/<loader>/` nested Gradle build produces an additional loader jar. Artifacts are named `heaphammer-<mc>-<loader>-<modver>.jar`.
 
-| Minecraft Version | Loader | Git Branch | Java Target | Release JAR |
+| Minecraft Version | Git Branch | Root Build (Primary Loader) | Nested Loader Builds | Build JDK |
 |---|---|---|---|---|
-| **1.21.1** *(Primary)* | Fabric | `master` / `release/v*` | Java 21 | `heaphammer-1.0.0.jar` |
-| **1.20.1** | Fabric & Forge | `ver/1.20.1` | Java 17 | `heaphammer-1.20.1-1.0.0.jar` |
-| **1.18.2** | Fabric & Forge | `ver/1.18.2` | Java 17 | `heaphammer-1.18.2-1.0.0.jar` |
-| **1.16.5** | Forge & Fabric | `ver/1.16.5` | Java 8 / 11 | `heaphammer-1.16.5-1.0.0.jar` |
-| **1.12.2** | Forge | `ver/1.12.2-forge` | Java 8 | `heaphammer-1.12.2-1.0.0.jar` |
+| **1.21.4** | `ver/1.21.4` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
+| **1.21.1** *(Primary)* | `master` / `release/v*` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
+| **1.20.6** | `ver/1.20.6` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
+| **1.20.4** | `ver/1.20.4` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
+| **1.20.1** | `ver/1.20.1` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
+| **1.19.4** | `ver/1.19.4` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
+| **1.19.2** | `ver/1.19.2` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
+| **1.18.2** | `ver/1.18.2` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
+| **1.17.1** | `ver/1.17.1` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
+| **1.16.5** | `ver/1.16.5` | Fabric (Loom) | `loaders/forge` (ForgeGradle) | 21 |
+| **1.15.2** | `ver/1.15.2` | Fabric (Loom) | — | 21 |
+| **1.14.4** | `ver/1.14.4` | Fabric (Loom) | — | 21 |
+| **1.12.2** | `ver/1.12.2-forge` | Forge (RetroFuturaGradle) | — | 17 |
+| **1.7.10** | `ver/1.7.10-forge` | Forge (RetroFuturaGradle) | — | 17 |
+
+> The authoritative, always-current target matrix lives in [BUILD_TARGETS.md](BUILD_TARGETS.md). The release workflow derives the published loader list from the artifacts actually produced — the release notes table is generated from staged filenames, never hardcoded.
 
 ---
 
@@ -133,18 +144,19 @@ git push origin release/v1.1.0
 ## 6. Automated CI/CD Gating
 
 - **Pushes to `master` / `ver/*`**: Run continuous integration (compile, test, archive artifacts). **Never deploy**.
-- **Tags matching `v*.*.*` or pushes to `release/*`**: Trigger the `Release Deployment Gate` stage in `Jenkinsfile`, publishing verified production jars.
+- **Tags matching `v*.*.*`**: Trigger `.github/workflows/release.yml`, which builds and tests every supported version branch (root build plus every `loaders/*/` nested build) and publishes verified production jars.
 
 ### GitHub Actions Auto-Deployment (`release.yml`)
 
-Production releases are now deployed automatically via `.github/workflows/release.yml`:
+Production releases are deployed automatically via `.github/workflows/release.yml`:
 
-- **Trigger**: Pushing a `v*.*.*` tag (e.g. `git tag v1.0.0 && git push origin v1.0.0`), or manual `workflow_dispatch`.
-- **Build**: Parallel matrix builds across all 5 supported Minecraft version branches (`master`, `ver/1.20.1`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`).
-- **Publish**: Single `Kir-Antipov/mc-publish@v3.3` step publishes all JARs to GitHub Releases, Modrinth, and CurseForge simultaneously. Game versions and loaders are auto-detected from each JAR's embedded `fabric.mod.json`.
+- **Trigger**: Pushing a `v*.*.*` tag (e.g. `git tag v1.0.2 && git push origin v1.0.2`), or manual `workflow_dispatch`.
+- **Build**: Parallel matrix builds across all 14 supported Minecraft version branches (`master` + every `ver/*`). Each job runs the full unit suite — `build` implies `test` — and then builds every nested `loaders/*/` project present on that branch. A failing test on any version blocks the release.
+- **Naming**: Every artifact is staged as `heaphammer-<mc>-<loader>-<modver>.jar`. The mod version is forced uniform via `-Pmod_version=<tag>` so branch `gradle.properties` drift can never leak into a release.
+- **Publish**: GitHub Releases receives every JAR plus `SHA256SUMS.txt` via `gh release`. A `publish-matrix` job then derives one matrix entry per staged jar from its `heaphammer-<mc>-<loader>-<modver>.jar` filename, and a `publish-platforms` job runs `Kir-Antipov/mc-publish@v3.3` once per file with the exact `loaders` and `game-versions` for that jar. Per-file invocation is required because mc-publish resolves loaders/game versions from the primary file only, and Modrinth requires a unique `version_number` per version — Modrinth versions are numbered `<modver>+<loader>.<mc>` (e.g. `1.0.2+neoforge.1.21.4`), while CurseForge display names read `HeapHammer <modver> (<loader> <mc>)`. Platform failures use warn-mode so a token or API outage cannot fail the release; check the `publish-platforms` matrix jobs to confirm uploads.
 - **Secrets required** (configured in repo Settings → Secrets and variables → Actions):
   - `CURSEFORGE_TOKEN` — CurseForge API token (upload scope on project `1687734`)
   - `MODRINTH_TOKEN` — Modrinth API token (write-version scope on the `heaphammer` project)
   - `GITHUB_TOKEN` — auto-provided by GitHub Actions
 
-The Jenkins `Production Release & Deployment` stage is deprecated for tag-triggered releases; `tools/publish-release.ps1` remains available for local/manual staging.
+`tools/publish-release.ps1` remains available for local/manual staging and mirrors the same loader-qualified naming and nested-build discovery.

@@ -64,7 +64,7 @@ To eliminate version migration friction, HeapHammer strictly decouples core logi
 │   └── ChunkTicketManager (Interface)                                   │
 │                                                                        │
 │   Modern Fabric (1.16–1.21.4)        Modern NeoForge (1.21.x)          │
-│   ├── FabricPlatformAdapter          ├── NeoForgePlatformAdapter       │
+│   ├── FabricPlatformAdapter          ├── NeoForgePlatformAdapter (*)   │
 │   └── FabricChunkTicketManager       ├── NeoForgeChunkTicketManager    │
 │                                      └── NeoForgeTicketBridge          │
 │                                                                        │
@@ -75,10 +75,13 @@ To eliminate version migration friction, HeapHammer strictly decouples core logi
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+(*) The `platform/neoforge` and `platform/forge` classes in shared `src/` are **pure-Java / reflection-decoupled** — they compile under every toolchain and serve as the unit-testable contract surface. The **production** loader code (entrypoints with `@Mod`, real `net.neoforged.*` / `net.minecraftforge.*` adapters, `neoforge.mods.toml` / `mods.toml`) lives in **nested per-loader Gradle builds** under `loaders/<loader>/` on each version branch — never in `src/main/java`. See [BUILD_TARGETS.md](BUILD_TARGETS.md) for the full version × loader matrix and build layout.
+
 ### The Invariant Contract
 - **95% of the codebase** has **zero** Minecraft or mod loader imports.
 - Any improvement to scenario planners, OLS slope math, or JSON reporting is **100% binary-compatible** across all supported Minecraft versions.
 - Version-specific logic is strictly quarantined inside `com.dwurdy.heaphammer.platform.fabric`, `com.dwurdy.heaphammer.platform.neoforge`, or `com.dwurdy.heaphammer.platform.forge`.
+- Loader-specific production code (`net.neoforged.*`, `net.minecraftforge.*` imports) is strictly quarantined inside `loaders/<loader>/src/`; `src/main/java` must never reference them.
 
 ---
 
@@ -127,9 +130,11 @@ master (Active Production Trunk — 1.21.1 Fabric & NeoForge, Java 21)
 ### Automated Branch Synchronization
 Every push to `master` triggers [`.github/workflows/sync-version-branches.yml`](../.github/workflows/sync-version-branches.yml):
 1. Merges `master` into each historical version branch (`ver/1.21.4`, `ver/1.20.6`, `ver/1.20.4`, `ver/1.20.1`, `ver/1.19.4`, `ver/1.19.2`, `ver/1.18.2`, `ver/1.17.1`, `ver/1.16.5`, `ver/1.15.2`, `ver/1.14.4`, `ver/1.12.2-forge`, `ver/1.7.10-forge`).
-2. Executes `./gradlew test` with the branch's specific JVM target.
+2. Executes `./gradlew test` with the branch's specific JVM target, **plus `test` inside every `loaders/*/` nested build present on that branch**.
 3. If clean $\rightarrow$ pushes automatically.
 4. If conflict/adaptation required $\rightarrow$ automatically opens a PR labeled `needs-version-adaptation`.
+
+Nested `loaders/<loader>/` directories propagate through these merges as additive files. On branches where a loader cannot exist (e.g. NeoForge on MC < 1.20.2), the adaptation PR simply deletes the directory once — it stays deleted permanently.
 
 ---
 
