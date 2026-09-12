@@ -2,7 +2,12 @@ package com.dwurdy.testmod.forge1710;
 
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import net.minecraft.command.ICommand;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkEvent;
@@ -24,6 +29,11 @@ public class ForgeChunkLeakMod1710 {
         LOGGER.info("[HHLeak-Forge1710] enabled; retaining every loaded chunk");
     }
 
+    @Mod.EventHandler
+    public void serverStarting(FMLServerStartingEvent event) {
+        event.registerServerCommand(new StatusCommand());
+    }
+
     @SubscribeEvent
     public void onChunkLoad(ChunkEvent.Load event) {
         RETAINED_CHUNKS.add(event.getChunk());
@@ -34,5 +44,50 @@ public class ForgeChunkLeakMod1710 {
 
     public static int retainedChunkCount() {
         return RETAINED_CHUNKS.size();
+    }
+
+    private static final class StatusCommand implements ICommand {
+        @Override
+        public String getCommandName() {
+            return "hhleak1710";
+        }
+
+        @Override
+        public String getCommandUsage(ICommandSender sender) {
+            return "/hhleak1710 status";
+        }
+
+        @Override
+        public List<String> getCommandAliases() {
+            return java.util.Collections.emptyList();
+        }
+
+        @Override
+        public void processCommand(ICommandSender sender, String[] args) {
+            sender.addChatMessage(new ChatComponentText(
+                    "[HHLeak-Forge1710] retained_chunks=" + RETAINED_CHUNKS.size()));
+        }
+
+        @Override
+        public boolean canCommandSenderUseCommand(ICommandSender sender) {
+            return true;
+        }
+
+        @Override
+        public List<String> addTabCompletionOptions(ICommandSender sender, String[] args) {
+            return null;
+        }
+
+        @Override
+        public boolean isUsernameIndex(String[] args, int index) {
+            return false;
+        }
+
+        @Override
+        public int compareTo(Object other) {
+            return other instanceof ICommand
+                    ? getCommandName().compareTo(((ICommand) other).getCommandName())
+                    : 0;
+        }
     }
 }
