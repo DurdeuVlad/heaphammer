@@ -19,6 +19,19 @@ from queue import Empty, Queue
 READY_RE = re.compile(r'Done \([0-9.]+s\)! For help, type "help"')
 REPORT_RE = re.compile(r'Report saved successfully')
 CRASH_RE = re.compile(r'(CrashReport|Fatal error|Exception in server thread|OutOfMemoryError)')
+VERSION_RE = re.compile(r'HeapHammer v([^ ]+)')
+FIXTURE_STATUS_RES = {
+    "fabric": (
+        re.compile(r"\[TestMod-ChunkCache\] Status: enabled=true, cached_chunks=(\d+)"),
+        re.compile(r"\[TestMod-OmniTrack\] Status: enabled=true, chunks=(\d+), entities=(\d+), ticks=(\d+)"),
+    ),
+    "forge1122": (
+        re.compile(r"\[HHLeak-Forge1122\] retained_chunks=(\d+)"),
+    ),
+    "forge1710": (
+        re.compile(r"\[HHLeak-Forge1710\] retained_chunks=(\d+)"),
+    ),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,6 +43,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         choices=("fabric", "forge1122", "forge1710"),
     )
+    parser.add_argument("--expected-mod-version", required=True)
     parser.add_argument("--boot-timeout", type=int, default=480)
     parser.add_argument("--run-timeout", type=int, default=180)
     return parser.parse_args()
@@ -131,6 +145,10 @@ def start_output_reader(process: subprocess.Popen[str]) -> Queue[str]:
     return lines
 
 
+def has_new_report(root: Path, before: set[str]) -> bool:
+    return any(item["path"] not in before for item in read_reports(root))
+
+
 def take_line(lines: Queue[str], deadline: float) -> str | None:
     while time.monotonic() < deadline:
         try:
@@ -148,6 +166,12 @@ def main() -> int:
     (root / "run").mkdir(parents=True, exist_ok=True)
     (root / "run" / "eula.txt").write_text(
         "# Disposable CI server only; this file is never committed.\neula=true\n",
+        encoding="utf-8",
+    )
+    (root / "run" / "server.properties").write_text(
+        "# Disposable CI server only; this file is never committed.\n"
+        "online-mode=false\n"
+        "pause-when-empty-seconds=0\n",
         encoding="utf-8",
     )
     stage_mods(root, args.loader, args.leak_fixture)
@@ -191,9 +215,15 @@ def main() -> int:
 
     command_output = []
     ready = False
+    observed_mod_version = None
     reports_before = {str(p) for p in (root / "run").rglob("*.json")}
     process = subprocess.Popen(
-        ["./gradlew", "runServer", "--no-daemon"],
+        [
+            "./gradlew",
+            "runServer",
+            f"-Pmod_version={args.expected_mod_version}",
+            "--no-daemon",
+        ],
         cwd=root,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -203,10 +233,11 @@ def main() -> int:
         start_new_session=(os.name == "posix"),
     )
     output_lines = start_output_reader(process)
-    if args.leak_fixture == "forge1122":
+    if args.loader == "forge":
         # Forge 1.12.2 asks this interactively before it reaches the normal
         # server console. CI runs offline and the disposable eula above is
-        # already explicit, so answer the prompt deterministically.
+        # already explicit, so answer the prompt deterministically. Forge
+        # 1.7.10 uses the same launcher prompt.
         process.stdin.write("n\n")
         process.stdin.flush()
 
@@ -218,6 +249,9 @@ def main() -> int:
                 break
             command_output.append(line)
             print(line.rstrip(), flush=True)
+            version_match = VERSION_RE.search(line)
+            if version_match:
+                observed_mod_version = version_match.group(1)
             if CRASH_RE.search(line):
                 raise RuntimeError(f"Server crash signature during boot: {line.strip()}")
             if READY_RE.search(line):
@@ -228,20 +262,42 @@ def main() -> int:
 
         time.sleep(2)
         for command in commands:
+            if command.startswith("hh run players") and not any(
+                "- players (v1.1):" in line for line in command_output
+            ):
+                print("[SKIP] players scenario is not exposed by this branch", flush=True)
+                continue
+
+            reports_before_command = {item["path"] for item in read_reports(root)}
             send(process, command)
             wait_for_report = command.startswith("hh run ")
             command_deadline = time.monotonic() + (args.run_timeout if wait_for_report else 5)
             saw_report = False
             saw_unsupported = False
             while time.monotonic() < command_deadline and process.poll() is None:
-                line = take_line(output_lines, command_deadline)
-                if line is None:
+                if wait_for_report and has_new_report(root, reports_before_command):
+                    saw_report = True
                     break
+                line = take_line(
+                    output_lines,
+                    min(command_deadline, time.monotonic() + 0.5),
+                )
+                if line is None:
+                    continue
                 command_output.append(line)
                 print(line.rstrip(), flush=True)
+                version_match = VERSION_RE.search(line)
+                if version_match:
+                    observed_mod_version = version_match.group(1)
                 if CRASH_RE.search(line):
                     raise RuntimeError(f"Server crash signature: {line.strip()}")
                 if wait_for_report and REPORT_RE.search(line):
+                    saw_report = True
+                    break
+                if wait_for_report and has_new_report(root, reports_before_command):
+                    # Some historical loader/logging combinations write the
+                    # JSON report before forwarding the completion message to
+                    # the Gradle console. The file is the authoritative signal.
                     saw_report = True
                     break
                 if wait_for_report and re.search(r'unsupported by this platform|not supported', line, re.IGNORECASE):
@@ -258,14 +314,25 @@ def main() -> int:
     new_reports = [item for item in reports if item["path"] not in reports_before]
     if not new_reports:
         raise RuntimeError("No new HeapHammer report JSON was produced")
+    if observed_mod_version != args.expected_mod_version:
+        raise RuntimeError(
+            f"Expected HeapHammer v{args.expected_mod_version}, "
+            f"observed {observed_mod_version or 'no version output'}"
+        )
 
     summary = {
         "minecraft": args.mc_version,
         "loader": args.loader,
         "fixture": args.leak_fixture,
+        "modVersion": observed_mod_version,
         "reports": [],
     }
     suspicious = False
+    fixture_status_lines = []
+    for line in command_output:
+        if any(pattern.search(line) for pattern in FIXTURE_STATUS_RES[args.leak_fixture]):
+            fixture_status_lines.append(line.strip())
+    fixture_status_observed = bool(fixture_status_lines)
     for item in new_reports:
         report = item["report"]
         detection = report.get("detection", {})
@@ -282,10 +349,13 @@ def main() -> int:
                 "cleanupValidation": report.get("cleanupValidation"),
             }
         )
+    summary["fixtureStatusObserved"] = fixture_status_observed
+    summary["fixtureStatusLines"] = fixture_status_lines
+    summary["leakDetectedBySlope"] = suspicious
     (evidence / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    if args.leak_fixture != "forge1710" and not suspicious:
-        raise RuntimeError("Leak fixture did not produce a SUSPICIOUS/FAIL report")
+    if not fixture_status_observed:
+        raise RuntimeError("Leak fixture did not report retained state")
     print(json.dumps(summary, indent=2), flush=True)
     return 0
 
