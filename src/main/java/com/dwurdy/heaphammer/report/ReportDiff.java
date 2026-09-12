@@ -31,11 +31,15 @@ public record ReportDiff(
         double slopeA,
         double slopeB,
         double slopeDifferenceBytes,
+        double rSquaredA,
+        double rSquaredB,
+        double rSquaredDifference,
         DetectionClassification classificationA,
         DetectionClassification classificationB,
         boolean classificationChanged,
         String summary,
-        List<String> warnings
+        List<String> warnings,
+        ReportEvidenceDiff evidence
 ) {
     public ReportDiff {
         Objects.requireNonNull(runA, "runA must not be null");
