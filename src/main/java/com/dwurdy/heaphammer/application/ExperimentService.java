@@ -88,6 +88,107 @@ public class ExperimentService {
         return executor;
     }
 
+    private ScenarioExecutor createExecutor(
+            ExperimentPlan plan,
+            BiConsumer<com.dwurdy.heaphammer.domain.CheckpointPhase, Integer> checkpoint,
+            Consumer<ExperimentState> completion
+    ) {
+        ScenarioExecutor executor;
+        if (plan.spec().scenarioId().equals(ScenarioId.PLAYERS)) {
+            com.dwurdy.heaphammer.platform.PlayerLifecyclePort playerPort = platform.getPlayerLifecyclePort()
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Player lifecycle scenario is unsupported by this platform: "
+                                    + platform.getCapabilities().status(PlatformCapability.PLAYER_LIFECYCLE).reason()));
+            executor = new PlayerScenarioExecutor(
+                    plan,
+                    playerPort,
+                    checkpoint,
+                    completion,
+                    recoveryJournal
+            );
+        } else if (plan.spec().scenarioId().equals(ScenarioId.ENTITIES)
+                && plan.spec().entityProfile() != EntityWorkloadProfile.TRANSIENT) {
+            PlatformCapability capability = plan.spec().entityProfile() == EntityWorkloadProfile.PERSISTENT
+                    ? PlatformCapability.PERSISTENT_ENTITIES : PlatformCapability.UNTICKED_CHUNKS;
+            if (!platform.getCapabilities().supports(capability)) {
+                throw new IllegalStateException("Entity profile " + plan.spec().entityProfile()
+                        + " is unsupported by this platform: " + platform.getCapabilities().status(capability).reason());
+            }
+            platform.getEntityLifecyclePort().orElseThrow(() ->
+                    new IllegalStateException("Entity lifecycle extension is unavailable on this platform"));
+            executor = new EntityScenarioExecutor(
+                    plan,
+                    platform,
+                    checkpoint,
+                    completion,
+                    recoveryJournal
+            );
+        } else {
+            Optional<com.dwurdy.heaphammer.adapter.WorkloadAdapter> customAdapter =
+                    com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance()
+                            .findAdapterForScenario(plan.spec().scenarioId().value());
+
+            if (customAdapter.isPresent()) {
+                Optional<ScenarioExecutor> customExecutor = customAdapter.get().createExecutor(
+                        plan,
+                        platform,
+                        checkpoint,
+                        completion
+                );
+                if (customExecutor.isPresent()) {
+                    executor = customExecutor.get();
+                } else if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
+                    executor = new EntityScenarioExecutor(
+                            plan,
+                            platform,
+                            checkpoint,
+                            completion,
+                            recoveryJournal
+                    );
+                } else if (plan.spec().scenarioId() == ScenarioId.BLOCK_ENTITIES) {
+                    executor = new BlockEntityScenarioExecutor(
+                            plan,
+                            platform,
+                            checkpoint,
+                            completion,
+                            recoveryJournal
+                    );
+                } else {
+                    executor = new ChunkScenarioExecutor(
+                            plan,
+                            platform.getChunkTicketManager(),
+                            checkpoint,
+                            completion
+                    );
+                }
+            } else if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
+                executor = new EntityScenarioExecutor(
+                        plan,
+                        platform,
+                        checkpoint,
+                        completion,
+                        recoveryJournal
+                );
+            } else if (plan.spec().scenarioId() == ScenarioId.BLOCK_ENTITIES) {
+                executor = new BlockEntityScenarioExecutor(
+                        plan,
+                        platform,
+                        checkpoint,
+                        completion,
+                        recoveryJournal
+                );
+            } else {
+                executor = new ChunkScenarioExecutor(
+                        plan,
+                        platform.getChunkTicketManager(),
+                        checkpoint,
+                        completion
+                );
+            }
+        }
+        return executor;
+    }
+
     public synchronized boolean stop(String reason) {
         if (activeExecutor != null && !activeExecutor.getStateMachine().getState().isTerminal()) {
             LOGGER.warn("Stopping experiment {}: {}", activeExecutor.getPlan().id(), reason);
