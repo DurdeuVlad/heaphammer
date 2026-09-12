@@ -1,7 +1,14 @@
 package com.dwurdy.heaphammer;
 
+import com.dwurdy.heaphammer.application.ExperimentService;
+import com.dwurdy.heaphammer.detection.CleanupValidator;
+import com.dwurdy.heaphammer.metrics.CheckpointService;
+import com.dwurdy.heaphammer.metrics.JvmMetricsCollector;
+import com.dwurdy.heaphammer.metrics.MinecraftMetricsCollector;
 import com.dwurdy.heaphammer.platform.forge1710.CommandHeapHammer1710;
 import com.dwurdy.heaphammer.platform.forge1710.ForgePlatformAdapter1710;
+import com.dwurdy.heaphammer.report.PlanStorage;
+import com.dwurdy.heaphammer.report.ReportService;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.Mod.EventHandler;
@@ -18,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
+import java.nio.file.Paths;
 
 /**
  * Forge 1.7.10 entrypoint for HeapHammer.
@@ -28,14 +36,23 @@ public class HeapHammerForge1710 {
     private static final Logger LOGGER = LoggerFactory.getLogger("heaphammer-forge1710");
 
     private ForgePlatformAdapter1710 platform;
+    private ExperimentService experimentService;
     private CommandHeapHammer1710 commandHandler;
 
     @EventHandler
     public void init(FMLInitializationEvent event) {
         platform = new ForgePlatformAdapter1710(this);
-        commandHandler = new CommandHeapHammer1710(platform);
+        experimentService = new ExperimentService(platform);
+        CheckpointService checkpointService = new CheckpointService(
+                new JvmMetricsCollector(),
+                new MinecraftMetricsCollector(platform),
+                new CleanupValidator(platform));
+        PlanStorage planStorage = new PlanStorage(Paths.get("heaphammer"));
+        ReportService reportService = new ReportService(Paths.get("heaphammer"));
+        commandHandler = new CommandHeapHammer1710(
+                platform, experimentService, checkpointService, planStorage, reportService);
         FMLCommonHandler.instance().bus().register(this);
-        LOGGER.info("HeapHammer v1.0.1 initialized (Minecraft 1.7.10 / Forge)");
+        LOGGER.info("HeapHammer v1.1.0 initialized (Minecraft 1.7.10 / Forge)");
     }
 
     @SubscribeEvent
@@ -55,6 +72,17 @@ public class HeapHammerForge1710 {
     public void serverStarted(FMLServerStartedEvent event) {
         platform.setServerReady(true);
         LOGGER.info("HeapHammer server-ready signal fired");
+    }
+
+    @EventHandler
+    public void serverStopped(cpw.mods.fml.common.event.FMLServerStoppedEvent event) {
+        if (experimentService != null) {
+            experimentService.stop("Server stopping");
+        }
+        if (platform != null) {
+            platform.getChunkTicketManager().releaseAllTickets();
+            platform.setServerReady(false);
+        }
     }
 
     /**

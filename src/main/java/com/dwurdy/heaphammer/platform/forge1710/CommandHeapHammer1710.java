@@ -1,13 +1,24 @@
 package com.dwurdy.heaphammer.platform.forge1710;
 
-import com.dwurdy.heaphammer.domain.EnvironmentFingerprint;
-import com.dwurdy.heaphammer.domain.ExperimentState;
+import com.dwurdy.heaphammer.application.ExperimentService;
+import com.dwurdy.heaphammer.command.argument.FlagParser;
+import com.dwurdy.heaphammer.detection.TrendAnalyzer;
+import com.dwurdy.heaphammer.domain.*;
+import com.dwurdy.heaphammer.metrics.CheckpointService;
 import com.dwurdy.heaphammer.platform.PlatformAdapter;
+import com.dwurdy.heaphammer.report.PlanStorage;
+import com.dwurdy.heaphammer.report.ReportService;
+import com.dwurdy.heaphammer.scenario.ScenarioExecutor;
+import com.dwurdy.heaphammer.scenario.blockentities.BlockEntityScenarioPlanner;
+import com.dwurdy.heaphammer.scenario.chunks.ChunkWorkloadPlanner;
+import com.dwurdy.heaphammer.scenario.entities.EntityScenarioPlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.BiConsumer;
 
@@ -21,6 +32,14 @@ public class CommandHeapHammer1710 {
     private static final Logger LOGGER = LoggerFactory.getLogger("heaphammer-forge1710-cmd");
 
     private final PlatformAdapter adapter;
+    private final ExperimentService experimentService;
+    private final CheckpointService checkpointService;
+    private final PlanStorage planStorage;
+    private final ReportService reportService;
+    private final ChunkWorkloadPlanner chunkPlanner;
+    private final EntityScenarioPlanner entityPlanner;
+    private final BlockEntityScenarioPlanner blockEntityPlanner;
+    private final TrendAnalyzer trendAnalyzer;
 
     // Reflection handles for legacy net.minecraft.command.ICommandSender and ChatComponentText
     private Method addChatMessageMethod;
@@ -28,7 +47,35 @@ public class CommandHeapHammer1710 {
     private boolean reflectionInitialized = false;
 
     public CommandHeapHammer1710(PlatformAdapter adapter) {
+        this(adapter, null, null, null, null);
+    }
+
+    public CommandHeapHammer1710(
+            PlatformAdapter adapter,
+            ExperimentService experimentService,
+            CheckpointService checkpointService,
+            PlanStorage planStorage,
+            ReportService reportService
+    ) {
         this.adapter = Objects.requireNonNull(adapter, "adapter must not be null");
+        this.experimentService = experimentService;
+        this.checkpointService = checkpointService;
+        this.planStorage = planStorage;
+        this.reportService = reportService;
+        this.chunkPlanner = new ChunkWorkloadPlanner();
+        this.entityPlanner = new EntityScenarioPlanner();
+        this.blockEntityPlanner = new BlockEntityScenarioPlanner();
+        this.trendAnalyzer = new TrendAnalyzer();
+        if (experimentService != null) {
+            experimentService.setCheckpointListener((phase, iteration) -> {
+                Optional<ScenarioExecutor> active = experimentService.getActiveExecutor();
+                String dimension = active.isPresent()
+                        ? active.get().getPlan().spec().dimension() : "minecraft:overworld";
+                boolean explicitGc = active.isPresent() && active.get().getPlan().spec().explicitGc();
+                checkpointService.recordCheckpoint(phase, iteration, dimension, explicitGc);
+            });
+            experimentService.setCompletionListener(this::onExperimentFinished);
+        }
         initChatReflection();
     }
 
@@ -167,25 +214,131 @@ public class CommandHeapHammer1710 {
         String strategy = flags.getOrDefault("strategy", "SPIRAL");
         String dimension = flags.getOrDefault("dimension", "minecraft:overworld");
 
-        switch (target) {
-            case "chunks":
-                feedback.accept(String.format("§a[HeapHammer] Starting chunk leak benchmark: %d iterations, batch %d, strategy %s in %s.",
-                        iterations, batch, strategy, dimension), true);
-                return 1;
-            case "entities":
-                String entityType = flags.getOrDefault("type", "minecraft:zombie");
-                feedback.accept(String.format("§a[HeapHammer] Starting entity benchmark: %d iterations, batch %d, type %s in %s.",
-                        iterations, batch, entityType, dimension), true);
-                return 1;
-            case "blockentities":
-                String beType = flags.getOrDefault("type", "minecraft:chest");
-                feedback.accept(String.format("§a[HeapHammer] Starting block entity benchmark: %d iterations, batch %d, type %s in %s.",
-                        iterations, batch, beType, dimension), true);
-                return 1;
-            default:
-                feedback.accept("§cUnknown target: " + target + ". Must be chunks, entities, or blockentities.", false);
-                return 0;
+        // Keep the lightweight parser-only behavior used by unit tests that
+        // construct this command without a live application context.
+        if (experimentService == null) {
+            switch (target) {
+                case "chunks":
+                    feedback.accept(String.format("§a[HeapHammer] Starting chunk leak benchmark: %d iterations, batch %d, strategy %s in %s.",
+                            iterations, batch, strategy, dimension), true);
+                    return 1;
+                case "entities":
+                    String entityType = flags.getOrDefault("type", "minecraft:zombie");
+                    feedback.accept(String.format("§a[HeapHammer] Starting entity benchmark: %d iterations, batch %d, type %s in %s.",
+                            iterations, batch, entityType, dimension), true);
+                    return 1;
+                case "blockentities":
+                    String beType = flags.getOrDefault("type", "minecraft:chest");
+                    feedback.accept(String.format("§a[HeapHammer] Starting block entity benchmark: %d iterations, batch %d, type %s in %s.",
+                            iterations, batch, beType, dimension), true);
+                    return 1;
+                default:
+                    feedback.accept("§cUnknown target: " + target + ". Must be chunks, entities, or blockentities.", false);
+                    return 0;
+            }
         }
+
+        if (experimentService.isExperimentActive()) {
+            feedback.accept("§cAn experiment is already in progress. Use /hh abort first.", false);
+            return 0;
+        }
+
+        String[] flagArgs = Arrays.copyOfRange(args, 2, args.length);
+        try {
+            ExperimentSpec baseSpec = FlagParser.parseSpec(flagArgs, 0, 0, 0);
+            ExperimentSpec spec;
+            ExperimentPlan plan;
+            switch (target) {
+                case "chunks":
+                    spec = baseSpec;
+                    plan = chunkPlanner.plan(spec);
+                    break;
+                case "entities":
+                    spec = scenarioSpec(baseSpec, ScenarioId.ENTITIES, baseSpec.radius() * 4);
+                    plan = entityPlanner.plan(spec, adapter.getAvailableEntityTypes());
+                    break;
+                case "blockentities":
+                    spec = scenarioSpec(baseSpec, ScenarioId.BLOCK_ENTITIES, baseSpec.radius() * 4);
+                    plan = blockEntityPlanner.plan(spec, adapter.getAvailableBlockEntityTypes());
+                    break;
+                default:
+                    feedback.accept("§cUnknown target: " + target + ". Must be chunks, entities, or blockentities.", false);
+                    return 0;
+            }
+
+            checkpointService.clear();
+            planStorage.savePlan(plan);
+            checkpointService.configure(plan.spec(), adapter);
+            experimentService.start(plan);
+            feedback.accept(String.format("§a[HeapHammer] Started %s experiment: %s (%d cycles, batch %d).",
+                    target, plan.id(), spec.iterations(), spec.batchSize()), true);
+            return 1;
+        } catch (IllegalArgumentException e) {
+            feedback.accept("§cInvalid parameter: " + e.getMessage(), false);
+            return 0;
+        } catch (Exception e) {
+            LOGGER.error("Failed to start experiment", e);
+            feedback.accept("§cFailed to start experiment: " + e.getMessage(), false);
+            return 0;
+        }
+    }
+
+    private ExperimentSpec scenarioSpec(ExperimentSpec baseSpec, ScenarioId scenarioId, int radius) {
+        return ExperimentSpec.builder()
+                .scenarioId(scenarioId)
+                .seed(baseSpec.seed())
+                .dimension(baseSpec.dimension())
+                .center(baseSpec.centerX(), baseSpec.centerZ())
+                .radius(radius)
+                .iterations(baseSpec.iterations())
+                .batchSize(baseSpec.batchSize())
+                .strategy(baseSpec.strategy())
+                .warmupIterations(baseSpec.warmupIterations())
+                .holdTicks(baseSpec.holdTicks())
+                .settleTicks(baseSpec.settleTicks())
+                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                .explicitGc(baseSpec.explicitGc())
+                .coverage(baseSpec.coverage())
+                .includeMods(baseSpec.includeMods())
+                .excludeMods(baseSpec.excludeMods())
+                .entityProfile(baseSpec.entityProfile())
+                .loginsPerCycle(baseSpec.loginsPerCycle())
+                .playerActions(baseSpec.playerActions())
+                .durationSeconds(baseSpec.durationSeconds())
+                .intervalSeconds(baseSpec.intervalSeconds())
+                .diagnosticCollectors(baseSpec.diagnosticCollectors())
+                .trackedClasses(baseSpec.trackedClasses())
+                .build();
+    }
+
+    private void onExperimentFinished(ScenarioExecutor executor) {
+        ExperimentPlan plan = executor.getPlan();
+        EnvironmentFingerprint environment = adapter.captureFingerprint();
+        checkpointService.awaitDiagnostics().thenAccept(evidence -> {
+            List<Checkpoint> checkpoints = checkpointService.getCheckpoints();
+            DetectionResult detection = trendAnalyzer.analyze(plan.spec(), checkpoints, evidence);
+            ExperimentReport report = new ExperimentReport(
+                    plan.id(),
+                    plan.createdAtEpochMs(),
+                    System.currentTimeMillis(),
+                    executor.getStateMachine().getState().name(),
+                    plan.spec(),
+                    environment,
+                    checkpoints,
+                    detection,
+                    DiagnosticRefs.EMPTY,
+                    evidence,
+                    ReportService.buildCanonicalCommand(plan.spec()),
+                    evidence.warnings()
+            );
+            try {
+                Path path = reportService.saveReport(report);
+                LOGGER.info("Report saved successfully: {}", path.toAbsolutePath());
+            } catch (IOException e) {
+                LOGGER.error("Failed to save experiment report", e);
+            }
+        });
     }
 
     public static Map<String, String> parseFlags(String[] args, int startIndex) {
