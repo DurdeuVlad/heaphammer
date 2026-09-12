@@ -1,6 +1,7 @@
 package com.dwurdy.heaphammer.scenario.blockentities;
 
 import com.dwurdy.heaphammer.application.ExecutionBudget;
+import com.dwurdy.heaphammer.application.CrashRecoveryJournal;
 import com.dwurdy.heaphammer.application.ExperimentStateMachine;
 import com.dwurdy.heaphammer.domain.CheckpointPhase;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
@@ -23,6 +24,7 @@ public class BlockEntityScenarioExecutor implements ScenarioExecutor {
     private final ExecutionBudget budget;
     private final BiConsumer<CheckpointPhase, Integer> checkpointTrigger;
     private final Consumer<ExperimentState> completionCallback;
+    private final CrashRecoveryJournal recoveryJournal;
 
     private int currentIteration = 0;
     private int currentOperationIndex = 0;
@@ -38,10 +40,21 @@ public class BlockEntityScenarioExecutor implements ScenarioExecutor {
             BiConsumer<CheckpointPhase, Integer> checkpointTrigger,
             Consumer<ExperimentState> completionCallback
     ) {
+        this(plan, adapter, checkpointTrigger, completionCallback, null);
+    }
+
+    public BlockEntityScenarioExecutor(
+            ExperimentPlan plan,
+            PlatformAdapter adapter,
+            BiConsumer<CheckpointPhase, Integer> checkpointTrigger,
+            Consumer<ExperimentState> completionCallback,
+            CrashRecoveryJournal recoveryJournal
+    ) {
         this.plan = Objects.requireNonNull(plan, "plan must not be null");
         this.adapter = Objects.requireNonNull(adapter, "adapter must not be null");
         this.checkpointTrigger = Objects.requireNonNull(checkpointTrigger, "checkpointTrigger must not be null");
         this.completionCallback = Objects.requireNonNull(completionCallback, "completionCallback must not be null");
+        this.recoveryJournal = recoveryJournal;
 
         this.stateMachine = new ExperimentStateMachine();
         ExperimentSpec spec = plan.spec();
@@ -125,9 +138,15 @@ public class BlockEntityScenarioExecutor implements ScenarioExecutor {
             }
 
             if (ResolvedBlockEntityOperation.ACTION_PLACE.equals(op.action())) {
-                adapter.placeBlockEntity(op.dimension(), op.blockEntityTypeId(), op.x(), op.y(), op.z());
+                if (adapter.placeBlockEntity(op.dimension(), op.blockEntityTypeId(), op.x(), op.y(), op.z())
+                        && recoveryJournal != null) {
+                    recoveryJournal.recordBlockPlaced(op.x(), op.y(), op.z());
+                }
             } else if (ResolvedBlockEntityOperation.ACTION_REMOVE.equals(op.action())) {
-                adapter.removeBlockEntity(op.dimension(), op.x(), op.y(), op.z());
+                if (adapter.removeBlockEntity(op.dimension(), op.x(), op.y(), op.z())
+                        && recoveryJournal != null) {
+                    recoveryJournal.recordBlockRemoved(op.x(), op.y(), op.z());
+                }
             }
 
             budget.recordOperation();
