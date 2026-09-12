@@ -46,8 +46,8 @@ public class OmniTrackLeakMod implements ModInitializer {
 
         // Subsystem 1: Chunk Load hook (omits CHUNK_UNLOAD)
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
-            if (LEAK_ENABLED.get() && chunk instanceof LevelChunk levelChunk) {
-                CHUNK_AUDIT_LOG.add(new ChunkAuditRecord(levelChunk.getPos(), world.dimension(), levelChunk));
+            if (LEAK_ENABLED.get() && chunk != null) {
+                CHUNK_AUDIT_LOG.add(new ChunkAuditRecord(chunk.getPos(), world.dimension(), chunk));
             }
         });
 

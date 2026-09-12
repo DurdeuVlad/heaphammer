@@ -31,9 +31,9 @@ public class ChunkCacheLeakMod implements ModInitializer {
         LOGGER.info("[TestMod-ChunkCache] Initializing single-subsystem chunk cache leak mod.");
 
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
-            if (LEAK_ENABLED.get() && chunk instanceof LevelChunk levelChunk) {
-                ChunkPos pos = levelChunk.getPos();
-                CACHE.put(pos, new RetainedChunkEntry(pos, world.dimension(), levelChunk));
+            if (LEAK_ENABLED.get() && chunk != null) {
+                ChunkPos pos = chunk.getPos();
+                CACHE.put(pos, new RetainedChunkEntry(pos, world.dimension(), chunk));
                 LOGGER.debug("[TestMod-ChunkCache] Cached chunk at {} (Total cached: {})", pos, CACHE.size());
             }
         });

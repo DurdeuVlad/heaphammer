@@ -1,6 +1,8 @@
 package com.dwurdy.heaphammer.detection;
 
 import com.dwurdy.heaphammer.domain.*;
+import com.dwurdy.heaphammer.diagnostics.RetentionClassEntry;
+import com.dwurdy.heaphammer.diagnostics.RetentionSnapshot;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -138,6 +140,33 @@ class TrendAnalyzerTest {
         DetectionResult result = analyzer.analyze(spec, checkpoints);
 
         assertEquals(DetectionClassification.CLEANUP_FAILED, result.classification());
+    }
+
+    @Test
+    @DisplayName("TrendAnalyzer promotes a fitted weak-reference retention trend")
+    void testRetentionEvidenceClassification() {
+        ExperimentSpec spec = ExperimentSpec.builder().warmupIterations(0).iterations(3).build();
+        long heap = 100L * 1024 * 1024;
+        List<Checkpoint> checkpoints = List.of(
+                createCheckpoint(CheckpointPhase.BASELINE, 0, heap, true),
+                createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 0, heap, true),
+                createCheckpoint(CheckpointPhase.ITERATION_CLEANUP, 1, heap, true),
+                createCheckpoint(CheckpointPhase.FINAL_CLEANUP, 2, heap, true)
+        );
+        List<RetentionSnapshot> retention = List.of(
+                retention(0), retention(1), retention(2), retention(3)
+        );
+        RunDiagnostics evidence = new RunDiagnostics(null, null, null,
+                retention.get(0), retention.get(3), retention, null, null, null, null, List.of());
+
+        DetectionResult result = new TrendAnalyzer().analyze(spec, checkpoints, evidence);
+        assertEquals(DetectionClassification.SUSPICIOUS, result.classification());
+        assertTrue(result.rationale().toLowerCase(java.util.Locale.ROOT).contains("weak-reference retention census"));
+    }
+
+    private RetentionSnapshot retention(long live) {
+        return new RetentionSnapshot(System.currentTimeMillis(),
+                java.util.Map.of("fixture.Target", new RetentionClassEntry("fixture.Target", live, live)));
     }
 
     private Checkpoint createCheckpoint(CheckpointPhase phase, int iteration, long heapUsed, boolean cleanupValid) {
