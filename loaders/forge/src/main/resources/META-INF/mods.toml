@@ -1,0 +1,26 @@
+modLoader = "javafml"
+loaderVersion = "[43,)"
+license = "LGPL-3.0"
+issueTrackerURL = "https://github.com/DurdeuVlad/heaphammer/issues"
+
+[[mods]]
+modId = "heaphammer"
+version = "${version}"
+displayName = "HeapHammer"
+authors = "dwurdy"
+description = '''Deterministic stress-testing and retained-memory regression framework for modded Minecraft.'''
+logoFile = "assets/heaphammer/icon.png"
+
+[[dependencies.heaphammer]]
+modId = "forge"
+mandatory = true
+versionRange = "[43,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.heaphammer]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.19.2,1.19.3)"
+ordering = "NONE"
+side = "BOTH"
