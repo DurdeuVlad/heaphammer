@@ -1,10 +1,9 @@
 package com.dwurdy.testmod.omnitrack;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.dimension.DimensionType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,13 +14,13 @@ import java.util.Objects;
  */
 public class ChunkAuditRecord {
     private final ChunkPos pos;
-    private final ResourceKey<Level> dimension;
+    private final DimensionType dimension;
     private final LevelChunk chunk;
     private final List<BlockPos> sampledPositions;
     private final long timestamp;
     private final byte[] auditPayload = new byte[1024 * 1024];
 
-    public ChunkAuditRecord(ChunkPos pos, ResourceKey<Level> dimension, LevelChunk chunk) {
+    public ChunkAuditRecord(ChunkPos pos, DimensionType dimension, LevelChunk chunk) {
         this.pos = Objects.requireNonNull(pos, "pos must not be null");
         this.dimension = Objects.requireNonNull(dimension, "dimension must not be null");
         this.chunk = Objects.requireNonNull(chunk, "chunk must not be null");
@@ -39,7 +38,7 @@ public class ChunkAuditRecord {
         return pos;
     }
 
-    public ResourceKey<Level> getDimension() {
+    public DimensionType getDimension() {
         return dimension;
     }
 
