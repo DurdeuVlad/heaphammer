@@ -32,3 +32,9 @@ Please verify that your change adheres to HeapHammer's core architectural constr
 - [ ] I have updated documentation in `README.md` or `docs/` where relevant.
 - [ ] All commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).
 - [ ] I have tested these changes on a live dedicated server or test suite.
+
+## AI Disclosure
+<!-- Mandatory per AGENTS.md and CONTRIBUTING.md -->
+- [ ] No AI assistance was used in drafting or implementing this PR.
+- [ ] AI assisted in this PR (Tool/Agent: __________). All code has been reviewed, locally built, and empirically verified against the test suite.
+

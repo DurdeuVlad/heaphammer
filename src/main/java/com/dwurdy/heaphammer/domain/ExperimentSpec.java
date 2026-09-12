@@ -1,5 +1,8 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.dwurdy.heaphammer.infrastructure.config.ConfigManager;
+import com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,7 +29,14 @@ public record ExperimentSpec(
         boolean explicitGc,
         double coverage,
         List<String> includeMods,
-        List<String> excludeMods
+        List<String> excludeMods,
+        EntityWorkloadProfile entityProfile,
+        int loginsPerCycle,
+        List<PlayerAction> playerActions,
+        long durationSeconds,
+        long intervalSeconds,
+        List<DiagnosticCollector> diagnosticCollectors,
+        List<String> trackedClasses
 ) {
     public static final String DEFAULT_DIMENSION = "minecraft:overworld";
     public static final String DEFAULT_STRATEGY = "SPIRAL";
@@ -35,17 +45,76 @@ public record ExperimentSpec(
         Objects.requireNonNull(scenarioId, "scenarioId must not be null");
         Objects.requireNonNull(dimension, "dimension must not be null");
         Objects.requireNonNull(strategy, "strategy must not be null");
-        if (radius <= 0) throw new IllegalArgumentException("radius must be > 0");
-        if (iterations <= 0) throw new IllegalArgumentException("iterations must be > 0");
-        if (batchSize <= 0) throw new IllegalArgumentException("batchSize must be > 0");
-        if (maxOperationsPerTick <= 0) throw new IllegalArgumentException("maxOperationsPerTick must be > 0");
-        if (maxMillisPerTick <= 0) throw new IllegalArgumentException("maxMillisPerTick must be > 0");
-        if (warmupIterations < 0) throw new IllegalArgumentException("warmupIterations must be >= 0");
-        if (holdTicks < 0) throw new IllegalArgumentException("holdTicks must be >= 0");
-        if (settleTicks < 0) throw new IllegalArgumentException("settleTicks must be >= 0");
+
+        HeapHammerConfig config = ConfigManager.getActiveConfig();
+        int maxRadius = config != null ? config.getMaxRadius() : 32;
+        int effectiveMaxRadius = ScenarioId.ENTITIES.equals(scenarioId) ? maxRadius * 4 : maxRadius;
+        if (radius <= 0 || radius > effectiveMaxRadius) {
+            throw new IllegalArgumentException("Radius " + radius + " exceeds configured safety ceiling (" + effectiveMaxRadius + " chunks). " +
+                    "To allow a larger radius, increase 'maxRadius' in config/heaphammer.json and run '/hh config reload'.");
+        }
+
+        int maxIterations = config != null ? config.getMaxIterations() : 50;
+        if (iterations <= 0 || iterations > maxIterations) {
+            throw new IllegalArgumentException("Iterations " + iterations + " exceeds configured safety ceiling (" + maxIterations + "). " +
+                    "To allow more iterations, increase 'maxIterations' in config/heaphammer.json and run '/hh config reload'.");
+        }
+
+        int maxBatchSize = config != null ? config.getMaxBatchSize() : 128;
+        if (batchSize <= 0 || batchSize > maxBatchSize) {
+            throw new IllegalArgumentException("Batch size " + batchSize + " exceeds configured safety ceiling (" + maxBatchSize + "). " +
+                    "To allow larger batch sizes, increase 'maxBatchSize' in config/heaphammer.json and run '/hh config reload'.");
+        }
+
+        int maxOps = config != null ? config.getMaxOperationsPerTick() : 50;
+        if (maxOperationsPerTick <= 0 || maxOperationsPerTick > maxOps) {
+            throw new IllegalArgumentException("maxOperationsPerTick " + maxOperationsPerTick + " exceeds configured ceiling (" + maxOps + "). " +
+                    "To adjust, modify 'maxOperationsPerTick' in config/heaphammer.json and run '/hh config reload'.");
+        }
+
+        long maxMs = config != null ? config.getMaxMillisPerTick() : 35;
+        if (maxMillisPerTick <= 0 || maxMillisPerTick > maxMs) {
+            throw new IllegalArgumentException("maxMillisPerTick " + maxMillisPerTick + " exceeds configured ceiling (" + maxMs + " ms). " +
+                    "To adjust, modify 'maxMillisPerTick' in config/heaphammer.json and run '/hh config reload'.");
+        }
+
+        int maxWarmup = config != null ? config.getMaxWarmupIterations() : 10;
+        if (warmupIterations < 0 || warmupIterations > maxWarmup) {
+            throw new IllegalArgumentException("Warmup iterations " + warmupIterations + " exceeds configured ceiling (" + maxWarmup + "). " +
+                    "To adjust, modify 'maxWarmupIterations' in config/heaphammer.json and run '/hh config reload'.");
+        }
+
+        int maxHold = config != null ? config.getMaxHoldTicks() : 1200;
+        if (holdTicks < 0 || holdTicks > maxHold) {
+            throw new IllegalArgumentException("Hold ticks " + holdTicks + " exceeds configured ceiling (" + maxHold + " ticks). " +
+                    "To adjust, modify 'maxHoldTicks' in config/heaphammer.json and run '/hh config reload'.");
+        }
+
+        int maxSettle = config != null ? config.getMaxSettleTicks() : 1200;
+        if (settleTicks < 0 || settleTicks > maxSettle) {
+            throw new IllegalArgumentException("Settle ticks " + settleTicks + " exceeds configured ceiling (" + maxSettle + " ticks). " +
+                    "To adjust, modify 'maxSettleTicks' in config/heaphammer.json and run '/hh config reload'.");
+        }
+        if (entityProfile == null) entityProfile = EntityWorkloadProfile.TRANSIENT;
+        if (loginsPerCycle <= 0) loginsPerCycle = Math.max(1, Math.min(batchSize, maxBatchSize));
+        if (loginsPerCycle > maxBatchSize) {
+            throw new IllegalArgumentException("loginsPerCycle must be between 1 and " + maxBatchSize);
+        }
+        if (durationSeconds < 0L || intervalSeconds < 0L) {
+            throw new IllegalArgumentException("durationSeconds and intervalSeconds must not be negative");
+        }
+        if (durationSeconds == 0L && intervalSeconds != 0L) {
+            throw new IllegalArgumentException("intervalSeconds requires durationSeconds");
+        }
+        if (durationSeconds > 0L && (intervalSeconds <= 0L || intervalSeconds > durationSeconds)) {
+            throw new IllegalArgumentException("intervalSeconds must be positive and no greater than durationSeconds");
+        }
         if (coverage <= 0.0 || coverage > 1.0) coverage = 1.0;
         includeMods = (includeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(includeMods));
         excludeMods = (excludeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(excludeMods));
+        playerActions = (playerActions == null) ? List.of(PlayerAction.JOIN, PlayerAction.QUIT) : Collections.unmodifiableList(List.copyOf(playerActions));
+        diagnosticCollectors = (diagnosticCollectors == null) ? List.of() : Collections.unmodifiableList(List.copyOf(diagnosticCollectors));
+        trackedClasses = (trackedClasses == null) ? List.of() : Collections.unmodifiableList(List.copyOf(trackedClasses));
     }
 
     public ExperimentSpec(
@@ -67,7 +136,9 @@ public record ExperimentSpec(
     ) {
         this(scenarioId, seed, dimension, centerX, centerZ, radius, iterations, batchSize,
                 strategy, warmupIterations, holdTicks, settleTicks, maxOperationsPerTick,
-                maxMillisPerTick, explicitGc, 1.0, List.of(), List.of());
+                maxMillisPerTick, explicitGc, 1.0, List.of(), List.of(),
+                EntityWorkloadProfile.TRANSIENT, batchSize, List.of(PlayerAction.JOIN, PlayerAction.QUIT),
+                0L, 0L, List.of(), List.of());
     }
 
     public static Builder builder() {
@@ -93,6 +164,13 @@ public record ExperimentSpec(
         private double coverage = 1.0;
         private List<String> includeMods = new ArrayList<>();
         private List<String> excludeMods = new ArrayList<>();
+        private EntityWorkloadProfile entityProfile = EntityWorkloadProfile.TRANSIENT;
+        private int loginsPerCycle = 1;
+        private List<PlayerAction> playerActions = new ArrayList<>(List.of(PlayerAction.JOIN, PlayerAction.QUIT));
+        private long durationSeconds = 0L;
+        private long intervalSeconds = 0L;
+        private List<DiagnosticCollector> diagnosticCollectors = new ArrayList<>();
+        private List<String> trackedClasses = new ArrayList<>();
 
         public Builder scenarioId(ScenarioId scenarioId) { this.scenarioId = scenarioId; return this; }
         public Builder seed(long seed) { this.seed = seed; return this; }
@@ -113,13 +191,26 @@ public record ExperimentSpec(
         public Builder coverage(double coverage) { this.coverage = coverage; return this; }
         public Builder includeMods(List<String> includeMods) { this.includeMods = (includeMods == null) ? new ArrayList<>() : new ArrayList<>(includeMods); return this; }
         public Builder excludeMods(List<String> excludeMods) { this.excludeMods = (excludeMods == null) ? new ArrayList<>() : new ArrayList<>(excludeMods); return this; }
+        public Builder entityProfile(EntityWorkloadProfile profile) { this.entityProfile = profile; return this; }
+        public Builder loginsPerCycle(int loginsPerCycle) { this.loginsPerCycle = loginsPerCycle; return this; }
+        public Builder playerActions(List<PlayerAction> actions) { this.playerActions = (actions == null) ? new ArrayList<>() : new ArrayList<>(actions); return this; }
+        public Builder durationSeconds(long durationSeconds) { this.durationSeconds = durationSeconds; return this; }
+        public Builder intervalSeconds(long intervalSeconds) { this.intervalSeconds = intervalSeconds; return this; }
+        public Builder diagnosticCollectors(List<DiagnosticCollector> collectors) { this.diagnosticCollectors = (collectors == null) ? new ArrayList<>() : new ArrayList<>(collectors); return this; }
+        public Builder trackedClasses(List<String> classes) { this.trackedClasses = (classes == null) ? new ArrayList<>() : new ArrayList<>(classes); return this; }
 
         public ExperimentSpec build() {
             return new ExperimentSpec(
                     scenarioId, seed, dimension, centerX, centerZ, radius, iterations, batchSize,
                     strategy, warmupIterations, holdTicks, settleTicks, maxOperationsPerTick,
-                    maxMillisPerTick, explicitGc, coverage, includeMods, excludeMods
+                    maxMillisPerTick, explicitGc, coverage, includeMods, excludeMods,
+                    entityProfile, loginsPerCycle, playerActions, durationSeconds, intervalSeconds,
+                    diagnosticCollectors, trackedClasses
             );
         }
+    }
+
+    public boolean isSoak() {
+        return durationSeconds > 0L;
     }
 }
