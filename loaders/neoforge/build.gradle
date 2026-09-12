@@ -94,9 +94,16 @@ sourceSets {
 	}
 }
 
+// Dependency ranges are derived from the branch's pins so a synced
+// neoforge.mods.toml never declares a version floor for a different MC line.
+def neoforgePin = project.findProperty('neoforge_version')?.toString()
+def neoforgeMajorMinor = neoforgePin ? neoforgePin.tokenize('.').take(2).join('.') : neoforgePin
+
 processResources {
 	filesMatching('META-INF/neoforge.mods.toml') {
-		expand 'version': project.version
+		expand 'version': project.version,
+				'mc_version_range': "[${mcVersion},)",
+				'neoforge_version_range': "[${neoforgeMajorMinor},)"
 	}
 }
 
