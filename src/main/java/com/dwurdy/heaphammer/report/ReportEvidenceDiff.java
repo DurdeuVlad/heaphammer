@@ -1,10 +1,13 @@
 package com.dwurdy.heaphammer.report;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Differential attribution evidence between two run reports (B minus A). */
+@Desugar
 public record ReportEvidenceDiff(
         Map<String, Long> classGrowthBytesDifference,
         Map<String, Long> retainedLiveDifference,

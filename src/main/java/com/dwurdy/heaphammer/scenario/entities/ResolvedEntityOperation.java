@@ -1,6 +1,7 @@
 package com.dwurdy.heaphammer.scenario.entities;
 
 import com.github.bsideup.jabel.Desugar;
+import com.dwurdy.heaphammer.domain.EntityWorkloadProfile;
 
 import java.util.Objects;
 

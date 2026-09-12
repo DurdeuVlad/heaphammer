@@ -1,5 +1,7 @@
 package com.dwurdy.heaphammer.application;
 
+import com.github.bsideup.jabel.Desugar;
+
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.infrastructure.FileStorage;
 import com.dwurdy.heaphammer.infrastructure.json.GsonCodec;
@@ -25,7 +27,8 @@ public class CrashRecoveryJournal {
     private static final Logger LOGGER = LoggerFactory.getLogger("heaphammer-recovery");
     public static final String DEFAULT_JOURNAL_PATH = "heaphammer/active_run_journal.json";
 
-    public record BlockPosRecord(int x, int y, int z) {}
+    @Desugar
+public record BlockPosRecord(int x, int y, int z) {}
 
     public static class JournalState {
         public String runId;

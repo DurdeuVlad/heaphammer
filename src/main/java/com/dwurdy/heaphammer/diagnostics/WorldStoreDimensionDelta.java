@@ -1,8 +1,11 @@
 package com.dwurdy.heaphammer.diagnostics;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Objects;
 
 /** Difference between two persisted entity-store snapshots for one dimension. */
+@Desugar
 public record WorldStoreDimensionDelta(
         String dimension,
         long deltaRegionFiles,

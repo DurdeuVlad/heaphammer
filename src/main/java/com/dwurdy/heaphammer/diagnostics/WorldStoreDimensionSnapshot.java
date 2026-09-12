@@ -1,10 +1,13 @@
 package com.dwurdy.heaphammer.diagnostics;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
 /** Read-only entity-region metrics for one dimension. */
+@Desugar
 public record WorldStoreDimensionSnapshot(
         String dimension,
         long regionFileCount,

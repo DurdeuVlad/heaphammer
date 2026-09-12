@@ -1,11 +1,14 @@
 package com.dwurdy.heaphammer.diagnostics;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
 /** Point-in-time weak-reference census. */
+@Desugar
 public record RetentionSnapshot(long timestamp, Map<String, RetentionClassEntry> entries) {
     public RetentionSnapshot {
         Objects.requireNonNull(entries, "entries must not be null");

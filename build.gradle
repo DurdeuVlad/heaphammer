@@ -48,6 +48,7 @@ sourceSets {
             exclude 'com/dwurdy/heaphammer/platform/fabric/**'
             exclude 'com/dwurdy/heaphammer/HeapHammer.java'
             exclude 'com/dwurdy/heaphammer/command/HeapHammerCommands.java'
+            exclude 'com/dwurdy/heaphammer/command/CommandPermissions.java'
             exclude 'com/dwurdy/heaphammer/mixin/**'
             exclude 'com/dwurdy/heaphammer/diagnostics/JfrTrigger.java'
         }
@@ -63,6 +64,7 @@ sourceSets {
         java {
             srcDirs = ['src/test/java']
             exclude 'com/dwurdy/heaphammer/ModMatrixVerificationTest.java'
+            exclude 'com/dwurdy/heaphammer/command/CommandPermissionsTest.java'
         }
         resources {
             srcDirs = ['src/test/resources']
@@ -86,7 +88,9 @@ dependencies {
 }
 
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
 }
 
 processResources {

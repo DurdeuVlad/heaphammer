@@ -1,11 +1,14 @@
 package com.dwurdy.heaphammer.diagnostics;
 
+import com.github.bsideup.jabel.Desugar;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
 /** Read-only snapshot of persisted entity stores across dimensions. */
+@Desugar
 public record WorldStoreSnapshot(long timestamp, Map<String, WorldStoreDimensionSnapshot> dimensions) {
     public WorldStoreSnapshot {
         Objects.requireNonNull(dimensions, "dimensions must not be null");

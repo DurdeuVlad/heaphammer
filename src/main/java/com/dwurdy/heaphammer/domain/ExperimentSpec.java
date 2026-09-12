@@ -1,6 +1,8 @@
 package com.dwurdy.heaphammer.domain;
 
 import com.github.bsideup.jabel.Desugar;
+import com.dwurdy.heaphammer.infrastructure.config.ConfigManager;
+import com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -133,7 +135,10 @@ public record ExperimentSpec(
     ) {
         this(scenarioId, seed, dimension, centerX, centerZ, radius, iterations, batchSize,
                 strategy, warmupIterations, holdTicks, settleTicks, maxOperationsPerTick,
-                maxMillisPerTick, explicitGc, 1.0, Collections.emptyList(), Collections.emptyList());
+                maxMillisPerTick, explicitGc, 1.0, Collections.emptyList(), Collections.emptyList(),
+                EntityWorkloadProfile.TRANSIENT, batchSize,
+                com.dwurdy.heaphammer.infrastructure.LegacyCollections.list(PlayerAction.JOIN, PlayerAction.QUIT),
+                0L, 0L, Collections.emptyList(), Collections.emptyList());
     }
 
     public static Builder builder() {
@@ -161,7 +166,7 @@ public record ExperimentSpec(
         private List<String> excludeMods = new ArrayList<>();
         private EntityWorkloadProfile entityProfile = EntityWorkloadProfile.TRANSIENT;
         private int loginsPerCycle = 1;
-        private List<PlayerAction> playerActions = new ArrayList<>(List.of(PlayerAction.JOIN, PlayerAction.QUIT));
+        private List<PlayerAction> playerActions = new ArrayList<>(com.dwurdy.heaphammer.infrastructure.LegacyCollections.list(PlayerAction.JOIN, PlayerAction.QUIT));
         private long durationSeconds = 0L;
         private long intervalSeconds = 0L;
         private List<DiagnosticCollector> diagnosticCollectors = new ArrayList<>();

@@ -182,7 +182,7 @@ public class FlagParser {
                     .map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toList());
             builder.trackedClasses(classes);
             if (!classes.isEmpty() && !flags.containsKey("diagnostics")) {
-                builder.diagnosticCollectors(List.of(DiagnosticCollector.RETENTION));
+                builder.diagnosticCollectors(com.dwurdy.heaphammer.infrastructure.LegacyCollections.list(DiagnosticCollector.RETENTION));
             }
         }
 

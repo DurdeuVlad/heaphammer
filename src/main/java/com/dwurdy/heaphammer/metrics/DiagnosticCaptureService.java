@@ -1,5 +1,7 @@
 package com.dwurdy.heaphammer.metrics;
 
+import com.github.bsideup.jabel.Desugar;
+
 import com.dwurdy.heaphammer.diagnostics.ClassHistogram;
 import com.dwurdy.heaphammer.diagnostics.ClassHistogramCollector;
 import com.dwurdy.heaphammer.diagnostics.EventMetricsSnapshot;
@@ -138,25 +140,27 @@ public final class DiagnosticCaptureService implements AutoCloseable {
         worker.shutdownNow();
     }
 
+    @Desugar
     private record Configuration(Set<DiagnosticCollector> collectors, PlatformAdapter platform, List<String> trackedClasses) {
         private Configuration {
             collectors = Collections.unmodifiableSet(EnumSet.copyOf(collectors));
-            trackedClasses = trackedClasses == null ? List.of() : List.copyOf(trackedClasses);
+            trackedClasses = trackedClasses == null ? com.dwurdy.heaphammer.infrastructure.LegacyCollections.list() : com.dwurdy.heaphammer.infrastructure.LegacyCollections.copy(trackedClasses);
         }
 
         private static Configuration disabled() {
-            return new Configuration(EnumSet.noneOf(DiagnosticCollector.class), null, List.of());
+            return new Configuration(EnumSet.noneOf(DiagnosticCollector.class), null, com.dwurdy.heaphammer.infrastructure.LegacyCollections.list());
         }
     }
 
-    public record CaptureResult(CheckpointDiagnostics diagnostics, ClassHistogram histogram, List<String> warnings) {
+    @Desugar
+public record CaptureResult(CheckpointDiagnostics diagnostics, ClassHistogram histogram, List<String> warnings) {
         public CaptureResult {
             diagnostics = diagnostics == null ? CheckpointDiagnostics.EMPTY : diagnostics;
-            warnings = warnings == null ? List.of() : List.copyOf(warnings);
+            warnings = warnings == null ? com.dwurdy.heaphammer.infrastructure.LegacyCollections.list() : com.dwurdy.heaphammer.infrastructure.LegacyCollections.copy(warnings);
         }
 
         public static CaptureResult empty() {
-            return new CaptureResult(CheckpointDiagnostics.EMPTY, null, List.of());
+            return new CaptureResult(CheckpointDiagnostics.EMPTY, null, com.dwurdy.heaphammer.infrastructure.LegacyCollections.list());
         }
     }
 }
