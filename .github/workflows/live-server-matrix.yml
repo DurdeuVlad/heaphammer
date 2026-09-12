@@ -97,6 +97,13 @@ jobs:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
 
+      - name: Load live harness from matrix branch
+        run: |
+          # The matrix intentionally checks out each historical version branch,
+          # while the harness itself is maintained on master.
+          git fetch origin master --depth=1
+          git show origin/master:tools/live_server_matrix.py > tools/live_server_matrix.py
+
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
         with:
@@ -108,6 +115,20 @@ jobs:
 
       - name: Grant execute permission to Gradle wrapper
         run: chmod +x gradlew
+
+      - name: Adapt Fabric leak-fixture metadata to target branch
+        if: matrix.loader == 'fabric'
+        run: |
+          FABRIC_LOADER=$(grep '^loader_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          MINECRAFT=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          JAVA_TARGET=$(grep '^java_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          while IFS= read -r -d '' manifest; do
+            sed -i \
+              -e "s/>=0.19.5/${FABRIC_LOADER}/g" \
+              -e "s/~1.21.1/${MINECRAFT}/g" \
+              -e "s/>=21/>=${JAVA_TARGET}/g" \
+              "$manifest"
+          done < <(find testmods -name fabric.mod.json -print0)
 
       - name: Build mod and live-test fixture
         env:
