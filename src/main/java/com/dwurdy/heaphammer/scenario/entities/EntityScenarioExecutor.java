@@ -1,11 +1,13 @@
 package com.dwurdy.heaphammer.scenario.entities;
 
 import com.dwurdy.heaphammer.application.ExecutionBudget;
+import com.dwurdy.heaphammer.application.CrashRecoveryJournal;
 import com.dwurdy.heaphammer.application.ExperimentStateMachine;
 import com.dwurdy.heaphammer.domain.CheckpointPhase;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
 import com.dwurdy.heaphammer.domain.ExperimentState;
+import com.dwurdy.heaphammer.domain.EntityWorkloadProfile;
 import com.dwurdy.heaphammer.platform.PlatformAdapter;
 import com.dwurdy.heaphammer.scenario.ScenarioExecutor;
 
@@ -23,6 +25,7 @@ public class EntityScenarioExecutor implements ScenarioExecutor {
     private final ExecutionBudget budget;
     private final BiConsumer<CheckpointPhase, Integer> checkpointTrigger;
     private final Consumer<ExperimentState> completionCallback;
+    private final CrashRecoveryJournal recoveryJournal;
 
     private final Queue<UUID> activeEntityUuids = new ArrayDeque<>();
     private int currentIteration = 0;
@@ -39,10 +42,21 @@ public class EntityScenarioExecutor implements ScenarioExecutor {
             BiConsumer<CheckpointPhase, Integer> checkpointTrigger,
             Consumer<ExperimentState> completionCallback
     ) {
+        this(plan, adapter, checkpointTrigger, completionCallback, null);
+    }
+
+    public EntityScenarioExecutor(
+            ExperimentPlan plan,
+            PlatformAdapter adapter,
+            BiConsumer<CheckpointPhase, Integer> checkpointTrigger,
+            Consumer<ExperimentState> completionCallback,
+            CrashRecoveryJournal recoveryJournal
+    ) {
         this.plan = Objects.requireNonNull(plan, "plan must not be null");
         this.adapter = Objects.requireNonNull(adapter, "adapter must not be null");
         this.checkpointTrigger = Objects.requireNonNull(checkpointTrigger, "checkpointTrigger must not be null");
         this.completionCallback = Objects.requireNonNull(completionCallback, "completionCallback must not be null");
+        this.recoveryJournal = recoveryJournal;
 
         this.stateMachine = new ExperimentStateMachine();
         ExperimentSpec spec = plan.spec();
@@ -126,14 +140,30 @@ public class EntityScenarioExecutor implements ScenarioExecutor {
             }
 
             if (ResolvedEntityOperation.ACTION_SPAWN.equals(op.action())) {
-                UUID uuid = adapter.spawnEntity(op.dimension(), op.entityTypeId(), op.x(), op.y(), op.z());
+                UUID uuid;
+                if (op.profile() == EntityWorkloadProfile.TRANSIENT) {
+                    uuid = adapter.spawnEntity(op.dimension(), op.entityTypeId(), op.x(), op.y(), op.z());
+                } else {
+                    com.dwurdy.heaphammer.platform.EntityLifecyclePort port = adapter.getEntityLifecyclePort()
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "Entity profile " + op.profile() + " is unsupported by this platform"));
+                    uuid = port.spawn(op.dimension(), op.entityTypeId(), op.x(), op.y(), op.z(), op.profile());
+                }
                 if (uuid != null) {
                     activeEntityUuids.add(uuid);
+                    if (recoveryJournal != null) recoveryJournal.recordEntitySpawned(uuid);
                 }
+            } else if (ResolvedEntityOperation.ACTION_CYCLE_CHUNK.equals(op.action())) {
+                com.dwurdy.heaphammer.platform.EntityLifecyclePort port = adapter.getEntityLifecyclePort()
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Entity profile " + op.profile() + " is unsupported by this platform"));
+                port.cycleChunk(op.dimension(), ((int) Math.floor(op.x())) >> 4,
+                        ((int) Math.floor(op.z())) >> 4, op.profile());
             } else if (ResolvedEntityOperation.ACTION_REMOVE.equals(op.action())) {
                 UUID uuid = activeEntityUuids.poll();
                 if (uuid != null) {
                     adapter.removeEntity(op.dimension(), uuid, op.removeMode());
+                    if (recoveryJournal != null) recoveryJournal.recordEntityRemoved(uuid);
                 }
             }
 
@@ -169,6 +199,7 @@ public class EntityScenarioExecutor implements ScenarioExecutor {
         stateMachine.transitionTo(ExperimentState.STOPPING, "Stopping: " + reason);
         activeEntityUuids.clear();
         adapter.removeAllTestEntities(plan.spec().dimension());
+        adapter.getEntityLifecyclePort().ifPresent(com.dwurdy.heaphammer.platform.EntityLifecyclePort::cleanupTestEntities);
         stateMachine.transitionTo(ExperimentState.ABORTED, "Aborted: " + reason);
         completionCallback.accept(ExperimentState.ABORTED);
     }
@@ -176,6 +207,7 @@ public class EntityScenarioExecutor implements ScenarioExecutor {
     private void completeExperiment() {
         activeEntityUuids.clear();
         adapter.removeAllTestEntities(plan.spec().dimension());
+        adapter.getEntityLifecyclePort().ifPresent(com.dwurdy.heaphammer.platform.EntityLifecyclePort::cleanupTestEntities);
         checkpointTrigger.accept(CheckpointPhase.FINAL_CLEANUP, currentIteration);
         stateMachine.transitionTo(ExperimentState.COMPLETED, "Entity experiment completed successfully");
         completionCallback.accept(ExperimentState.COMPLETED);
