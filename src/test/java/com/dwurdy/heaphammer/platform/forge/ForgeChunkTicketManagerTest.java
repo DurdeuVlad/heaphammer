@@ -5,6 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -67,6 +70,25 @@ public class ForgeChunkTicketManagerTest {
         ticketManager.releaseAllTickets();
         assertEquals(0, ticketManager.getActiveTicketCount());
         assertEquals(0, mockBridge.activeTickets.size());
+    }
+
+    @Test
+    @DisplayName("Restored Forge tickets are released through the loading callback")
+    void testRestoredTicketsAreReleased() throws Exception {
+        List<Object> released = new ArrayList<>();
+        ForgeLoadingCallbackInvocationHandler handler = new ForgeLoadingCallbackInvocationHandler(
+                ticket -> released.add(ticket));
+        Object first = new Object();
+        Object second = new Object();
+
+        handler.invoke(null, FakeLoadingCallback.class.getMethod("ticketsLoaded", List.class, Object.class),
+                new Object[]{Arrays.asList(first, second), new Object()});
+
+        assertEquals(Arrays.asList(first, second), released);
+    }
+
+    private interface FakeLoadingCallback {
+        void ticketsLoaded(List<?> tickets, Object world);
     }
 
     private static class MockForgeTicketBridge implements ForgeTicketBridge {
