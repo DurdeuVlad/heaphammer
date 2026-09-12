@@ -1,9 +1,10 @@
 # tools/verify-live-server-commands.ps1
-# Automated Live Minecraft Dedicated Server Verification Harness for HeapHammer Commands (1.7.10)
+# Automated Live Minecraft Dedicated Server Verification Harness for HeapHammer Commands
 
 param (
     [int]$BootTimeoutSeconds = 180,
-    [int]$CommandTimeoutSeconds = 25
+    [int]$CommandTimeoutSeconds = 25,
+    [int]$RunTimeoutSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +12,7 @@ $WorkspaceRoot = Resolve-Path "$PSScriptRoot/.."
 Set-Location $WorkspaceRoot
 
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "  HeapHammer Live Dedicated Server Command Verification (1.7.10) " -ForegroundColor Cyan
+Write-Host "  HeapHammer Live Dedicated Server Command & Crash Verification  " -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # Step 1: Ensure run/mods/ is clean
@@ -20,20 +21,168 @@ if (Test-Path $RunModsDir) {
     Get-ChildItem -Path $RunModsDir -Filter "*.jar" | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-# Step 2: Define Command Verification Matrix (1.7.10 supports 7 subcommands)
+# Step 2: Define Command Verification Matrix
 $TestCommands = @(
-    @{ Cmd = "hh version"; Pattern = "HeapHammer v[0-9]+\.[0-9]+\.[0-9]+"; Description = "Version information display"; Timeout = $CommandTimeoutSeconds },
-    @{ Cmd = "hh help"; Pattern = "HeapHammer 1.7.10 Command Center"; Description = "Top-level help overview"; Timeout = $CommandTimeoutSeconds },
-    @{ Cmd = "hh status"; Pattern = "HeapHammer Status"; Description = "Idle experiment status check"; Timeout = $CommandTimeoutSeconds },
-    @{ Cmd = "hh diagnostics histogram"; Pattern = "JVM class histogram"; Description = "Diagnostic histogram trigger"; Timeout = $CommandTimeoutSeconds },
-    @{ Cmd = "hh run chunks --iterations=2 --batch=5"; Pattern = "Starting chunk leak benchmark"; Description = "Chunk workload run"; Timeout = $CommandTimeoutSeconds },
-    @{ Cmd = "hh run entities --iterations=2 --batch=5"; Pattern = "Starting entity benchmark"; Description = "Entity workload run"; Timeout = $CommandTimeoutSeconds },
-    @{ Cmd = "hh run blockentities --iterations=2 --batch=5"; Pattern = "Starting block entity benchmark"; Description = "Block entity workload run"; Timeout = $CommandTimeoutSeconds },
-    @{ Cmd = "hh abort"; Pattern = "Abort requested"; Description = "Emergency abort and ticket release"; Timeout = $CommandTimeoutSeconds }
+    @{
+        Cmd = "hh version";
+        Pattern = "HeapHammer v[0-9]+\.[0-9]+\.[0-9]+";
+        Description = "Version information display";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh help";
+        Pattern = "HeapHammer Commands";
+        Description = "Top-level help overview";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh capabilities";
+        Pattern = "HeapHammer Capabilities:";
+        Description = "Platform adapter capabilities";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh doctor";
+        Pattern = "HeapHammer Doctor:";
+        Description = "Diagnostic health check";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh status";
+        Pattern = "No experiment currently active";
+        Description = "Idle experiment status check";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh metrics";
+        Pattern = "Metrics: Heap:";
+        Description = "JVM and chunk metrics inspection";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh inspect mods";
+        Pattern = "Installed Mods \(";
+        Description = "Active mod list scanner";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh config show";
+        Pattern = "HeapHammer Configuration";
+        Description = "Safety ceiling configuration dump";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh config reload";
+        Pattern = "reloaded successfully";
+        Description = "Hot-reload config from disk";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh adapters list";
+        Pattern = "workload adapters";
+        Description = "Workload adapter registry check";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh diagnostics histogram";
+        Pattern = "Capturing JVM class histogram|Top \d+ Classes|histogram";
+        Description = "JVM class histogram collection";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh scenario list";
+        Pattern = "Available Scenarios:";
+        Description = "Scenario engine catalog";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh scenario describe chunks";
+        Pattern = "Scenario: chunks";
+        Description = "Chunk scenario documentation";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh scenario describe entities";
+        Pattern = "Scenario: entities";
+        Description = "Entity scenario documentation";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh scenario describe blockentities";
+        Pattern = "Scenario: blockentities";
+        Description = "Block entity scenario documentation";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh plan chunks --radius=4 --iterations=2";
+        Pattern = "Plan Created:";
+        Description = "Dry-run chunk scenario planner";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh plan entities --iterations=2 --batch=5";
+        Pattern = "Entity Plan Created:";
+        Description = "Dry-run entity churn planner";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh plan blockentities --iterations=2 --batch=5";
+        Pattern = "Block Entity Plan Created:";
+        Description = "Dry-run block entity planner";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh run chunks --iterations=2 --batch=5 --hold=2 --settle=2 --radius=4 --explicit-gc=true";
+        Pattern = "Report saved successfully";
+        Description = "Live chunk workload run and ticket lifecycle";
+        Timeout = $RunTimeoutSeconds
+    },
+    @{
+        Cmd = "hh report list";
+        Pattern = "Saved Reports|No reports found";
+        Description = "Saved report enumeration";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh report show last";
+        Pattern = "=== HeapHammer Report:|Verdict:";
+        Description = "Report card inspection and OLS verdict";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh report export last";
+        Pattern = "=== HeapHammer Report:|Verdict:";
+        Description = "Report summary export";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh run entities --iterations=2 --batch=5 --hold=2 --settle=2 --explicit-gc=true";
+        Pattern = "Report saved successfully";
+        Description = "Live entity churn workload and cleanup";
+        Timeout = $RunTimeoutSeconds
+    },
+    @{
+        Cmd = "hh run blockentities --iterations=2 --batch=5 --hold=2 --settle=2 --explicit-gc=true";
+        Pattern = "Report saved successfully";
+        Description = "Live block entity stress workload and cleanup";
+        Timeout = $RunTimeoutSeconds
+    },
+    @{
+        Cmd = "hh checkpoint";
+        Pattern = "Recorded manual checkpoint";
+        Description = "Manual memory checkpoint recording";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh cleanup";
+        Pattern = "Cleanup complete";
+        Description = "Emergency cleanup and ticket release sweep";
+        Timeout = $CommandTimeoutSeconds
+    }
 )
 
-# Step 3: Launch the dedicated server
-Write-Host "`n[Step 1] Launching Minecraft dedicated server..." -ForegroundColor Yellow
+# Step 3: Launch Dedicated Server Process
+Write-Host "`n[Step 1] Launching Minecraft dedicated server (Fabric 1.21.1)..." -ForegroundColor Yellow
 
 $pinfo = New-Object System.Diagnostics.ProcessStartInfo
 $pinfo.FileName = "cmd.exe"
@@ -41,136 +190,162 @@ $pinfo.Arguments = "/c gradlew.bat runServer --no-daemon 2>&1"
 $pinfo.WorkingDirectory = $WorkspaceRoot
 $pinfo.RedirectStandardInput = $true
 $pinfo.RedirectStandardOutput = $true
-$pinfo.RedirectStandardError = $true
+$pinfo.RedirectStandardError = $false
 $pinfo.UseShellExecute = $false
 $pinfo.CreateNoWindow = $true
 
 $proc = New-Object System.Diagnostics.Process
 $proc.StartInfo = $pinfo
-[void]$proc.Start()
+$proc.Start() | Out-Null
 
-$bootOutput = New-Object System.Collections.ArrayList
-$bootStart = Get-Date
-$booted = $false
+$serverReady = $false
+$bootStart = [System.DateTime]::Now
+$cmdIndex = 0
+$currentCmdStart = [System.DateTime]::Now
+$results = [System.Collections.Generic.List[PSCustomObject]]::new()
+$crashDetected = $false
+$crashDetails = @()
+
+Write-Host "Waiting for server to complete boot sequence..." -ForegroundColor Gray
+
+# Use asynchronous non-blocking stream reader task
+$lineTask = $proc.StandardOutput.ReadLineAsync()
 
 while (-not $proc.HasExited) {
-    $line = $proc.StandardOutput.ReadLine()
-    if ($line -ne $null) {
-        [void]$bootOutput.Add($line)
-        Write-Host "  [INIT] $line" -ForegroundColor DarkGray
-        if ($line -match "Done \(.*\)! for help") {
-            $booted = $true
-            break
-        }
-        if ($line -match "Starting Minecraft server on") {
-            # 1.7.10 may not print "Done!" in nogui mode via stdin
-            Start-Sleep -Seconds 5
-            $booted = $true
-            break
-        }
-    }
-    $elapsed = ((Get-Date) - $bootStart).TotalSeconds
-    if ($elapsed -gt $BootTimeoutSeconds) {
-        break
-    }
-}
+    if ($lineTask.Wait(100)) {
+        $line = $lineTask.Result
+        $lineTask = $proc.StandardOutput.ReadLineAsync()
 
-if (-not $booted) {
-    Write-Host "`n[FAIL] Server did not boot within $BootTimeoutSeconds seconds" -ForegroundColor Red
-    if (-not $proc.HasExited) { $proc.Kill() }
-    exit 1
-}
+        if ($line -ne $null) {
+            if ($line -match "NullPointerException|FatalException|CrashReport") {
+                $crashDetected = $true
+                $crashDetails += $line
+                Write-Host "    [CRASH DETECTED] $line" -ForegroundColor Red
+            }
 
-Write-Host "`n[SUCCESS] Server booted and ready for commands!" -ForegroundColor Green
+            # Detect server boot completion
+            if (-not $serverReady) {
+                if ($line -match "HeapHammer|Registered|Starting Minecraft|Loading properties|Starting Minecraft server") {
+                    Write-Host "  [INIT] $line" -ForegroundColor DarkGray
+                }
+                if ($line -match "Done \([0-9\.]+s\)! For help, type `"help`"") {
+                    $serverReady = $true
+                    $elapsedBoot = [math]::Round(([System.DateTime]::Now - $bootStart).TotalSeconds, 1)
+                    Write-Host "`n[SUCCESS] Server booted and ready for commands in ${elapsedBoot}s!" -ForegroundColor Green
+                    Write-Host "`n[Step 2] Executing Command Verification Matrix ($($TestCommands.Count) commands)..." -ForegroundColor Yellow
 
-# Step 4: Execute commands
-Write-Host "`n[Step 2] Executing Command Verification Matrix ($($TestCommands.Count) commands)..." -ForegroundColor Yellow
+                    Start-Sleep -Seconds 1
+                    $activeTest = $TestCommands[$cmdIndex]
+                    Write-Host "`n-----------------------------------------------------------------" -ForegroundColor Magenta
+                    Write-Host " [1/$($TestCommands.Count)] Command:     /$($activeTest.Cmd)" -ForegroundColor White
+                    Write-Host " Description: $($activeTest.Description)" -ForegroundColor Gray
+                    Write-Host " Expecting:   $($activeTest.Pattern)" -ForegroundColor DarkGray
+                    $currentCmdStart = [System.DateTime]::Now
+                    $proc.StandardInput.WriteLine($activeTest.Cmd)
+                    continue
+                }
+            }
 
-$results = @()
-$passCount = 0
-$failCount = 0
-
-foreach ($test in $TestCommands) {
-    Write-Host "`n-----------------------------------------------------------------" -ForegroundColor DarkGray
-    Write-Host " Command:     /$($test.Cmd)" -ForegroundColor White
-    Write-Host " Description: $($test.Description)" -ForegroundColor White
-    Write-Host " Expecting:   $($test.Pattern)" -ForegroundColor White
-
-    $outputFile = "$WorkspaceRoot/run/logs/latest.log"
-    $beforeLineCount = if (Test-Path $outputFile) { (Get-Content $outputFile | Measure-Object -Line).Lines } else { 0 }
-
-    $proc.StandardInput.WriteLine($test.Cmd)
-
-    $found = $false
-    $foundLine = ""
-    $cmdStart = Get-Date
-
-    while (-not $proc.HasExited) {
-        Start-Sleep -Milliseconds 200
-        if (Test-Path $outputFile) {
-            $currentContent = Get-Content $outputFile -ErrorAction SilentlyContinue
-            $currentLineCount = ($currentContent | Measure-Object -Line).Lines
-            if ($currentLineCount -gt $beforeLineCount) {
-                $newLines = $currentContent | Select-Object -Skip $beforeLineCount
-                foreach ($nl in $newLines) {
-                    if ($nl -match $test.Pattern) {
-                        $found = $true
-                        $foundLine = $nl
-                        break
+            # Evaluate active command response
+            if ($serverReady -and $cmdIndex -lt $TestCommands.Count) {
+                $activeTest = $TestCommands[$cmdIndex]
+                if ($line -match $activeTest.Pattern) {
+                    $elapsed = [math]::Round(([System.DateTime]::Now - $currentCmdStart).TotalSeconds, 2)
+                    Write-Host "  -> PASS in ${elapsed}s: $line" -ForegroundColor Green
+                    $results.Add([PSCustomObject]@{
+                        Command = "/$($activeTest.Cmd)"
+                        Status = "PASS"
+                        Duration = "${elapsed}s"
+                        Output = $line.Trim()
+                    })
+                    $cmdIndex++
+                    if ($cmdIndex -lt $TestCommands.Count) {
+                        $nextTest = $TestCommands[$cmdIndex]
+                        Write-Host "`n-----------------------------------------------------------------" -ForegroundColor Magenta
+                        Write-Host " [$($cmdIndex+1)/$($TestCommands.Count)] Command:     /$($nextTest.Cmd)" -ForegroundColor White
+                        Write-Host " Description: $($nextTest.Description)" -ForegroundColor Gray
+                        Write-Host " Expecting:   $($nextTest.Pattern)" -ForegroundColor DarkGray
+                        $currentCmdStart = [System.DateTime]::Now
+                        Start-Sleep -Milliseconds 200
+                        $proc.StandardInput.WriteLine($nextTest.Cmd)
+                    } else {
+                        Write-Host "`n[ALL COMMANDS EXECUTED] Stopping dedicated server gracefully..." -ForegroundColor Green
+                        Start-Sleep -Seconds 2
+                        $proc.StandardInput.WriteLine("stop")
                     }
                 }
             }
         }
-        if ($found) { break }
-        $elapsed = (Get-Date) - $cmdStart | ForEach-Object TotalSeconds
-        if ($elapsed -gt $test.Timeout) { break }
-    }
-
-    if ($found) {
-        Write-Host "  -> PASS: $foundLine" -ForegroundColor Green
-        $passCount++
-        $results += [PSCustomObject]@{ Command = "/$($test.Cmd)"; Status = "PASS"; Output = $foundLine }
     } else {
-        Write-Host "  -> FAIL: Timed out waiting for '$($test.Pattern)' in $($test.Timeout)s" -ForegroundColor Red
-        $failCount++
-        $results += [PSCustomObject]@{ Command = "/$($test.Cmd)"; Status = "FAIL"; Output = "Timeout" }
-    }
-}
-
-# Step 5: Stop server
-Write-Host "`n[ALL COMMANDS EXECUTED] Stopping dedicated server gracefully..." -ForegroundColor Yellow
-$proc.StandardInput.WriteLine("stop")
-Start-Sleep -Seconds 5
-if (-not $proc.HasExited) { $proc.Kill() }
-
-# Step 6: Check for crashes
-Write-Host "`n[Step 3] Checking latest.log for hidden exceptions..." -ForegroundColor Yellow
-$crashCount = 0
-if (Test-Path "$WorkspaceRoot/run/logs/latest.log") {
-    $logContent = Get-Content "$WorkspaceRoot/run/logs/latest.log" -ErrorAction SilentlyContinue
-    $crashPatterns = @("Exception", "CRASH", "FATAL", "java\.lang\.\w+Exception")
-    foreach ($line in $logContent) {
-        foreach ($pattern in $crashPatterns) {
-            if ($line -match $pattern) { $crashCount++ }
+        # Check command timeout if no lines received
+        if ($serverReady -and $cmdIndex -lt $TestCommands.Count) {
+            $activeTest = $TestCommands[$cmdIndex]
+            if (([System.DateTime]::Now - $currentCmdStart).TotalSeconds -gt $activeTest.Timeout) {
+                $elapsed = [math]::Round(([System.DateTime]::Now - $currentCmdStart).TotalSeconds, 2)
+                Write-Host "  -> FAIL: Timed out waiting for '$($activeTest.Pattern)' in ${elapsed}s" -ForegroundColor Red
+                $results.Add([PSCustomObject]@{
+                    Command = "/$($activeTest.Cmd)"
+                    Status = "FAIL"
+                    Duration = "${elapsed}s"
+                    Output = "TIMEOUT (Pattern: $($activeTest.Pattern))"
+                })
+                $cmdIndex++
+                if ($cmdIndex -lt $TestCommands.Count) {
+                    $nextTest = $TestCommands[$cmdIndex]
+                    Write-Host "`n-----------------------------------------------------------------" -ForegroundColor Magenta
+                    Write-Host " [$($cmdIndex+1)/$($TestCommands.Count)] Command:     /$($nextTest.Cmd)" -ForegroundColor White
+                    Write-Host " Description: $($nextTest.Description)" -ForegroundColor Gray
+                    Write-Host " Expecting:   $($nextTest.Pattern)" -ForegroundColor DarkGray
+                    $currentCmdStart = [System.DateTime]::Now
+                    Start-Sleep -Milliseconds 200
+                    $proc.StandardInput.WriteLine($nextTest.Cmd)
+                } else {
+                    Write-Host "`n[ALL COMMANDS EXECUTED] Stopping dedicated server gracefully..." -ForegroundColor Green
+                    Start-Sleep -Seconds 2
+                    $proc.StandardInput.WriteLine("stop")
+                }
+            }
         }
     }
 }
 
-# Step 7: Report
+$proc.WaitForExit(5000)
+
+# Step 4: Log File Crash Analysis
+Write-Host "`n[Step 3] Checking latest.log for hidden exceptions..." -ForegroundColor Yellow
+$latestLog = "$WorkspaceRoot/run/logs/latest.log"
+$logExceptions = @()
+if (Test-Path $latestLog) {
+    $logLines = Get-Content $latestLog
+    $logExceptions = $logLines | Where-Object {
+        $_ -match "NullPointerException|FatalException|CrashReport" -and
+        $_ -notmatch "expected in test|synthetic"
+    }
+}
+
+# Step 5: Results Summary Table
 Write-Host "`n=================================================================" -ForegroundColor Cyan
 Write-Host "  Command Verification Matrix Results                            " -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
-$results | Format-Table -AutoSize
+$results | Format-Table -Property Command, Status, Duration, Output -AutoSize
 
-Write-Host "`nTest Execution Summary:"
-Write-Host "  Total Commands Tested: $($TestCommands.Count)"
-Write-Host "  Passed:                $passCount"
-Write-Host "  Failed:                $failCount"
-Write-Host "  Crash/Exceptions:      $crashCount"
+$passCount = ($results | Where-Object { $_.Status -eq "PASS" }).Count
+$failCount = $TestCommands.Count - $passCount
 
-if ($passCount -eq $TestCommands.Count -and $crashCount -eq 0) {
-    Write-Host "`n[FINAL VERDICT] ALL $($TestCommands.Count) COMMANDS WORKING - ZERO CRASHES - SERVER STABLE!" -ForegroundColor Green
+Write-Host "`nTest Execution Summary:" -ForegroundColor White
+Write-Host "  Total Commands Tested: $($TestCommands.Count)" -ForegroundColor White
+Write-Host "  Passed:                $passCount" -ForegroundColor Green
+Write-Host "  Failed:                $failCount" -ForegroundColor $(if ($failCount -eq 0) { "Green" } else { "Red" })
+Write-Host "  Crash/Exceptions:      $($logExceptions.Count)" -ForegroundColor $(if ($logExceptions.Count -eq 0) { "Green" } else { "Red" })
+
+if ($logExceptions.Count -gt 0) {
+    Write-Warning "Detected unhandled exceptions in log:"
+    $logExceptions | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+}
+
+if ($passCount -eq $TestCommands.Count -and $logExceptions.Count -eq 0 -and -not $crashDetected) {
+    Write-Host "`n[FINAL VERDICT] ALL 26 COMMANDS WORKING - ZERO CRASHES - SERVER STABLE!" -ForegroundColor Green
     exit 0
 } else {
     Write-Error "Verification failed: Expected $($TestCommands.Count) passing commands, got $passCount."

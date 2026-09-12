@@ -37,4 +37,14 @@ class FlagParserTest {
         assertEquals(8, spec.batchSize());
         assertTrue(spec.explicitGc());
     }
+
+    @Test
+    @DisplayName("FlagParser delegates excessive inputs to ExperimentSpec which throws IllegalArgumentException explaining config modification")
+    void testExcessiveInputsRejectedWithExplanation() {
+        String[] args = {"--radius=9999"};
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> FlagParser.parseSpec(args, 0, 0, 0));
+        assertTrue(ex.getMessage().contains("exceeds configured safety ceiling"));
+        assertTrue(ex.getMessage().contains("config/heaphammer.json"));
+        assertTrue(ex.getMessage().contains("/hh config reload"));
+    }
 }

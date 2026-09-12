@@ -1,0 +1,338 @@
+name: Release & Deploy
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write   # Required for GitHub Releases
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.mc-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Every supported Minecraft version line. primary-loader is the loader
+          # produced by the ROOT build; nested loaders/ builds add more jars.
+          - branch: master
+            mc-version: '1.21.1'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.21.1
+          - branch: ver/1.21.4
+            mc-version: '1.21.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.21.4
+          - branch: ver/1.20.6
+            mc-version: '1.20.6'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.20.6
+          - branch: ver/1.20.4
+            mc-version: '1.20.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.20.4
+          - branch: ver/1.20.1
+            mc-version: '1.20.1'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.20.1
+          - branch: ver/1.19.4
+            mc-version: '1.19.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.19.4
+          - branch: ver/1.19.2
+            mc-version: '1.19.2'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.19.2
+          - branch: ver/1.18.2
+            mc-version: '1.18.2'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.18.2
+          - branch: ver/1.17.1
+            mc-version: '1.17.1'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.17.1
+          - branch: ver/1.16.5
+            mc-version: '1.16.5'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.16.5
+          - branch: ver/1.15.2
+            mc-version: '1.15.2'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.15.2
+          - branch: ver/1.14.4
+            mc-version: '1.14.4'
+            java-version: '21'
+            primary-loader: fabric
+            artifact-name: heaphammer-1.14.4
+          - branch: ver/1.12.2-forge
+            mc-version: '1.12.2'
+            java-version: '17'
+            primary-loader: forge
+            artifact-name: heaphammer-1.12.2
+          - branch: ver/1.7.10-forge
+            mc-version: '1.7.10'
+            java-version: '17'
+            primary-loader: forge
+            artifact-name: heaphammer-1.7.10
+    steps:
+      - name: Checkout ${{ matrix.branch }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Resolve release version
+        id: relver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION} (all artifacts are built with -Pmod_version to stay uniform)"
+
+      # The release build runs the FULL unit suite (build -> check -> test) so a
+      # release can only ever ship code that passed tests on every version.
+      - name: Build & test primary mod JAR
+        run: ./gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon
+
+      - name: Build & test nested loader JARs
+        run: |
+          for d in loaders/*/; do
+            if [ -f "${d}settings.gradle" ]; then
+              echo "=== Nested loader build: ${d} ==="
+              # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+              # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+              if [ -f "${d}gradlew" ]; then
+                (cd "$d" && chmod +x gradlew && ./gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon)
+              else
+                (cd "$d" && ../../gradlew build -Pmod_version=${{ steps.relver.outputs.version }} --no-daemon)
+              fi
+            fi
+          done
+
+      - name: Stage JARs as heaphammer-<mc>-<loader>-<version>
+        run: |
+          mkdir -p staging
+          MOD_VERSION="${{ steps.relver.outputs.version }}"
+          MC_VERSION="${{ matrix.mc-version }}"
+          PRIMARY_LOADER="${{ matrix.primary-loader }}"
+
+          # Root build jar -> primary loader label
+          JAR=$(find build/libs -name "heaphammer-*.jar" ! -name "*sources*" ! -name "*dev*" | head -1)
+          if [ -z "$JAR" ]; then
+            echo "ERROR: No primary JAR found in build/libs/"
+            ls -la build/libs/ || true
+            exit 1
+          fi
+          cp "$JAR" "staging/heaphammer-${MC_VERSION}-${PRIMARY_LOADER}-${MOD_VERSION}.jar"
+          echo "Staged: heaphammer-${MC_VERSION}-${PRIMARY_LOADER}-${MOD_VERSION}.jar"
+
+          # Nested loader jars -> loader label = directory name
+          for d in loaders/*/; do
+            [ -f "${d}settings.gradle" ] || continue
+            LOADER=$(basename "$d")
+            LJAR=$(find "${d}build/libs" -name "*.jar" ! -name "*sources*" ! -name "*dev*" | head -1)
+            if [ -z "$LJAR" ]; then
+              # Loader builds no-op on branches where the loader cannot exist
+              # (e.g. loaders/neoforge synced to a pre-1.20.2 branch) — skip.
+              echo "NOTICE: no JAR produced by ${d} — loader not supported on this branch, skipping."
+              continue
+            fi
+            cp "$LJAR" "staging/heaphammer-${MC_VERSION}-${LOADER}-${MOD_VERSION}.jar"
+            echo "Staged: heaphammer-${MC_VERSION}-${LOADER}-${MOD_VERSION}.jar"
+          done
+          ls -la staging/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: staging/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to GitHub, Modrinth & CurseForge
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          # Strip leading 'v' for the bare version number
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Release tag: ${TAG}, version: ${VERSION}"
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/production
+          merge-multiple: true
+
+      - name: Generate SHA-256 checksums
+        run: |
+          cd dist/production
+          sha256sum *.jar > SHA256SUMS.txt
+          echo "Checksums generated:"
+          cat SHA256SUMS.txt
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating changelog from ${PREV_TAG} to ${TAG}..."
+            git log --pretty=format:"- %s" "${PREV_TAG}..${TAG}" > CHANGELOG.md
+          else
+            echo "No previous tag found. Generating full changelog..."
+            git log --pretty=format:"- %s" HEAD > CHANGELOG.md
+          fi
+          # The supported-targets table is generated from the actual staged
+          # artifacts (heaphammer-<mc>-<loader>-<ver>.jar) so it can never
+          # overstate loader coverage.
+          {
+            echo "# HeapHammer ${TAG}"
+            echo ""
+            echo "**Deterministic Minecraft server stress testing and retained-memory regression detection.**"
+            echo ""
+            echo "### Supported Minecraft Versions"
+            echo ""
+            echo "| Minecraft Version | Loader | Release Binary |"
+            echo "|---|---|---|"
+            for jar in $(ls dist/production/heaphammer-*.jar | sort -V -r); do
+              base=$(basename "$jar" .jar)              # heaphammer-<mc>-<loader>-<ver>
+              rest="${base#heaphammer-}"
+              mc_loader="${rest%-*}"
+              loader="${mc_loader##*-}"
+              mc="${mc_loader%-*}"
+              echo "| **${mc}** | ${loader} | \`${base}.jar\` |"
+            done
+            echo ""
+            echo "### Changes"
+            echo ""
+            cat CHANGELOG.md
+            echo ""
+            echo ""
+            echo "### Checksums (SHA-256)"
+            echo ""
+            echo '```'
+            cat dist/production/SHA256SUMS.txt
+            echo '```'
+          } > RELEASE_NOTES.md
+          echo "Changelog generated ($(wc -l < RELEASE_NOTES.md) lines)"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} already exists — uploading any missing assets."
+            gh release upload "${TAG}" dist/production/*.jar dist/production/SHA256SUMS.txt --clobber
+          else
+            echo "Creating GitHub Release ${TAG}..."
+            gh release create "${TAG}" \
+              dist/production/*.jar \
+              dist/production/SHA256SUMS.txt \
+              --title "HeapHammer ${TAG}" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag
+          fi
+
+      - name: Publish all JARs to Modrinth & CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          # Modrinth
+          modrinth-id: heaphammer
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: true
+          modrinth-unfeature-mode: subset
+          modrinth-fail-mode: warn
+
+          # CurseForge
+          curseforge-id: '1687734'
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-fail-mode: warn
+
+          # GitHub (links the release created above)
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-fail-mode: warn
+
+          # Release metadata
+          name: HeapHammer ${{ steps.release.outputs.version }}
+          version: ${{ steps.release.outputs.version }}
+          version-type: release
+          changelog-file: RELEASE_NOTES.md
+
+          # All jars — loaders auto-detected per file:
+          #  - Fabric JARs: from fabric.mod.json
+          #  - NeoForge JARs: from META-INF/neoforge.mods.toml
+          #  - Forge JARs: from META-INF/mods.toml / mcmod.info
+          files: |
+            dist/production/heaphammer-*.jar
+          game-version-filter: any
+          java: |
+            21
+            17
+            8
+
+      - name: Summary
+        run: |
+          echo "## Release ${{ steps.release.outputs.tag }} Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Published to GitHub Releases, Modrinth (heaphammer), and CurseForge (1687734)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          ls -1 dist/production/*.jar | sed 's|.*/|`|;s|$`|' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY

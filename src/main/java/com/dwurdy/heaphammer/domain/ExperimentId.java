@@ -15,10 +15,15 @@ import java.util.concurrent.ThreadLocalRandom;
 public record ExperimentId(String value) {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
+    private static final java.util.regex.Pattern SAFE_ID_PATTERN = java.util.regex.Pattern.compile("^[a-zA-Z0-9_-]{1,64}$");
+
     public ExperimentId {
         Objects.requireNonNull(value, "value must not be null");
         if (value.trim().isEmpty()) {
             throw new IllegalArgumentException("value must not be blank");
+        }
+        if (!SAFE_ID_PATTERN.matcher(value).matches()) {
+            throw new IllegalArgumentException("Invalid experiment ID '" + value + "'. Must be 1-64 alphanumeric characters, underscores, or hyphens.");
         }
     }
 
