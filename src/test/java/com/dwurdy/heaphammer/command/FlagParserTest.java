@@ -1,7 +1,10 @@
 package com.dwurdy.heaphammer.command;
 
 import com.dwurdy.heaphammer.command.argument.FlagParser;
+import com.dwurdy.heaphammer.domain.DiagnosticCollector;
+import com.dwurdy.heaphammer.domain.EntityWorkloadProfile;
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
+import com.dwurdy.heaphammer.domain.PlayerAction;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -46,5 +49,23 @@ class FlagParserTest {
         assertTrue(ex.getMessage().contains("exceeds configured safety ceiling"));
         assertTrue(ex.getMessage().contains("config/heaphammer.json"));
         assertTrue(ex.getMessage().contains("/hh config reload"));
+    }
+
+    @Test
+    @DisplayName("FlagParser parses 1.1 workload profiles, lifecycle actions, durations, and diagnostics")
+    void parsesRelease110Flags() {
+        ExperimentSpec spec = FlagParser.parseSpec(new String[]{
+                "--profile=persistent", "--logins-per-cycle=3", "--actions=join,respawn,quit",
+                "--duration=2m", "--interval=30s", "--diagnostics=histogram,world-store",
+                "--track-classes=java.lang.String,com.example.Test"
+        }, 0, 0, 0);
+
+        assertEquals(EntityWorkloadProfile.PERSISTENT, spec.entityProfile());
+        assertEquals(3, spec.loginsPerCycle());
+        assertEquals(java.util.List.of(PlayerAction.JOIN, PlayerAction.RESPAWN, PlayerAction.QUIT), spec.playerActions());
+        assertEquals(120L, spec.durationSeconds());
+        assertEquals(30L, spec.intervalSeconds());
+        assertEquals(java.util.List.of(DiagnosticCollector.HISTOGRAM, DiagnosticCollector.WORLD_STORE), spec.diagnosticCollectors());
+        assertEquals(java.util.List.of("java.lang.String", "com.example.Test"), spec.trackedClasses());
     }
 }

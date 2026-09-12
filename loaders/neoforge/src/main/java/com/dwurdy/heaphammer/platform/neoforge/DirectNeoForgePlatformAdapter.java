@@ -1,6 +1,10 @@
 package com.dwurdy.heaphammer.platform.neoforge;
 
 import com.dwurdy.heaphammer.domain.EnvironmentFingerprint;
+import com.dwurdy.heaphammer.domain.PlatformCapabilities;
+import com.dwurdy.heaphammer.domain.PlatformCapability;
+import com.dwurdy.heaphammer.diagnostics.EventMetricsCounter;
+import com.dwurdy.heaphammer.infrastructure.worldstore.AnvilWorldStoreScanner;
 import com.google.common.collect.Iterables;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -35,16 +39,74 @@ public class DirectNeoForgePlatformAdapter extends NeoForgePlatformAdapter {
     private final Supplier<MinecraftServer> serverSupplier;
     private final Map<String, Set<UUID>> liveTestEntitiesByDimension = new ConcurrentHashMap<>();
     private final Map<String, Set<BlockPos>> liveTestBlockEntitiesByDimension = new ConcurrentHashMap<>();
+    private final NeoForgePlayerLifecyclePort playerLifecyclePort;
+    private final NeoForgeEntityLifecyclePort entityLifecyclePort;
+    private final EventMetricsCounter eventMetrics = new EventMetricsCounter();
 
     public DirectNeoForgePlatformAdapter(NeoForgeChunkTicketManager ticketManager,
                                          Supplier<MinecraftServer> serverSupplier) {
         super(ticketManager);
         this.serverSupplier = Objects.requireNonNull(serverSupplier, "serverSupplier must not be null");
+        this.playerLifecyclePort = new NeoForgePlayerLifecyclePort(serverSupplier);
+        this.entityLifecyclePort = new NeoForgeEntityLifecyclePort(serverSupplier);
+        eventMetrics.recordRegistration("neoforge:ServerTickEvent.Post");
+    }
+
+    @Override
+    public void onServerTick() {
+        eventMetrics.recordDispatch("neoforge:ServerTickEvent.Post");
+        super.onServerTick();
+    }
+
+    @Override
+    public PlatformCapabilities getCapabilities() {
+        return PlatformCapabilities.builder()
+                .supported(PlatformCapability.PLAYER_LIFECYCLE)
+                .supported(PlatformCapability.PERSISTENT_ENTITIES)
+                .unsupported(PlatformCapability.UNTICKED_CHUNKS, "NeoForge 1.21.1 has no stable public per-entity unticked-chunk contract")
+                .supported(PlatformCapability.HISTOGRAM)
+                .supported(PlatformCapability.RETENTION)
+                .supported(PlatformCapability.WORLD_STORE)
+                .supported(PlatformCapability.EVENT_METRICS)
+                .supported(PlatformCapability.SOAK)
+                .build();
+    }
+
+    @Override
+    public Optional<com.dwurdy.heaphammer.platform.PlayerLifecyclePort> getPlayerLifecyclePort() {
+        return Optional.of(playerLifecyclePort);
+    }
+
+    @Override
+    public Optional<com.dwurdy.heaphammer.platform.EntityLifecyclePort> getEntityLifecyclePort() {
+        return Optional.of(entityLifecyclePort);
+    }
+
+    @Override
+    public Optional<com.dwurdy.heaphammer.platform.WorldStoreMetricsPort> getWorldStoreMetricsPort() {
+        return Optional.of(() -> {
+            MinecraftServer server = serverSupplier.get();
+            return server == null ? com.dwurdy.heaphammer.diagnostics.WorldStoreSnapshot.empty()
+                    : new AnvilWorldStoreScanner(server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)).capture();
+        });
+    }
+
+    @Override
+    public Optional<com.dwurdy.heaphammer.platform.EventMetricsPort> getEventMetricsPort() {
+        return Optional.of(eventMetrics);
+    }
+
+    @Override
+    public Optional<com.dwurdy.heaphammer.platform.RetentionObservationPort> getRetentionObservationPort() {
+        return Optional.of(tracker -> {
+            playerLifecyclePort.attach(tracker);
+            entityLifecyclePort.attach(tracker);
+        });
     }
 
     @Override
     public EnvironmentFingerprint captureFingerprint() {
-        String heapHammerVersion = modVersion("heaphammer", "1.0.1");
+        String heapHammerVersion = modVersion("heaphammer", "1.1.0");
         String mcVersion = modVersion("minecraft", "1.21.1");
         String loaderVersion = "neoforge-" + modVersion("neoforge", "21.1.248");
         String javaVersion = System.getProperty("java.version", "21");
@@ -301,6 +363,8 @@ public class DirectNeoForgePlatformAdapter extends NeoForgePlatformAdapter {
                 }
             }
         }
+
+        cleaned += playerLifecyclePort.cleanupTestPlayers();
 
         return cleaned;
     }
