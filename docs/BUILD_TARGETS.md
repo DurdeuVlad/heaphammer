@@ -62,7 +62,7 @@ cd loaders/neoforge
 | 1.19.2 | `ver/1.19.2` | ✅ root (Loom) | — | 🛠 `loaders/forge` (43.x) | 21 |
 | 1.18.2 | `ver/1.18.2` | ✅ root (Loom) | — | 🛠 `loaders/forge` (40.x) | 21 |
 | 1.17.1 | `ver/1.17.1` | ✅ root (Loom) | — | 🛠 `loaders/forge` (37.x) | 21 |
-| 1.16.5 | `ver/1.16.5` | ✅ root (Loom) | — | 🛠 `loaders/forge` (ForgeGradle, 36.2.x) | 21 |
+| 1.16.5 | `ver/1.16.5` | ✅ root (Loom) | — | ○ `loaders/forge` (ForgeGradle, 36.2.x) | 21 |
 | 1.15.2 | `ver/1.15.2` | ✅ root (Loom) | — | ○ (ForgeGradle) | 21 |
 | 1.14.4 | `ver/1.14.4` | ✅ root (Loom) | — | ○ (ForgeGradle) | 21 |
 | 1.12.2 | `ver/1.12.2-forge` | — | — | ✅ root (RFG) | 17 |
@@ -109,4 +109,4 @@ sourceSets {
 
 3. Keep real loader classes in `loaders/<name>/src/main/java/com/dwurdy/heaphammer/platform/<name>/` — same package names as the shared pure-Java counterparts is fine (same-package access still works across source roots).
 4. Wire CI automatically: `ci.yml`, `sync-version-branches.yml`, `release.yml`, and `tools/*.ps1` all discover `loaders/*/settings.gradle` dynamically — **no workflow edits needed**.
-5. On branches where the loader cannot exist (e.g. NeoForge on 1.19.2), delete the `loaders/<name>/` directory in the adaptation PR the sync opens — it stays deleted permanently.
+5. Gate the build on the branch's root `minecraft_version`: when a sync lands the loader on a branch where it cannot exist (e.g. NeoForge on 1.19.2), the nested `build.gradle` must degrade to a no-op — register `build`/`test`/`check`/`jar`/`assemble` no-op tasks and return early, before applying the toolchain plugin (see `loaders/neoforge/build.gradle` for the reference implementation). Release staging skips loader dirs that produced no jar.
