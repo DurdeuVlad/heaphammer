@@ -17,11 +17,19 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          - ver/1.21.1
+          - ver/1.21.4
+          - ver/1.20.6
+          - ver/1.20.4
           - ver/1.20.1
+          - ver/1.19.4
+          - ver/1.19.2
           - ver/1.18.2
+          - ver/1.17.1
           - ver/1.16.5
+          - ver/1.15.2
+          - ver/1.14.4
           - ver/1.12.2-forge
+          - ver/1.7.10-forge
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,9 +71,17 @@ jobs:
             exit 0
           fi
 
-          # Backup branch properties and build configuration
+          # Backup branch properties and build configuration (root + nested
+          # loader builds — loaders/*/gradle.properties holds per-branch pins)
           cp gradle.properties gradle.properties.bak || true
           cp build.gradle build.gradle.bak || true
+          LOADER_BAK=$(mktemp -d)
+          for d in loaders/*/; do
+            bn=$(basename "$d")
+            mkdir -p "$LOADER_BAK/$bn"
+            cp "${d}gradle.properties" "$LOADER_BAK/$bn/" 2>/dev/null || true
+            cp "${d}build.gradle" "$LOADER_BAK/$bn/" 2>/dev/null || true
+          done
 
           # Attempt merge from master
           if git merge origin/master -m "chore(sync): automated merge master into $TARGET_BRANCH"; then
@@ -74,16 +90,27 @@ jobs:
             CONFLICTS=$(git diff --name-only --diff-filter=U)
             CAN_AUTORESOLVE=true
             for FILE in $CONFLICTS; do
-              if [ "$FILE" != "gradle.properties" ] && [ "$FILE" != "build.gradle" ]; then
-                CAN_AUTORESOLVE=false
-                break
-              fi
+              case "$FILE" in
+                gradle.properties|build.gradle|loaders/*/gradle.properties|loaders/*/build.gradle) ;;
+                *) CAN_AUTORESOLVE=false; break ;;
+              esac
             done
 
             if [ "$CAN_AUTORESOLVE" = "true" ]; then
               echo "Preserving branch-specific configuration for $TARGET_BRANCH..."
               [ -f gradle.properties.bak ] && mv gradle.properties.bak gradle.properties && git add gradle.properties
               [ -f build.gradle.bak ] && mv build.gradle.bak build.gradle && git add build.gradle
+              for FILE in $CONFLICTS; do
+                case "$FILE" in
+                  loaders/*/gradle.properties|loaders/*/build.gradle)
+                    bn=$(basename "$(dirname "$FILE")")
+                    fname=$(basename "$FILE")
+                    if [ -f "$LOADER_BAK/$bn/$fname" ]; then
+                      cp "$LOADER_BAK/$bn/$fname" "$FILE" && git add "$FILE"
+                    fi
+                    ;;
+                esac
+              done
               git commit -m "chore(sync): preserve version-specific configuration for $TARGET_BRANCH"
             else
               echo "Merge conflict detected across files: $CONFLICTS"
@@ -94,7 +121,31 @@ jobs:
           fi
 
           echo "Verifying test suite on $TARGET_BRANCH..."
-          if ./gradlew test --no-daemon; then
+          TESTS_OK=true
+          if ! ./gradlew test --no-daemon; then
+            TESTS_OK=false
+          fi
+
+          # Nested loader builds (loaders/*/) are part of the branch's verified
+          # surface — a loader jar that does not compile blocks the sync push.
+          if [ "$TESTS_OK" = "true" ]; then
+            for d in loaders/*/; do
+              if [ -f "${d}settings.gradle" ]; then
+                echo "Running nested loader tests: ${d}"
+                # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+                # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+                if [ -f "${d}gradlew" ]; then
+                  if ! (cd "$d" && chmod +x gradlew && ./gradlew test --no-daemon); then
+                    TESTS_OK=false
+                  fi
+                elif ! (cd "$d" && ../../gradlew test --no-daemon); then
+                  TESTS_OK=false
+                fi
+              fi
+            done
+          fi
+
+          if [ "$TESTS_OK" = "true" ]; then
             echo "Verification passed! Pushing to $TARGET_BRANCH..."
             git push origin "$TARGET_BRANCH"
           else
