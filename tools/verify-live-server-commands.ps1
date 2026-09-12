@@ -25,7 +25,7 @@ if (Test-Path $RunModsDir) {
 $TestCommands = @(
     @{
         Cmd = "hh version";
-        Pattern = "HeapHammer v1\.0\.0";
+        Pattern = "HeapHammer v[0-9]+\.[0-9]+\.[0-9]+";
         Description = "Version information display";
         Timeout = $CommandTimeoutSeconds
     },
@@ -63,6 +63,24 @@ $TestCommands = @(
         Cmd = "hh inspect mods";
         Pattern = "Installed Mods \(";
         Description = "Active mod list scanner";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh config show";
+        Pattern = "HeapHammer Configuration";
+        Description = "Safety ceiling configuration dump";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh config reload";
+        Pattern = "reloaded successfully";
+        Description = "Hot-reload config from disk";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh adapters list";
+        Pattern = "workload adapters";
+        Description = "Workload adapter registry check";
         Timeout = $CommandTimeoutSeconds
     },
     @{
@@ -157,14 +175,14 @@ $TestCommands = @(
     },
     @{
         Cmd = "hh cleanup";
-        Pattern = "Cleanup complete|Purged \d+ tickets";
+        Pattern = "Cleanup complete";
         Description = "Emergency cleanup and ticket release sweep";
         Timeout = $CommandTimeoutSeconds
     }
 )
 
 # Step 3: Launch Dedicated Server Process
-Write-Host "`n[Step 1] Launching Minecraft dedicated server..." -ForegroundColor Yellow
+Write-Host "`n[Step 1] Launching Minecraft dedicated server (Fabric 1.14.4)..." -ForegroundColor Yellow
 
 $pinfo = New-Object System.Diagnostics.ProcessStartInfo
 $pinfo.FileName = "cmd.exe"

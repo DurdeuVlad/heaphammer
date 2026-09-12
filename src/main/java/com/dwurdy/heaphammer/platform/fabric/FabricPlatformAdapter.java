@@ -65,7 +65,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         String heapHammerVersion = FabricLoader.getInstance()
                 .getModContainer("heaphammer")
                 .map(m -> m.getMetadata().getVersion().getFriendlyString())
-                .orElse("1.0.0-alpha.1");
+                .orElse("1.0.0");
 
         String mcVersion = FabricLoader.getInstance()
                 .getModContainer("minecraft")
@@ -155,6 +155,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         return server != null && server.isRunning();
     }
 
+    public static final String TEST_ENTITY_TAG = "heaphammer:test";
     private final Map<String, Set<UUID>> testEntitiesByDimension = new ConcurrentHashMap<>();
     private final Map<String, Set<BlockPos>> testBlockEntitiesByDimension = new ConcurrentHashMap<>();
 
@@ -192,6 +193,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
             mob.setNoAi(true);
             mob.setPersistenceRequired();
         }
+        entity.addTag(TEST_ENTITY_TAG);
 
         boolean added = level.addFreshEntity(entity);
         if (!added) return null;
@@ -313,6 +315,52 @@ public class FabricPlatformAdapter implements PlatformAdapter {
             }
         }
         return count;
+    }
+
+    @Override
+    public int cleanupOrphanedState() {
+        int cleaned = 0;
+
+        // 1. Release all chunk tickets
+        ticketManager.releaseAllTickets();
+
+        // 2. Revert any tracked block entities
+        for (String dim : new ArrayList<>(testBlockEntitiesByDimension.keySet())) {
+            cleaned += removeAllTestBlockEntities(dim);
+        }
+
+        // 3. Discard any tracked test entities
+        for (String dim : new ArrayList<>(testEntitiesByDimension.keySet())) {
+            cleaned += removeAllTestEntities(dim);
+        }
+
+        // 4. Sweep all server levels for any orphaned entity bearing TEST_ENTITY_TAG
+        // (MC 1.14.4 has no public all-entities view — reuse the entitiesById
+        // reflective read used by getActiveEntityCount above.)
+        MinecraftServer server = serverSupplier.get();
+        if (server != null) {
+            for (ServerLevel level : server.getAllLevels()) {
+                try {
+                    java.lang.reflect.Field f = ServerLevel.class.getDeclaredField("entitiesById");
+                    f.setAccessible(true);
+                    java.util.Map<?, ?> map = (java.util.Map<?, ?>) f.get(level);
+                    if (map == null) continue;
+                    for (Object o : new ArrayList<>(map.values())) {
+                        if (o instanceof Entity) {
+                            Entity entity = (Entity) o;
+                            if (entity.getTags().contains(TEST_ENTITY_TAG)) {
+                                entity.remove();
+                                cleaned++;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // Entity sweep is best-effort; tracked-entity removal above is authoritative.
+                }
+            }
+        }
+
+        return cleaned;
     }
 
     private ServerLevel getLevel(String dimension) {

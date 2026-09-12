@@ -44,4 +44,14 @@ public interface PlatformAdapter {
     boolean removeBlockEntity(String dimension, int x, int y, int z);
 
     int removeAllTestBlockEntities(String dimension);
+
+    /**
+     * Purges any orphaned test state (leftover chunk tickets, test-tagged entities, block entities)
+     * across all dimensions, typically invoked on server startup or after a crash.
+     *
+     * @return count of cleaned up assets
+     */
+    default int cleanupOrphanedState() {
+        return 0;
+    }
 }
