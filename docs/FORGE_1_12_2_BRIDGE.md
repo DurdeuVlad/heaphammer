@@ -114,4 +114,4 @@ public class ForgeChunkTicketManager implements ChunkTicketManager {
 
 1. **Gradle Tooling**: Uses CleanroomMC Loom or ForgeGradle 2.3 for modern Gradle daemon compatibility.
 2. **Dedicated Branch**: `ver/1.12.2-forge` maintains the Forge adapter and build script.
-3. **Jenkins Integration**: Bound automatically to `JDK8` via dynamic environment detection.
+3. **CI Integration**: Built by GitHub Actions on JDK 17 (`ci.yml` resolves `java_version` from `gradle.properties`).
