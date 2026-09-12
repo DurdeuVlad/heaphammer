@@ -32,8 +32,8 @@ class CommandPermissionsTest {
     @Test
     @DisplayName("CommandPermissions denies access when source or predicate is null")
     void testNullSource() {
-        assertFalse(CommandPermissions.check((IntPredicate) null, CommandPermissions.PERM_RUN));
-        assertFalse(CommandPermissions.check((net.minecraft.commands.CommandSourceStack) null, CommandPermissions.PERM_RUN));
+        assertFalse(CommandPermissions.check(null, (IntPredicate) null, CommandPermissions.PERM_RUN, 2));
+        assertFalse(CommandPermissions.check(new Object(), null, CommandPermissions.PERM_RUN, 2));
     }
 
     @Test
