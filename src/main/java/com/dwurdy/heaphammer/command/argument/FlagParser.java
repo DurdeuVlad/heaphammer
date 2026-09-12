@@ -1,6 +1,9 @@
 package com.dwurdy.heaphammer.command.argument;
 
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
+import com.dwurdy.heaphammer.domain.DiagnosticCollector;
+import com.dwurdy.heaphammer.domain.EntityWorkloadProfile;
+import com.dwurdy.heaphammer.domain.PlayerAction;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,6 +126,88 @@ public class FlagParser {
             builder.excludeMods(list);
         }
 
+        if (flags.containsKey("profile")) {
+            try {
+                builder.entityProfile(EntityWorkloadProfile.valueOf(flags.get("profile").trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid entity profile: " + flags.get("profile") +
+                        ". Valid values: transient, persistent, unticked_ring");
+            }
+        }
+        if (flags.containsKey("logins-per-cycle") || flags.containsKey("logins")) {
+            String value = flags.getOrDefault("logins-per-cycle", flags.get("logins"));
+            try {
+                builder.loginsPerCycle(Integer.parseInt(value));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--logins-per-cycle': " + value);
+            }
+        }
+        if (flags.containsKey("actions")) {
+            List<PlayerAction> actions = new ArrayList<>();
+            for (String raw : flags.get("actions").split(",")) {
+                if (!raw.trim().isEmpty()) {
+                    try {
+                        actions.add(PlayerAction.valueOf(raw.trim().toUpperCase(Locale.ROOT)));
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException("Invalid player action: " + raw +
+                                ". Valid values: join, quit, respawn, dimchange, teleport");
+                    }
+                }
+            }
+            builder.playerActions(actions);
+        }
+        if (flags.containsKey("duration")) {
+            builder.durationSeconds(parseDurationSeconds(flags.get("duration"), "duration"));
+        }
+        if (flags.containsKey("interval")) {
+            builder.intervalSeconds(parseDurationSeconds(flags.get("interval"), "interval"));
+        }
+        if (flags.containsKey("diagnostics")) {
+            List<DiagnosticCollector> collectors = new ArrayList<>();
+            for (String raw : flags.get("diagnostics").split(",")) {
+                if (!raw.trim().isEmpty() && !"none".equalsIgnoreCase(raw.trim())) {
+                    try {
+                        collectors.add(DiagnosticCollector.valueOf(raw.trim().toUpperCase(Locale.ROOT).replace('-', '_')));
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException("Invalid diagnostic collector: " + raw +
+                                ". Valid values: histogram, retention, world-store, event-metrics");
+                    }
+                }
+            }
+            builder.diagnosticCollectors(collectors);
+        }
+        if (flags.containsKey("track-classes") || flags.containsKey("classes")) {
+            String value = flags.getOrDefault("track-classes", flags.get("classes"));
+            List<String> classes = Arrays.stream(value.split(","))
+                    .map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toList());
+            builder.trackedClasses(classes);
+            if (!classes.isEmpty() && !flags.containsKey("diagnostics")) {
+                builder.diagnosticCollectors(List.of(DiagnosticCollector.RETENTION));
+            }
+        }
+
         return builder.build();
+    }
+
+    private static long parseDurationSeconds(String value, String flagName) {
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("Invalid duration for flag '--" + flagName + "': " + value);
+        }
+        long multiplier = 1L;
+        char suffix = normalized.charAt(normalized.length() - 1);
+        if (suffix == 's' || suffix == 'm' || suffix == 'h' || suffix == 'd') {
+            normalized = normalized.substring(0, normalized.length() - 1).trim();
+            multiplier = suffix == 's' ? 1L : suffix == 'm' ? 60L : suffix == 'h' ? 3600L : 86400L;
+        }
+        try {
+            long valueNumber = Long.parseLong(normalized);
+            if (valueNumber <= 0L || valueNumber > Long.MAX_VALUE / multiplier) {
+                throw new NumberFormatException();
+            }
+            return valueNumber * multiplier;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid duration for flag '--" + flagName + "': " + value);
+        }
     }
 }

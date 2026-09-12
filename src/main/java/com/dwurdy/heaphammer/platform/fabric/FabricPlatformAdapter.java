@@ -1,8 +1,17 @@
 package com.dwurdy.heaphammer.platform.fabric;
 
 import com.dwurdy.heaphammer.domain.EnvironmentFingerprint;
+import com.dwurdy.heaphammer.domain.PlatformCapabilities;
+import com.dwurdy.heaphammer.domain.PlatformCapability;
+import com.dwurdy.heaphammer.diagnostics.EventMetricsCounter;
+import com.dwurdy.heaphammer.infrastructure.worldstore.AnvilWorldStoreScanner;
 import com.dwurdy.heaphammer.platform.ChunkTicketManager;
+import com.dwurdy.heaphammer.platform.EntityLifecyclePort;
+import com.dwurdy.heaphammer.platform.EventMetricsPort;
 import com.dwurdy.heaphammer.platform.PlatformAdapter;
+import com.dwurdy.heaphammer.platform.PlayerLifecyclePort;
+import com.dwurdy.heaphammer.platform.RetentionObservationPort;
+import com.dwurdy.heaphammer.platform.WorldStoreMetricsPort;
 import com.google.common.collect.Iterables;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -38,15 +47,22 @@ public class FabricPlatformAdapter implements PlatformAdapter {
     private final Supplier<MinecraftServer> serverSupplier;
     private final FabricChunkTicketManager ticketManager;
     private final List<Consumer<Long>> tickListeners = new CopyOnWriteArrayList<>();
+    private final FabricPlayerLifecyclePort playerLifecyclePort;
+    private final FabricEntityLifecyclePort entityLifecyclePort;
+    private final EventMetricsCounter eventMetrics = new EventMetricsCounter();
     private long serverTickCounter = 0;
 
     public FabricPlatformAdapter(Supplier<MinecraftServer> serverSupplier) {
         this.serverSupplier = Objects.requireNonNull(serverSupplier, "serverSupplier must not be null");
         this.ticketManager = new FabricChunkTicketManager(serverSupplier);
+        this.playerLifecyclePort = new FabricPlayerLifecyclePort(serverSupplier);
+        this.entityLifecyclePort = new FabricEntityLifecyclePort(serverSupplier);
+        eventMetrics.recordRegistration("fabric:ServerTickEvents.END_SERVER_TICK");
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server == serverSupplier.get()) {
                 serverTickCounter++;
+                eventMetrics.recordDispatch("fabric:ServerTickEvents.END_SERVER_TICK");
                 for (Consumer<Long> listener : tickListeners) {
                     try {
                         listener.accept(serverTickCounter);
@@ -68,7 +84,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         String heapHammerVersion = FabricLoader.getInstance()
                 .getModContainer("heaphammer")
                 .map(m -> m.getMetadata().getVersion().getFriendlyString())
-                .orElse("1.0.0");
+                .orElse("1.1.0");
 
         String mcVersion = FabricLoader.getInstance()
                 .getModContainer("minecraft")
@@ -146,6 +162,52 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         return server != null && server.isRunning();
     }
 
+    @Override
+    public PlatformCapabilities getCapabilities() {
+        return PlatformCapabilities.builder()
+                .supported(PlatformCapability.PLAYER_LIFECYCLE)
+                .supported(PlatformCapability.PERSISTENT_ENTITIES)
+                .unsupported(PlatformCapability.UNTICKED_CHUNKS, "Fabric 1.21.1 has no stable public per-entity unticked-chunk contract")
+                .supported(PlatformCapability.HISTOGRAM)
+                .supported(PlatformCapability.RETENTION)
+                .supported(PlatformCapability.WORLD_STORE)
+                .supported(PlatformCapability.EVENT_METRICS)
+                .supported(PlatformCapability.SOAK)
+                .build();
+    }
+
+    @Override
+    public java.util.Optional<PlayerLifecyclePort> getPlayerLifecyclePort() {
+        return java.util.Optional.of(playerLifecyclePort);
+    }
+
+    @Override
+    public java.util.Optional<EntityLifecyclePort> getEntityLifecyclePort() {
+        return java.util.Optional.of(entityLifecyclePort);
+    }
+
+    @Override
+    public java.util.Optional<WorldStoreMetricsPort> getWorldStoreMetricsPort() {
+        return java.util.Optional.of(() -> {
+            MinecraftServer server = serverSupplier.get();
+            return server == null ? com.dwurdy.heaphammer.diagnostics.WorldStoreSnapshot.empty()
+                    : new AnvilWorldStoreScanner(server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)).capture();
+        });
+    }
+
+    @Override
+    public java.util.Optional<EventMetricsPort> getEventMetricsPort() {
+        return java.util.Optional.of(eventMetrics);
+    }
+
+    @Override
+    public java.util.Optional<RetentionObservationPort> getRetentionObservationPort() {
+        return java.util.Optional.of(tracker -> {
+            playerLifecyclePort.attach(tracker);
+            entityLifecyclePort.attach(tracker);
+        });
+    }
+
     public static final String TEST_ENTITY_TAG = "heaphammer:test";
     private final Map<String, Set<UUID>> testEntitiesByDimension = new ConcurrentHashMap<>();
     private final Map<String, Set<BlockPos>> testBlockEntitiesByDimension = new ConcurrentHashMap<>();
@@ -182,7 +244,6 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         entity.moveTo(x, y, z, 0.0f, 0.0f);
         if (entity instanceof Mob mob) {
             mob.setNoAi(true);
-            mob.setPersistenceRequired();
         }
         entity.addTag(TEST_ENTITY_TAG);
 
@@ -337,6 +398,9 @@ public class FabricPlatformAdapter implements PlatformAdapter {
                 }
             }
         }
+
+        // 5. Remove any test players that survived an interrupted lifecycle run.
+        cleaned += playerLifecyclePort.cleanupTestPlayers();
 
         return cleaned;
     }
