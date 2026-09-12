@@ -22,6 +22,7 @@ public record ExperimentReport(
         List<Checkpoint> checkpoints,
         DetectionResult detection,
         DiagnosticRefs diagnostics,
+        RunDiagnostics evidence,
         String canonicalCommand,
         List<String> warnings
 ) {
@@ -48,7 +49,25 @@ public record ExperimentReport(
             String canonicalCommand,
             List<String> warnings
     ) {
-        this(runId, startTimeEpochMs, endTimeEpochMs, status, spec, environment, checkpoints, detection, DiagnosticRefs.EMPTY, canonicalCommand, warnings);
+        this(runId, startTimeEpochMs, endTimeEpochMs, status, spec, environment, checkpoints, detection,
+                DiagnosticRefs.EMPTY, RunDiagnostics.EMPTY, canonicalCommand, warnings);
+    }
+
+    public ExperimentReport(
+            ExperimentId runId,
+            long startTimeEpochMs,
+            long endTimeEpochMs,
+            String status,
+            ExperimentSpec spec,
+            EnvironmentFingerprint environment,
+            List<Checkpoint> checkpoints,
+            DetectionResult detection,
+            DiagnosticRefs diagnostics,
+            String canonicalCommand,
+            List<String> warnings
+    ) {
+        this(runId, startTimeEpochMs, endTimeEpochMs, status, spec, environment, checkpoints, detection,
+                diagnostics, RunDiagnostics.EMPTY, canonicalCommand, warnings);
     }
 
     public long durationMs() {

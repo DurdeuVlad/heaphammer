@@ -1,6 +1,7 @@
 # gradle
 .gradle/
 build/
+dist/
 out/
 classes/
 
@@ -23,8 +24,14 @@ bin/
 # macos
 *.DS_Store
 
-# fabric
+# fabric & runtime
 run/
+/heaphammer/
+/config/
+# nested loader build runtime dirs (loaders/<name>/ run artifacts)
+loaders/*/run/
+loaders/*/heaphammer/
+loaders/*/config/
 
 # java
 hs_err_*.log
@@ -32,3 +39,8 @@ replay_*.log
 *.hprof
 *.jfr
 logs/
+
+# scratch temporary files
+.scratch/*.html
+.scratch/*.js
+.worktrees/

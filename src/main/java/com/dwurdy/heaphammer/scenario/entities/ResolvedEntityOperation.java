@@ -18,10 +18,12 @@ public record ResolvedEntityOperation(
         String entityTypeId,
         String action,
         int lifetimeTicks,
-        String removeMode
+        String removeMode,
+        EntityWorkloadProfile profile
 ) {
     public static final String ACTION_SPAWN = "SPAWN";
     public static final String ACTION_REMOVE = "REMOVE";
+    public static final String ACTION_CYCLE_CHUNK = "CYCLE_CHUNK";
     public static final String MODE_DISCARD = "DISCARD";
     public static final String MODE_KILL = "KILL";
 
@@ -32,5 +34,22 @@ public record ResolvedEntityOperation(
         if (removeMode == null) {
             removeMode = MODE_DISCARD;
         }
+        profile = profile == null ? EntityWorkloadProfile.TRANSIENT : profile;
+    }
+
+    public ResolvedEntityOperation(
+            int iteration,
+            int stepIndex,
+            String dimension,
+            double x,
+            double y,
+            double z,
+            String entityTypeId,
+            String action,
+            int lifetimeTicks,
+            String removeMode
+    ) {
+        this(iteration, stepIndex, dimension, x, y, z, entityTypeId, action, lifetimeTicks,
+                removeMode, EntityWorkloadProfile.TRANSIENT);
     }
 }
