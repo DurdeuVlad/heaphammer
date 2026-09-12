@@ -31,7 +31,7 @@ public class NeoForgePlatformAdapterTest {
         assertNotNull(fp);
         assertEquals("1.21.1", fp.minecraftVersion());
         assertTrue(fp.loaderVersion().contains("neoforge"));
-        assertEquals("1.0.0", fp.heapHammerVersion());
+        assertEquals("1.1.0", fp.heapHammerVersion());
         assertTrue(fp.installedMods().containsKey("neoforge"));
         assertTrue(fp.installedMods().containsKey("minecraft"));
         assertNotNull(fp.javaVersion());

@@ -32,7 +32,7 @@ public class NeoForgePlatformAdapter implements PlatformAdapter {
         this.ticketManager = Objects.requireNonNull(ticketManager, "ticketManager must not be null");
         installedMods.put("minecraft", "1.21.1");
         installedMods.put("neoforge", "21.1.70");
-        installedMods.put("heaphammer", "1.0.0");
+        installedMods.put("heaphammer", "1.1.0");
     }
 
     @Override
@@ -41,9 +41,30 @@ public class NeoForgePlatformAdapter implements PlatformAdapter {
     }
 
     @Override
+    public com.dwurdy.heaphammer.domain.PlatformCapabilities getCapabilities() {
+        return com.dwurdy.heaphammer.domain.PlatformCapabilities.builder()
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.PLAYER_LIFECYCLE,
+                        "Headless NeoForge adapter has no live MinecraftServer connection")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.PERSISTENT_ENTITIES,
+                        "Headless NeoForge adapter cannot persist real entities")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.UNTICKED_CHUNKS,
+                        "No stable public unticked-chunk contract")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.HISTOGRAM,
+                        "Diagnostics require a live JVM platform")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.RETENTION,
+                        "Diagnostics require a live JVM platform")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.WORLD_STORE,
+                        "Headless adapter has no world root")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.EVENT_METRICS,
+                        "Headless adapter has no loader event bus")
+                .supported(com.dwurdy.heaphammer.domain.PlatformCapability.SOAK)
+                .build();
+    }
+
+    @Override
     public EnvironmentFingerprint captureFingerprint() {
         return new EnvironmentFingerprint(
-                "1.0.0",
+                "1.1.0",
                 "1.21.1",
                 "neoforge-21.1.70",
                 System.getProperty("java.version", "21"),
