@@ -23,7 +23,6 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,30 +96,32 @@ public class HeapHammerCommands {
     }
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        var root = Commands.literal("hh");
+        // Root /hh command requires OP level 2 or heaphammer.use permission
+        var root = Commands.literal("hh").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_USE));
 
-        // Info commands (available to all)
-        root.then(Commands.literal("version").executes(this::cmdVersion));
-        root.then(Commands.literal("help")
+        // Info commands (requires OP / permission)
+        root.then(Commands.literal("version").requires(s -> CommandPermissions.check(s, "heaphammer.version")).executes(this::cmdVersion));
+        root.then(Commands.literal("help").requires(s -> CommandPermissions.check(s, "heaphammer.help"))
                 .executes(this::cmdHelp)
                 .then(Commands.argument("topic", StringArgumentType.string()).executes(this::cmdHelpTopic)));
-        root.then(Commands.literal("capabilities").executes(this::cmdCapabilities));
-        root.then(Commands.literal("doctor").executes(this::cmdDoctor));
-        root.then(Commands.literal("status").executes(this::cmdStatus));
-        root.then(Commands.literal("metrics").executes(this::cmdMetrics));
-        root.then(Commands.literal("inspect").then(Commands.literal("mods").executes(this::cmdInspectMods)));
+        root.then(Commands.literal("capabilities").requires(s -> CommandPermissions.check(s, "heaphammer.capabilities")).executes(this::cmdCapabilities));
+        root.then(Commands.literal("doctor").requires(s -> CommandPermissions.check(s, "heaphammer.doctor")).executes(this::cmdDoctor));
+        root.then(Commands.literal("status").requires(s -> CommandPermissions.check(s, "heaphammer.status")).executes(this::cmdStatus));
+        root.then(Commands.literal("metrics").requires(s -> CommandPermissions.check(s, "heaphammer.metrics")).executes(this::cmdMetrics));
+        root.then(Commands.literal("inspect").requires(s -> CommandPermissions.check(s, "heaphammer.inspect"))
+                .then(Commands.literal("mods").executes(this::cmdInspectMods)));
 
-        // Operator commands (requires level 2)
-        root.then(Commands.literal("stop").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
-        root.then(Commands.literal("abort").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
-        root.then(Commands.literal("cancel").requires(s -> s.hasPermission(2)).executes(this::cmdStop));
-        root.then(Commands.literal("cleanup").requires(s -> s.hasPermission(2)).executes(this::cmdCleanup));
-        root.then(Commands.literal("checkpoint").requires(s -> s.hasPermission(2))
+        // Operator control commands
+        root.then(Commands.literal("stop").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_STOP)).executes(this::cmdStop));
+        root.then(Commands.literal("abort").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_STOP)).executes(this::cmdStop));
+        root.then(Commands.literal("cancel").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_STOP)).executes(this::cmdStop));
+        root.then(Commands.literal("cleanup").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_CLEANUP)).executes(this::cmdCleanup));
+        root.then(Commands.literal("checkpoint").requires(s -> CommandPermissions.check(s, "heaphammer.checkpoint"))
                 .executes(this::cmdCheckpoint)
                 .then(Commands.literal("--diagnostics").executes(this::cmdCheckpointDiagnostics)));
 
         // Scenario command branch
-        var scenario = Commands.literal("scenario");
+        var scenario = Commands.literal("scenario").requires(s -> CommandPermissions.check(s, "heaphammer.scenario"));
         scenario.then(Commands.literal("list").executes(this::cmdScenarioList));
         scenario.then(Commands.literal("describe")
                 .then(Commands.literal("chunks").executes(this::cmdScenarioDescribeChunks))
@@ -129,7 +130,7 @@ public class HeapHammerCommands {
         root.then(scenario);
 
         // Planning
-        var plan = Commands.literal("plan");
+        var plan = Commands.literal("plan").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_PLAN));
         plan.then(Commands.literal("chunks")
                 .executes(ctx -> cmdPlanChunks(ctx, ""))
                 .then(Commands.argument("flags", StringArgumentType.greedyString())
@@ -145,7 +146,7 @@ public class HeapHammerCommands {
         root.then(plan);
 
         // Running
-        var run = Commands.literal("run").requires(s -> s.hasPermission(2));
+        var run = Commands.literal("run").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_RUN));
         run.then(Commands.literal("chunks")
                 .executes(ctx -> cmdRunChunks(ctx, ""))
                 .then(Commands.argument("flags", StringArgumentType.greedyString())
@@ -161,22 +162,22 @@ public class HeapHammerCommands {
         root.then(run);
 
         // Replay & Rerun
-        root.then(Commands.literal("replay").requires(s -> s.hasPermission(2))
-                .then(Commands.argument("target", StringArgumentType.string())
+        root.then(Commands.literal("replay").requires(s -> CommandPermissions.check(s, "heaphammer.replay"))
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdReplay(ctx, StringArgumentType.getString(ctx, "target")))));
 
-        root.then(Commands.literal("rerun").requires(s -> s.hasPermission(2))
-                .then(Commands.argument("target", StringArgumentType.string())
+        root.then(Commands.literal("rerun").requires(s -> CommandPermissions.check(s, "heaphammer.rerun"))
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdRerun(ctx, StringArgumentType.getString(ctx, "target")))));
 
         // Reports
-        var report = Commands.literal("report");
+        var report = Commands.literal("report").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_REPORT));
         report.then(Commands.literal("list").executes(this::cmdReportList));
         report.then(Commands.literal("show")
-                .then(Commands.argument("target", StringArgumentType.string())
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdReportShow(ctx, StringArgumentType.getString(ctx, "target")))));
         report.then(Commands.literal("export")
-                .then(Commands.argument("target", StringArgumentType.string())
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdReportExport(ctx, StringArgumentType.getString(ctx, "target")))));
         report.then(Commands.literal("diff")
                 .then(Commands.argument("runA", StringArgumentType.string())
@@ -185,7 +186,7 @@ public class HeapHammerCommands {
         root.then(report);
 
         // Diagnostics
-        var diagnostics = Commands.literal("diagnostics").requires(s -> s.hasPermission(2));
+        var diagnostics = Commands.literal("diagnostics").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_DIAGNOSTICS));
         diagnostics.then(Commands.literal("histogram").executes(this::cmdDiagnosticsHistogram));
         diagnostics.then(Commands.literal("heapdump").executes(this::cmdDiagnosticsHeapdump));
         var jfr = Commands.literal("jfr");
@@ -196,7 +197,7 @@ public class HeapHammerCommands {
         root.then(diagnostics);
 
         // Fixtures (operator only)
-        var fixture = Commands.literal("fixture").requires(s -> s.hasPermission(2));
+        var fixture = Commands.literal("fixture").requires(s -> CommandPermissions.check(s, "heaphammer.fixture"));
         fixture.then(Commands.literal("reset").executes(this::cmdFixtureReset));
         fixture.then(Commands.argument("mode", StringArgumentType.string())
                 .executes(ctx -> cmdFixture(ctx, StringArgumentType.getString(ctx, "mode"), 10))
@@ -205,9 +206,15 @@ public class HeapHammerCommands {
         root.then(fixture);
 
         // Adapters (operator only)
-        var adapters = Commands.literal("adapters").requires(s -> s.hasPermission(2));
+        var adapters = Commands.literal("adapters").requires(s -> CommandPermissions.check(s, "heaphammer.adapters"));
         adapters.then(Commands.literal("list").executes(this::cmdAdaptersList));
         root.then(adapters);
+
+        // Configuration (operator only)
+        var config = Commands.literal("config").requires(s -> CommandPermissions.check(s, "heaphammer.config"));
+        config.then(Commands.literal("show").executes(this::cmdConfigShow));
+        config.then(Commands.literal("reload").executes(this::cmdConfigReload));
+        root.then(config);
 
         dispatcher.register(root);
     }
@@ -250,8 +257,8 @@ public class HeapHammerCommands {
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
         EnvironmentFingerprint env = platform.captureFingerprint();
         ctx.getSource().sendSuccess(new TextComponent(
-                String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / Fabric)",
-                        env.heapHammerVersion(), env.minecraftVersion()))
+                String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / %s)",
+                        env.heapHammerVersion(), env.minecraftVersion(), env.loaderVersion()))
                 .withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
@@ -287,7 +294,7 @@ public class HeapHammerCommands {
                 "HeapHammer Capabilities:\n" +
                 "- Scenario: chunks (v1.0)\n" +
                 "- JVM Max Memory: " + maxMb + " MB (Allocated: " + totalMb + " MB)\n" +
-                "- Platform: Fabric (Server-side only)\n" +
+                "- Platform: " + platform.captureFingerprint().loaderVersion() + " (Server-side only)\n" +
                 "- Ticket Type: heaphammer (distance 1)"
         ).withStyle(ChatFormatting.GREEN), false);
         return 1;
@@ -350,13 +357,12 @@ public class HeapHammerCommands {
     }
 
     private int cmdCleanup(CommandContext<CommandSourceStack> ctx) {
-        int countBefore = platform.getChunkTicketManager().getActiveTicketCount();
-        platform.getChunkTicketManager().releaseAllTickets();
-        String dim = "minecraft:overworld";
-        int entitiesPurged = platform.removeAllTestEntities(dim);
-        int blockEntitiesPurged = platform.removeAllTestBlockEntities(dim);
-        ctx.getSource().sendSuccess(new TextComponent("Purged " + countBefore + " tickets, " +
-                entitiesPurged + " test entities, and " + blockEntitiesPurged + " test block entities.").withStyle(ChatFormatting.GREEN), true);
+        int journalCleaned = experimentService.getRecoveryJournal().recoverIfInterrupted(platform);
+        int platformCleaned = platform.cleanupOrphanedState();
+        int total = journalCleaned + platformCleaned;
+        ctx.getSource().sendSuccess(new TextComponent(
+                "Cleanup complete: Purged all tickets, removed " + total + " orphaned test entities and block entities across all dimensions."
+        ).withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 
@@ -407,10 +413,9 @@ public class HeapHammerCommands {
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
         String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
-        ExperimentSpec spec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
-
-        ExperimentPlan plan = planner.plan(spec);
         try {
+            ExperimentSpec spec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+            ExperimentPlan plan = planner.plan(spec);
             Path path = planStorage.savePlan(plan);
             ctx.getSource().sendSuccess(new TextComponent(
                     "Plan Created: " + plan.id() + "\n" +
@@ -418,6 +423,8 @@ public class HeapHammerCommands {
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to persist plan: " + e.getMessage()));
         }
@@ -435,16 +442,17 @@ public class HeapHammerCommands {
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
         String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
-        ExperimentSpec spec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
-
-        checkpointService.clear();
-        ExperimentPlan plan = planner.plan(spec);
         try {
+            ExperimentSpec spec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+            checkpointService.clear();
+            ExperimentPlan plan = planner.plan(spec);
             planStorage.savePlan(plan);
             experimentService.start(plan);
             ctx.getSource().sendSuccess(new TextComponent(
                     "Started Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, radius " + spec.radius() + ")"
             ).withStyle(ChatFormatting.GOLD), true);
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to start experiment: " + e.getMessage()));
         }
@@ -457,27 +465,27 @@ public class HeapHammerCommands {
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
         String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
-        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
-        ExperimentSpec spec = ExperimentSpec.builder()
-                .scenarioId(ScenarioId.ENTITIES)
-                .seed(baseSpec.seed())
-                .dimension(baseSpec.dimension())
-                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
-                .radius(baseSpec.radius() * 4)
-                .iterations(baseSpec.iterations())
-                .batchSize(baseSpec.batchSize())
-                .strategy(baseSpec.strategy())
-                .warmupIterations(baseSpec.warmupIterations())
-                .holdTicks(baseSpec.holdTicks())
-                .settleTicks(baseSpec.settleTicks())
-                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
-                .maxMillisPerTick(baseSpec.maxMillisPerTick())
-                .explicitGc(baseSpec.explicitGc())
-                .build();
-
-        List<String> available = platform.getAvailableEntityTypes();
-        ExperimentPlan plan = entityPlanner.plan(spec, available);
         try {
+            ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+            ExperimentSpec spec = ExperimentSpec.builder()
+                    .scenarioId(ScenarioId.ENTITIES)
+                    .seed(baseSpec.seed())
+                    .dimension(baseSpec.dimension())
+                    .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                    .radius(baseSpec.radius() * 4)
+                    .iterations(baseSpec.iterations())
+                    .batchSize(baseSpec.batchSize())
+                    .strategy(baseSpec.strategy())
+                    .warmupIterations(baseSpec.warmupIterations())
+                    .holdTicks(baseSpec.holdTicks())
+                    .settleTicks(baseSpec.settleTicks())
+                    .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                    .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                    .explicitGc(baseSpec.explicitGc())
+                    .build();
+
+            List<String> available = platform.getAvailableEntityTypes();
+            ExperimentPlan plan = entityPlanner.plan(spec, available);
             Path path = planStorage.savePlan(plan);
             ctx.getSource().sendSuccess(new TextComponent(
                     "Entity Plan Created: " + plan.id() + "\n" +
@@ -485,6 +493,8 @@ public class HeapHammerCommands {
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to persist entity plan: " + e.getMessage()));
         }
@@ -502,33 +512,35 @@ public class HeapHammerCommands {
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
         String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
-        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
-        ExperimentSpec spec = ExperimentSpec.builder()
-                .scenarioId(ScenarioId.ENTITIES)
-                .seed(baseSpec.seed())
-                .dimension(baseSpec.dimension())
-                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
-                .radius(baseSpec.radius() * 4)
-                .iterations(baseSpec.iterations())
-                .batchSize(baseSpec.batchSize())
-                .strategy(baseSpec.strategy())
-                .warmupIterations(baseSpec.warmupIterations())
-                .holdTicks(baseSpec.holdTicks())
-                .settleTicks(baseSpec.settleTicks())
-                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
-                .maxMillisPerTick(baseSpec.maxMillisPerTick())
-                .explicitGc(baseSpec.explicitGc())
-                .build();
-
-        checkpointService.clear();
-        List<String> available = platform.getAvailableEntityTypes();
-        ExperimentPlan plan = entityPlanner.plan(spec, available);
         try {
+            ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+            ExperimentSpec spec = ExperimentSpec.builder()
+                    .scenarioId(ScenarioId.ENTITIES)
+                    .seed(baseSpec.seed())
+                    .dimension(baseSpec.dimension())
+                    .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                    .radius(baseSpec.radius() * 4)
+                    .iterations(baseSpec.iterations())
+                    .batchSize(baseSpec.batchSize())
+                    .strategy(baseSpec.strategy())
+                    .warmupIterations(baseSpec.warmupIterations())
+                    .holdTicks(baseSpec.holdTicks())
+                    .settleTicks(baseSpec.settleTicks())
+                    .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                    .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                    .explicitGc(baseSpec.explicitGc())
+                    .build();
+
+            checkpointService.clear();
+            List<String> available = platform.getAvailableEntityTypes();
+            ExperimentPlan plan = entityPlanner.plan(spec, available);
             planStorage.savePlan(plan);
             experimentService.start(plan);
             ctx.getSource().sendSuccess(new TextComponent(
                     "Started Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " entities/batch)"
             ).withStyle(ChatFormatting.GOLD), true);
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to start entity experiment: " + e.getMessage()));
         }
@@ -541,27 +553,27 @@ public class HeapHammerCommands {
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
         String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
-        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
-        ExperimentSpec spec = ExperimentSpec.builder()
-                .scenarioId(ScenarioId.BLOCK_ENTITIES)
-                .seed(baseSpec.seed())
-                .dimension(baseSpec.dimension())
-                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
-                .radius(baseSpec.radius())
-                .iterations(baseSpec.iterations())
-                .batchSize(baseSpec.batchSize())
-                .strategy(baseSpec.strategy())
-                .warmupIterations(baseSpec.warmupIterations())
-                .holdTicks(baseSpec.holdTicks())
-                .settleTicks(baseSpec.settleTicks())
-                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
-                .maxMillisPerTick(baseSpec.maxMillisPerTick())
-                .explicitGc(baseSpec.explicitGc())
-                .build();
-
-        List<String> available = platform.getAvailableBlockEntityTypes();
-        ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
         try {
+            ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+            ExperimentSpec spec = ExperimentSpec.builder()
+                    .scenarioId(ScenarioId.BLOCK_ENTITIES)
+                    .seed(baseSpec.seed())
+                    .dimension(baseSpec.dimension())
+                    .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                    .radius(baseSpec.radius())
+                    .iterations(baseSpec.iterations())
+                    .batchSize(baseSpec.batchSize())
+                    .strategy(baseSpec.strategy())
+                    .warmupIterations(baseSpec.warmupIterations())
+                    .holdTicks(baseSpec.holdTicks())
+                    .settleTicks(baseSpec.settleTicks())
+                    .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                    .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                    .explicitGc(baseSpec.explicitGc())
+                    .build();
+
+            List<String> available = platform.getAvailableBlockEntityTypes();
+            ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
             Path path = planStorage.savePlan(plan);
             ctx.getSource().sendSuccess(new TextComponent(
                     "Block Entity Plan Created: " + plan.id() + "\n" +
@@ -569,6 +581,8 @@ public class HeapHammerCommands {
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to persist block entity plan: " + e.getMessage()));
         }
@@ -586,33 +600,35 @@ public class HeapHammerCommands {
         int chunkZ = ((int) Math.floor(pos.z)) >> 4;
 
         String[] rawTokens = flagsString.isBlank() ? new String[0] : flagsString.split("\\s+");
-        ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
-        ExperimentSpec spec = ExperimentSpec.builder()
-                .scenarioId(ScenarioId.BLOCK_ENTITIES)
-                .seed(baseSpec.seed())
-                .dimension(baseSpec.dimension())
-                .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
-                .radius(baseSpec.radius())
-                .iterations(baseSpec.iterations())
-                .batchSize(baseSpec.batchSize())
-                .strategy(baseSpec.strategy())
-                .warmupIterations(baseSpec.warmupIterations())
-                .holdTicks(baseSpec.holdTicks())
-                .settleTicks(baseSpec.settleTicks())
-                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
-                .maxMillisPerTick(baseSpec.maxMillisPerTick())
-                .explicitGc(baseSpec.explicitGc())
-                .build();
-
-        checkpointService.clear();
-        List<String> available = platform.getAvailableBlockEntityTypes();
-        ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
         try {
+            ExperimentSpec baseSpec = FlagParser.parseSpec(rawTokens, 0, chunkX, chunkZ);
+            ExperimentSpec spec = ExperimentSpec.builder()
+                    .scenarioId(ScenarioId.BLOCK_ENTITIES)
+                    .seed(baseSpec.seed())
+                    .dimension(baseSpec.dimension())
+                    .center((int) Math.floor(pos.x), (int) Math.floor(pos.z))
+                    .radius(baseSpec.radius())
+                    .iterations(baseSpec.iterations())
+                    .batchSize(baseSpec.batchSize())
+                    .strategy(baseSpec.strategy())
+                    .warmupIterations(baseSpec.warmupIterations())
+                    .holdTicks(baseSpec.holdTicks())
+                    .settleTicks(baseSpec.settleTicks())
+                    .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
+                    .maxMillisPerTick(baseSpec.maxMillisPerTick())
+                    .explicitGc(baseSpec.explicitGc())
+                    .build();
+
+            checkpointService.clear();
+            List<String> available = platform.getAvailableBlockEntityTypes();
+            ExperimentPlan plan = blockEntityPlanner.plan(spec, available);
             planStorage.savePlan(plan);
             experimentService.start(plan);
             ctx.getSource().sendSuccess(new TextComponent(
                     "Started Block Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " block entities/batch)"
             ).withStyle(ChatFormatting.GOLD), true);
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to start block entity experiment: " + e.getMessage()));
         }
@@ -666,6 +682,8 @@ public class HeapHammerCommands {
                 String summary = reportService.formatSummary(repOpt.get());
                 ctx.getSource().sendSuccess(new TextComponent(summary).withStyle(ChatFormatting.YELLOW), false);
             }
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(new TextComponent(e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Error loading report: " + e.getMessage()));
         }
@@ -823,6 +841,28 @@ public class HeapHammerCommands {
                 "Hash: " + env.modpackHash() + "\n" +
                 String.join(", ", env.installedMods().keySet().stream().limit(15).toList()) + "..."
         ).withStyle(ChatFormatting.AQUA), false);
+        return 1;
+    }
+
+    private int cmdConfigShow(CommandContext<CommandSourceStack> ctx) {
+        com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig cfg =
+                com.dwurdy.heaphammer.infrastructure.config.ConfigManager.getActiveConfig();
+        StringBuilder sb = new StringBuilder("=== HeapHammer Configuration ===\n");
+        sb.append("- Max Radius: ").append(cfg.getMaxRadius()).append(" chunks\n");
+        sb.append("- Max Iterations: ").append(cfg.getMaxIterations()).append("\n");
+        sb.append("- Max Batch Size: ").append(cfg.getMaxBatchSize()).append("\n");
+        sb.append("- Max Warmup: ").append(cfg.getMaxWarmupIterations()).append("\n");
+        sb.append("- Max Hold/Settle: ").append(cfg.getMaxHoldTicks()).append(" / ").append(cfg.getMaxSettleTicks()).append(" ticks\n");
+        sb.append("- Max Ops/Tick: ").append(cfg.getMaxOperationsPerTick()).append(" ops (max ").append(cfg.getMaxMillisPerTick()).append(" ms)\n");
+        sb.append("- Circuit Breaker: ").append(cfg.isCircuitBreakerEnabled() ? "ENABLED (min free " + cfg.getMinFreeMemoryMb() + " MB)" : "DISABLED").append("\n");
+        sb.append("- Auto Cleanup on Startup: ").append(cfg.isAutoCleanupOnStartup() ? "YES" : "NO");
+        ctx.getSource().sendSuccess(new TextComponent(sb.toString()).withStyle(ChatFormatting.AQUA), false);
+        return 1;
+    }
+
+    private int cmdConfigReload(CommandContext<CommandSourceStack> ctx) {
+        com.dwurdy.heaphammer.infrastructure.config.ConfigManager.reload();
+        ctx.getSource().sendSuccess(new TextComponent("HeapHammer configuration reloaded successfully from disk.").withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 
