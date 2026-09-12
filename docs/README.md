@@ -10,7 +10,7 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 |---|---|---|
 | **Server Admins & Modpack Creators** | **[SERVER_ADMIN_GUIDE.md](SERVER_ADMIN_GUIDE.md)** (Quickstart & Triage) | [CASE_STUDIES.md](CASE_STUDIES.md) • [README.md](../README.md#quickstart) |
 | **Mod Developers & Contributors** | **[CONTRIBUTING.md](../CONTRIBUTING.md)** (Contribution Standards) | [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md) • [DECISION.md](DECISION.md) • [AGENTS.md](../AGENTS.md) |
-| **DevOps & Release Engineers** | **[PUBLICATION.md](PUBLICATION.md)** (Release & Distribution) | [JENKINS_PIPELINE.md](JENKINS_PIPELINE.md) • [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md#5-automated-branch-synchronization) |
+| **DevOps & Release Engineers** | **[PUBLICATION.md](PUBLICATION.md)** (Release & Distribution) | [BUILD_TARGETS.md](BUILD_TARGETS.md) • [MULTI_VERSION_ARCHITECTURE.md](MULTI_VERSION_ARCHITECTURE.md#5-automated-branch-synchronization) |
 
 ---
 
@@ -27,7 +27,7 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 
 ### 3. Release & Operations
 - **[PUBLICATION.md](PUBLICATION.md)**: Canonical release lifecycle, milestone-batched release branching model (`release/v*`), strict Semantic Versioning (Zero Alpha policy), verification checklists, and Modrinth/CurseForge packaging.
-- **[JENKINS_PIPELINE.md](JENKINS_PIPELINE.md)**: Declarative multibranch Jenkins CI/CD setup, dynamic JDK resolution (`JDK21`, `JDK17`, `JDK8`), and release deployment gating.
+- **[BUILD_TARGETS.md](BUILD_TARGETS.md)**: Canonical version × loader target matrix, nested `loaders/` build layout, per-loader toolchain map, and how to add a new loader target.
 
 ### 4. Governance & Community
 - **[OSS.md](OSS.md)**: Open-source governance, licensing policy (LGPL-3.0), dual-axis branch strategy, and historical LTS version maintenance roadmap.

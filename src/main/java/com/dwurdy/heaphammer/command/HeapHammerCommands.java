@@ -257,8 +257,8 @@ public class HeapHammerCommands {
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
         EnvironmentFingerprint env = platform.captureFingerprint();
         ctx.getSource().sendSuccess(() -> Component.literal(
-                String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / Fabric)",
-                        env.heapHammerVersion(), env.minecraftVersion()))
+                String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / %s)",
+                        env.heapHammerVersion(), env.minecraftVersion(), env.loaderVersion()))
                 .withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
@@ -294,7 +294,7 @@ public class HeapHammerCommands {
                 "HeapHammer Capabilities:\n" +
                 "- Scenario: chunks (v1.0)\n" +
                 "- JVM Max Memory: " + maxMb + " MB (Allocated: " + totalMb + " MB)\n" +
-                "- Platform: Fabric (Server-side only)\n" +
+                "- Platform: " + platform.captureFingerprint().loaderVersion() + " (Server-side only)\n" +
                 "- Ticket Type: heaphammer (distance 1)"
         ).withStyle(ChatFormatting.GREEN), false);
         return 1;
