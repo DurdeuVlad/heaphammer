@@ -1,8 +1,7 @@
 package com.dwurdy.testmod.omnitrack;
 
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -13,12 +12,12 @@ import java.util.UUID;
 public class EntityTrackingRecord {
     private final UUID entityUuid;
     private final String entityTypeName;
-    private final ResourceKey<Level> dimension;
+    private final DimensionType dimension;
     private final Entity entity;
     private final long loadTimestamp;
     private final byte[] pathfindingCache = new byte[512 * 1024];
 
-    public EntityTrackingRecord(Entity entity, ResourceKey<Level> dimension) {
+    public EntityTrackingRecord(Entity entity, DimensionType dimension) {
         this.entity = Objects.requireNonNull(entity, "entity must not be null");
         this.entityUuid = entity.getUUID();
         this.entityTypeName = entity.getType().getDescriptionId();
@@ -34,7 +33,7 @@ public class EntityTrackingRecord {
         return entityTypeName;
     }
 
-    public ResourceKey<Level> getDimension() {
+    public DimensionType getDimension() {
         return dimension;
     }
 

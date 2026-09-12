@@ -2,12 +2,12 @@ package com.dwurdy.testmod.crossmod.consumer;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
@@ -59,7 +59,7 @@ public class CrossModConsumerMod implements ModInitializer {
             }
         });
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
             registerCommands(dispatcher);
         });
     }
@@ -72,7 +72,7 @@ public class CrossModConsumerMod implements ModInitializer {
                     boolean core = CORE_MOD_ACTIVE.get();
                     int fallbackCount = FALLBACK_TRANSIENT_MAP.size();
                     int bridgeCount = core ? ChunkListenerBridge.getActiveBridgeCount() : 0;
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(new TextComponent(
                         String.format("[TestMod-CrossModConsumer] CoreDetected=%b, BridgesCreated=%d, FallbackCount=%d",
                             core, bridgeCount, fallbackCount)), false);
                     return bridgeCount;
