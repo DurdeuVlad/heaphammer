@@ -105,14 +105,32 @@ try {
         # Run verification tests
         Write-Host "  Running test suite verification on $branch..." -ForegroundColor Cyan
         ./gradlew test --no-daemon
-        if ($LASTEXITCODE -ne 0) {
+        $testsOk = ($LASTEXITCODE -eq 0)
+
+        # Nested loader builds are part of the branch's verified surface
+        if ($testsOk -and (Test-Path "$WorkspaceRoot/loaders")) {
+            Get-ChildItem "$WorkspaceRoot/loaders" -Directory | ForEach-Object {
+                if ($testsOk -and (Test-Path "$($_.FullName)/settings.gradle")) {
+                    Write-Host "  Running nested loader tests: loaders/$($_.Name)..." -ForegroundColor Cyan
+                    Push-Location $_.FullName
+                    try {
+                        & "$WorkspaceRoot/gradlew.bat" test --no-daemon
+                        if ($LASTEXITCODE -ne 0) { $testsOk = $false }
+                    } finally {
+                        Pop-Location
+                    }
+                }
+            }
+        }
+
+        if (-not $testsOk) {
             Write-Warning "  Test suite failed on $branch after merge!"
             git reset --hard HEAD~1
             Write-Warning "  Rolled back merge on $branch due to test failures."
             continue
         }
 
-        Write-Host "  [SUCCESS] $branch cleanly merged and verified with ./gradlew test!" -ForegroundColor Green
+        Write-Host "  [SUCCESS] $branch cleanly merged and verified (root + nested loaders)!" -ForegroundColor Green
 
         if ($Push) {
             Write-Host "  Pushing $branch to remote origin..." -ForegroundColor Yellow

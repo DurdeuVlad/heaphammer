@@ -102,7 +102,25 @@ jobs:
           fi
 
           echo "Verifying test suite on $TARGET_BRANCH..."
-          if ./gradlew test --no-daemon; then
+          TESTS_OK=true
+          if ! ./gradlew test --no-daemon; then
+            TESTS_OK=false
+          fi
+
+          # Nested loader builds (loaders/*/) are part of the branch's verified
+          # surface — a loader jar that does not compile blocks the sync push.
+          if [ "$TESTS_OK" = "true" ]; then
+            for d in loaders/*/; do
+              if [ -f "${d}settings.gradle" ]; then
+                echo "Running nested loader tests: ${d}"
+                if ! (cd "$d" && ../../gradlew test --no-daemon); then
+                  TESTS_OK=false
+                fi
+              fi
+            done
+          fi
+
+          if [ "$TESTS_OK" = "true" ]; then
             echo "Verification passed! Pushing to $TARGET_BRANCH..."
             git push origin "$TARGET_BRANCH"
           else

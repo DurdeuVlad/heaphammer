@@ -1,0 +1,83 @@
+plugins {
+	id 'net.neoforged.moddev' version "${mdg_version}"
+	id 'maven-publish'
+}
+
+// Shared mod metadata is read from the root gradle.properties so this nested
+// build can never diverge from the primary Fabric build's version/group/name.
+// Command-line -P overrides (e.g. -Pmod_version=1.0.2 during release) win.
+def rootProps = new Properties()
+file('../../gradle.properties').withReader('UTF-8') { rootProps.load(it) }
+
+version = project.findProperty('mod_version') ?: rootProps['mod_version']
+group = project.findProperty('maven_group') ?: rootProps['maven_group']
+base.archivesName = project.findProperty('archives_base_name') ?: rootProps['archives_base_name']
+
+neoForge {
+	version = project.neoforge_version
+}
+
+java {
+	toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// Both are provided by the Minecraft/NeoForge runtime classpath (strictly pinned
+	// to gson 2.10.1 / slf4j 2.0.9 by minecraft-dependencies), so compile-only here.
+	compileOnly "com.google.code.gson:gson:2.10.1"
+	compileOnly "org.slf4j:slf4j-api:2.0.9"
+
+	testImplementation "com.google.code.gson:gson:2.10.1"
+	testImplementation "org.slf4j:slf4j-api:2.0.9"
+	testRuntimeOnly "org.slf4j:slf4j-simple:2.0.9"
+	testImplementation platform("org.junit:junit-bom:5.10.2")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+// The shared source tree contains Fabric-specific code (entrypoint, mixins,
+// platform/fabric) that must not be compiled into the NeoForge artifact.
+// Loader-specific code with net.neoforged.* imports lives exclusively under
+// loaders/neoforge/src — never in src/main/java.
+sourceSets {
+	main {
+		java {
+			// 'src/main/java' is already implied; add the repo-root shared tree.
+			srcDir '../../src/main/java'
+			exclude 'com/dwurdy/heaphammer/HeapHammer.java'
+			exclude 'com/dwurdy/heaphammer/mixin/**'
+			exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+		}
+		resources {
+			// 'src/main/resources' is already implied; add shared resources.
+			srcDir '../../src/main/resources'
+			exclude 'fabric.mod.json'
+			exclude 'heaphammer.mixins.json'
+		}
+	}
+	test {
+		java {
+			srcDir '../../src/test/java'
+			exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+		}
+	}
+}
+
+processResources {
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand 'version': project.version
+	}
+}
+
+test {
+	// Packaging tests inspect the assembled jar, so it must exist first.
+	dependsOn tasks.named('jar')
+	systemProperty "heaphammer.jar", tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+	useJUnitPlatform {
+		excludeTags 'integration'
+	}
+}

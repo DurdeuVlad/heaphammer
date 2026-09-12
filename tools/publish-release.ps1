@@ -4,6 +4,7 @@
 param (
     [string]$Tag = "v1.0.0",
     [string]$Title = "HeapHammer v1.0.0 - Production Release",
+    [string]$PrimaryLoader = "fabric",
     [switch]$BuildAll,
     [switch]$SkipGitHub,
     [switch]$Draft
@@ -48,33 +49,63 @@ if (-not (Test-Path $prodDir)) {
 
 Write-Host "`nStaging production release bundle in dist/production..." -ForegroundColor Cyan
 
-# Copy primary jar with standard and versioned names
-Copy-Item $primaryJar "$prodDir/heaphammer-$modVersion.jar" -Force
-Copy-Item $primaryJar "$prodDir/heaphammer-$mcVersion-$modVersion.jar" -Force
+# Copy primary jar with loader-qualified name: heaphammer-<mc>-<loader>-<ver>.jar
+Copy-Item $primaryJar "$prodDir/heaphammer-$mcVersion-$PrimaryLoader-$modVersion.jar" -Force
+
+# Build and stage nested loader builds present in this checkout (loaders/*/)
+function Invoke-NestedLoaderBuilds {
+    param([string]$Root, [string]$MC, [string]$ModVer)
+    $loadersDir = Join-Path $Root "loaders"
+    if (-not (Test-Path $loadersDir)) { return }
+    Get-ChildItem $loadersDir -Directory | ForEach-Object {
+        $loader = $_.Name
+        if (Test-Path "$($_.FullName)/settings.gradle") {
+            Write-Host "  Building nested loader: $loader" -ForegroundColor Cyan
+            Push-Location $_.FullName
+            try {
+                & "$Root/gradlew.bat" build -x test --no-daemon
+                if ($LASTEXITCODE -ne 0) { Write-Warning "  Nested loader build failed: $loader"; return }
+            } finally {
+                Pop-Location
+            }
+            $loaderJar = Get-ChildItem "$($_.FullName)/build/libs/*.jar" -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -notmatch "sources|dev" } | Select-Object -First 1
+            if ($loaderJar) {
+                Copy-Item $loaderJar.FullName "$prodDir/heaphammer-$MC-$loader-$ModVer.jar" -Force
+                Write-Host "  [OK] Staged: heaphammer-$MC-$loader-$ModVer.jar" -ForegroundColor Green
+            } else {
+                Write-Warning "  No JAR produced by nested loader build: $loader"
+            }
+        }
+    }
+}
+
+Invoke-NestedLoaderBuilds -Root $WorkspaceRoot -MC $mcVersion -ModVer $modVersion
 
 # 4. Build other supported Minecraft versions if -BuildAll requested
 if ($BuildAll) {
     Write-Host "`n[-BuildAll specified] Compiling multi-version LTS release binaries..." -ForegroundColor Cyan
     $versionBranches = @(
-        @{ Branch = "ver/1.21.4"; MC = "1.21.4" },
-        @{ Branch = "ver/1.20.6"; MC = "1.20.6" },
-        @{ Branch = "ver/1.20.4"; MC = "1.20.4" },
-        @{ Branch = "ver/1.20.1"; MC = "1.20.1" },
-        @{ Branch = "ver/1.19.4"; MC = "1.19.4" },
-        @{ Branch = "ver/1.19.2"; MC = "1.19.2" },
-        @{ Branch = "ver/1.18.2"; MC = "1.18.2" },
-        @{ Branch = "ver/1.17.1"; MC = "1.17.1" },
-        @{ Branch = "ver/1.16.5"; MC = "1.16.5" },
-        @{ Branch = "ver/1.15.2"; MC = "1.15.2" },
-        @{ Branch = "ver/1.14.4"; MC = "1.14.4" },
-        @{ Branch = "ver/1.12.2-forge"; MC = "1.12.2" },
-        @{ Branch = "ver/1.7.10-forge"; MC = "1.7.10" }
+        @{ Branch = "ver/1.21.4"; MC = "1.21.4"; Loader = "fabric" },
+        @{ Branch = "ver/1.20.6"; MC = "1.20.6"; Loader = "fabric" },
+        @{ Branch = "ver/1.20.4"; MC = "1.20.4"; Loader = "fabric" },
+        @{ Branch = "ver/1.20.1"; MC = "1.20.1"; Loader = "fabric" },
+        @{ Branch = "ver/1.19.4"; MC = "1.19.4"; Loader = "fabric" },
+        @{ Branch = "ver/1.19.2"; MC = "1.19.2"; Loader = "fabric" },
+        @{ Branch = "ver/1.18.2"; MC = "1.18.2"; Loader = "fabric" },
+        @{ Branch = "ver/1.17.1"; MC = "1.17.1"; Loader = "fabric" },
+        @{ Branch = "ver/1.16.5"; MC = "1.16.5"; Loader = "fabric" },
+        @{ Branch = "ver/1.15.2"; MC = "1.15.2"; Loader = "fabric" },
+        @{ Branch = "ver/1.14.4"; MC = "1.14.4"; Loader = "fabric" },
+        @{ Branch = "ver/1.12.2-forge"; MC = "1.12.2"; Loader = "forge" },
+        @{ Branch = "ver/1.7.10-forge"; MC = "1.7.10"; Loader = "forge" }
     )
 
     $wtBase = "$WorkspaceRoot/.worktrees"
     foreach ($entry in $versionBranches) {
         $targetMC = $entry.MC
         $targetBranch = $entry.Branch
+        $targetLoader = $entry.Loader
         $wtPath = "$wtBase/wt-$targetMC"
         Write-Host "`nBuilding Minecraft $targetMC from branch $targetBranch..." -ForegroundColor Yellow
 
@@ -95,11 +126,14 @@ if ($BuildAll) {
             }
 
             if (Test-Path $builtJar) {
-                Copy-Item $builtJar "$prodDir/heaphammer-$targetMC-$modVersion.jar" -Force
-                Write-Host "  [OK] Staged: heaphammer-$targetMC-$modVersion.jar" -ForegroundColor Green
+                Copy-Item $builtJar "$prodDir/heaphammer-$targetMC-$targetLoader-$modVersion.jar" -Force
+                Write-Host "  [OK] Staged: heaphammer-$targetMC-$targetLoader-$modVersion.jar" -ForegroundColor Green
             } else {
                 Write-Warning "Could not find built JAR for $targetMC in $wtPath/build/libs"
             }
+
+            # Build any nested loader builds present on that branch
+            Invoke-NestedLoaderBuilds -Root $wtPath -MC $targetMC -ModVer $modVersion
         } finally {
             if ((Get-Location).Path -eq $wtPath) { Pop-Location }
             Remove-Item -Path $wtPath -Recurse -Force -ErrorAction SilentlyContinue
@@ -153,25 +187,30 @@ if (-not $ghInstalled) {
     exit 0
 }
 
-# Prepare multi-version release notes
+# Prepare multi-version release notes — the supported-targets table is generated
+# from the actual staged heaphammer-<mc>-<loader>-<ver>.jar files so the notes can
+# never overstate loader coverage.
+$jarRows = Get-ChildItem "$prodDir/heaphammer-*.jar" | ForEach-Object {
+    if ($_.Name -match '^heaphammer-(.+)-(fabric|neoforge|forge)-[^-]+\.jar$') {
+        [PSCustomObject]@{ MC = $Matches[1]; Loader = $Matches[2]; File = $_.Name }
+    }
+} | Sort-Object { [version]$_.MC } -Descending, Loader
+
+$tableLines = $jarRows | ForEach-Object {
+    "| **$($_.MC)** | $($_.Loader) | ``$($_.File)`` |"
+}
+
 $notesLines = @(
     "# HeapHammer v$modVersion - Official Production Release",
     "",
     "**Deterministic Minecraft server stress testing and retained-memory regression detection.**",
     "",
     "### Supported Minecraft Versions",
-    "HeapHammer v$modVersion provides dedicated, precompiled binaries for 8 major Minecraft version lines:",
+    "HeapHammer v$modVersion provides dedicated, precompiled binaries for $($jarRows.Count) version/loader targets:",
     "",
-    "| Minecraft Version | Mod Loader | Java Target | Release Binary |",
-    "|---|---|---|---|",
-    "| **1.21.4** | Fabric | Java 21 | ``heaphammer-1.21.4-$modVersion.jar`` |",
-    "| **1.21.1** *(Trunk)* | Fabric & NeoForge | Java 21 | ``heaphammer-1.21.1-$modVersion.jar`` |",
-    "| **1.20.1** | Fabric & Forge | Java 17 | ``heaphammer-1.20.1-$modVersion.jar`` |",
-    "| **1.19.2** | Fabric & Forge | Java 17 | ``heaphammer-1.19.2-$modVersion.jar`` |",
-    "| **1.18.2** | Fabric & Forge | Java 17 | ``heaphammer-1.18.2-$modVersion.jar`` |",
-    "| **1.16.5** | Forge & Fabric | Java 8 / 17 | ``heaphammer-1.16.5-$modVersion.jar`` |",
-    "| **1.12.2** | Forge | Java 8 | ``heaphammer-1.12.2-$modVersion.jar`` |",
-    "| **1.7.10** | Forge | Java 8 | ``heaphammer-1.7.10-$modVersion.jar`` |",
+    "| Minecraft Version | Mod Loader | Release Binary |",
+    "|---|---|---|"
+) + $tableLines + @(
     "",
     "### Release Highlights",
     "- **Hexagonal Core Architecture**: 100% pure Java domain engine with zero ``net.minecraft.*`` runtime coupling.",
