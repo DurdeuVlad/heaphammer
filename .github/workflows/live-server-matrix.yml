@@ -1,0 +1,161 @@
+name: Live Dedicated Server Matrix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-server-matrix-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  live-server:
+    name: ${{ matrix.mc-version }} / ${{ matrix.loader }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - branch: master
+            mc-version: '1.21.1'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.21.4
+            mc-version: '1.21.4'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.20.6
+            mc-version: '1.20.6'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.20.4
+            mc-version: '1.20.4'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.20.1
+            mc-version: '1.20.1'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.19.4
+            mc-version: '1.19.4'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.19.2
+            mc-version: '1.19.2'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.18.2
+            mc-version: '1.18.2'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.17.1
+            mc-version: '1.17.1'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.16.5
+            mc-version: '1.16.5'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.15.2
+            mc-version: '1.15.2'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.14.4
+            mc-version: '1.14.4'
+            loader: fabric
+            java-version: '21'
+            leak-mod: fabric
+          - branch: ver/1.12.2-forge
+            mc-version: '1.12.2'
+            loader: forge
+            java-version: '17'
+            leak-mod: forge1122
+          - branch: ver/1.7.10-forge
+            mc-version: '1.7.10'
+            loader: forge
+            java-version: '17'
+            leak-mod: forge1710
+
+    steps:
+      - name: Checkout version branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+
+      - name: Load live harness from matrix branch
+        run: |
+          # The matrix intentionally checks out each historical version branch,
+          # while the harness itself is maintained on master.
+          git fetch origin master --depth=1
+          git show origin/master:tools/live_server_matrix.py > tools/live_server_matrix.py
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission to Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Adapt Fabric leak-fixture metadata to target branch
+        if: matrix.loader == 'fabric'
+        run: |
+          FABRIC_LOADER=$(grep '^loader_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          MINECRAFT=$(grep '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          JAVA_TARGET=$(grep '^java_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          while IFS= read -r -d '' manifest; do
+            sed -i \
+              -e "s/>=0.19.5/${FABRIC_LOADER}/g" \
+              -e "s/~1.21.1/${MINECRAFT}/g" \
+              -e "s/>=21/>=${JAVA_TARGET}/g" \
+              "$manifest"
+          done < <(find testmods -name fabric.mod.json -print0)
+
+      - name: Build mod and live-test fixture
+        env:
+          LOADER: ${{ matrix.loader }}
+        run: |
+          ./gradlew build buildTestmods -Pmod_version=1.1.0 --no-daemon
+
+      - name: Boot server and execute live matrix
+        env:
+          MC_VERSION: ${{ matrix.mc-version }}
+          LOADER: ${{ matrix.loader }}
+          LEAK_FIXTURE: ${{ matrix.leak-mod }}
+        run: |
+          python3 tools/live_server_matrix.py \
+            --mc-version "$MC_VERSION" \
+            --loader "$LOADER" \
+            --leak-fixture "$LEAK_FIXTURE" \
+            --expected-mod-version 1.1.0
+
+      - name: Upload live-server evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-server-${{ matrix.mc-version }}-${{ matrix.loader }}
+          path: |
+            run/logs/
+            run/heaphammer/
+            build/live-server/
+          if-no-files-found: warn
+          retention-days: 14
