@@ -190,7 +190,7 @@ jobs:
           retention-days: 7
 
   publish:
-    name: Publish to GitHub, Modrinth & CurseForge
+    name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -291,48 +291,108 @@ jobs:
               --verify-tag
           fi
 
-      - name: Publish all JARs to Modrinth & CurseForge
-        uses: Kir-Antipov/mc-publish@v3.3
+      - name: Upload release notes for platform publish jobs
+        uses: actions/upload-artifact@v4
         with:
-          # Modrinth
-          modrinth-id: heaphammer
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-featured: true
-          modrinth-unfeature-mode: subset
-          modrinth-fail-mode: warn
-
-          # CurseForge
-          curseforge-id: '1687734'
-          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          curseforge-fail-mode: warn
-
-          # GitHub (links the release created above)
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-fail-mode: warn
-
-          # Release metadata
-          name: HeapHammer ${{ steps.release.outputs.version }}
-          version: ${{ steps.release.outputs.version }}
-          version-type: release
-          changelog-file: RELEASE_NOTES.md
-
-          # All jars — loaders auto-detected per file:
-          #  - Fabric JARs: from fabric.mod.json
-          #  - NeoForge JARs: from META-INF/neoforge.mods.toml
-          #  - Forge JARs: from META-INF/mods.toml / mcmod.info
-          files: |
-            dist/production/heaphammer-*.jar
-          game-version-filter: any
-          java: |
-            21
-            17
-            8
+          name: release-notes
+          path: RELEASE_NOTES.md
+          retention-days: 1
 
       - name: Summary
         run: |
-          echo "## Release ${{ steps.release.outputs.tag }} Published" >> $GITHUB_STEP_SUMMARY
+          echo "## Release ${{ steps.release.outputs.tag }} Published to GitHub" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Published to GitHub Releases, Modrinth (heaphammer), and CurseForge (1687734)" >> $GITHUB_STEP_SUMMARY
+          echo "Modrinth/CurseForge uploads run in the per-file publish-platforms jobs (warn-mode)." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
           ls -1 dist/production/*.jar | sed 's|.*/|`|;s|$`|' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+
+  # mc-publish resolves loaders/game-versions from the PRIMARY file only, so a
+  # single invocation cannot correctly publish a multi-loader release. Emit one
+  # matrix entry per staged jar; each publish-platforms job then publishes its
+  # file with the exact loader and game version taken from the filename.
+  publish-matrix:
+    name: Prepare platform publish matrix
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/production
+          merge-multiple: true
+
+      - name: Build publish matrix from artifact names
+        id: plan
+        run: |
+          entries='[]'
+          for jar in dist/production/heaphammer-*.jar; do
+            base=$(basename "$jar" .jar)              # heaphammer-<mc>-<loader>-<ver>
+            rest="${base#heaphammer-}"
+            mc_loader="${rest%-*}"
+            loader="${mc_loader##*-}"
+            mc="${mc_loader%-*}"
+            entries=$(echo "$entries" | jq -c \
+              --arg f "${base}.jar" --arg mc "$mc" --arg l "$loader" \
+              '. + [{file:$f, mc:$mc, loader:$l}]')
+          done
+          echo "matrix={\"include\":$entries}" >> $GITHUB_OUTPUT
+          echo "$entries" | jq .
+
+  publish-platforms:
+    name: Publish ${{ matrix.loader }} ${{ matrix.mc }} to Modrinth & CurseForge
+    needs: [publish, publish-matrix]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.publish-matrix.outputs.matrix) }}
+    steps:
+      - name: Resolve release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/production
+          merge-multiple: true
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      - name: Publish ${{ matrix.file }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          # Modrinth requires a unique version_number per project, so each
+          # loader/MC file gets its own version: 1.0.2+fabric.1.20.1 etc.
+          modrinth-id: heaphammer
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: false
+          modrinth-fail-mode: warn
+          modrinth-version: ${{ steps.release.outputs.version }}+${{ matrix.loader }}.${{ matrix.mc }}
+
+          curseforge-id: '1687734'
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-fail-mode: warn
+          curseforge-version: HeapHammer ${{ steps.release.outputs.version }} (${{ matrix.loader }} ${{ matrix.mc }})
+
+          name: HeapHammer ${{ steps.release.outputs.version }} (${{ matrix.loader }} ${{ matrix.mc }})
+          version-type: release
+          changelog-file: RELEASE_NOTES.md
+          environment: server
+
+          files: dist/production/${{ matrix.file }}
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ matrix.mc }}
+          game-version-filter: none
