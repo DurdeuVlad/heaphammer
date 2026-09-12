@@ -1,6 +1,8 @@
 plugins {
-	id 'net.neoforged.moddev' version "${mdg_version}"
-	id 'maven-publish'
+	// Resolved but not applied until the version-range check below passes — the
+	// sync workflow merges this directory into every ver/* branch, including
+	// ones where NeoForge cannot exist.
+	id 'net.neoforged.moddev' version "${mdg_version}" apply false
 }
 
 // Shared mod metadata is read from the root gradle.properties so this nested
@@ -11,6 +13,31 @@ file('../../gradle.properties').withReader('UTF-8') { rootProps.load(it) }
 
 version = project.findProperty('mod_version') ?: rootProps['mod_version']
 group = project.findProperty('maven_group') ?: rootProps['maven_group']
+
+// NeoForge only exists for Minecraft 1.20.2+ (1.20.1 transitional NeoForge uses
+// the legacyforge plugin — see loaders/forge). When a branch sync lands this
+// directory on an unsupported branch, degrade to a no-op instead of failing the
+// whole branch pipeline.
+def mcVersion = rootProps['minecraft_version'] ?: ''
+def neoforgeSupported = (mcVersion ==~ /1\.20\.[2-9].*/)
+		|| (mcVersion ==~ /1\.2[1-9]\..*/)
+		|| (mcVersion ==~ /1\.[3-9][0-9]\..*/)
+		|| (mcVersion ==~ /[2-9]\..*/)
+
+if (!neoforgeSupported) {
+	logger.lifecycle("NeoForge is not available for Minecraft ${mcVersion}; loaders/neoforge is a no-op on this branch.")
+	// Register the lifecycle task names CI/release invoke so they succeed as no-ops.
+	tasks.register('build')
+	tasks.register('check')
+	tasks.register('test')
+	tasks.register('jar')
+	tasks.register('assemble')
+	return
+}
+
+apply plugin: 'net.neoforged.moddev'
+apply plugin: 'maven-publish'
+
 base.archivesName = project.findProperty('archives_base_name') ?: rootProps['archives_base_name']
 
 neoForge {

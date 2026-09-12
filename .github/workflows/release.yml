@@ -165,9 +165,10 @@ jobs:
             LOADER=$(basename "$d")
             LJAR=$(find "${d}build/libs" -name "*.jar" ! -name "*sources*" ! -name "*dev*" | head -1)
             if [ -z "$LJAR" ]; then
-              echo "ERROR: No JAR produced by nested loader build: ${d}"
-              ls -la "${d}build/libs/" || true
-              exit 1
+              # Loader builds no-op on branches where the loader cannot exist
+              # (e.g. loaders/neoforge synced to a pre-1.20.2 branch) — skip.
+              echo "NOTICE: no JAR produced by ${d} — loader not supported on this branch, skipping."
+              continue
             fi
             cp "$LJAR" "staging/heaphammer-${MC_VERSION}-${LOADER}-${MOD_VERSION}.jar"
             echo "Staged: heaphammer-${MC_VERSION}-${LOADER}-${MOD_VERSION}.jar"
