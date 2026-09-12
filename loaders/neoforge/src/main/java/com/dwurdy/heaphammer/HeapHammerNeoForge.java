@@ -22,7 +22,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.event.TickEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,7 +103,11 @@ public class HeapHammerNeoForge {
 			}
 		});
 
-		gameBus.addListener(ServerTickEvent.Post.class, event -> platform.onServerTick());
+		gameBus.addListener(TickEvent.ServerTickEvent.class, event -> {
+			if (event.phase == TickEvent.Phase.END) {
+				platform.onServerTick();
+			}
+		});
 
 		gameBus.addListener(RegisterCommandsEvent.class, event -> commands.register(event.getDispatcher()));
 
