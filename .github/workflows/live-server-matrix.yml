@@ -97,6 +97,13 @@ jobs:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
 
+      - name: Load live harness from matrix branch
+        run: |
+          # The matrix intentionally checks out each historical version branch,
+          # while the harness itself is maintained on master.
+          git fetch origin master --depth=1
+          git show origin/master:tools/live_server_matrix.py > tools/live_server_matrix.py
+
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
         with:
