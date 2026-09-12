@@ -66,12 +66,18 @@ def fixture_jars(root: Path, fixture: str) -> list[Path]:
     return result
 
 
-def stage_mods(root: Path, fixture: str) -> None:
+def stage_mods(root: Path, loader: str, fixture: str) -> None:
     mods = root / "run" / "mods"
     mods.mkdir(parents=True, exist_ok=True)
     for jar in mods.glob("*.jar"):
         jar.unlink()
-    shutil.copy2(find_primary_jar(root), mods / find_primary_jar(root).name)
+    # Modern Fabric's runServer task does not put the built mod on its runtime
+    # classpath, so stage it explicitly. RetroFuturaGradle's legacy Forge
+    # launcher already adds build/libs/*; copying the primary jar there would
+    # make Forge abort with DuplicateModsFoundException.
+    if loader == "fabric":
+        primary = find_primary_jar(root)
+        shutil.copy2(primary, mods / primary.name)
     for jar in fixture_jars(root, fixture):
         shutil.copy2(jar, mods / jar.name)
 
@@ -144,7 +150,7 @@ def main() -> int:
         "# Disposable CI server only; this file is never committed.\neula=true\n",
         encoding="utf-8",
     )
-    stage_mods(root, args.leak_fixture)
+    stage_mods(root, args.loader, args.leak_fixture)
 
     if args.loader == "fabric":
         commands = [
@@ -197,6 +203,12 @@ def main() -> int:
         start_new_session=(os.name == "posix"),
     )
     output_lines = start_output_reader(process)
+    if args.leak_fixture == "forge1122":
+        # Forge 1.12.2 asks this interactively before it reaches the normal
+        # server console. CI runs offline and the disposable eula above is
+        # already explicit, so answer the prompt deterministically.
+        process.stdin.write("n\n")
+        process.stdin.flush()
 
     deadline = time.monotonic() + args.boot_timeout
     try:
