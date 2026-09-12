@@ -105,6 +105,9 @@ processResources {
     filesMatching("mcmod.info") {
         expand "mod_version": project.mod_version
     }
+    filesMatching("heaphammer-version.properties") {
+        expand "mod_version": project.mod_version
+    }
 }
 
 // Stub task for Jenkins pipeline compatibility across version branches

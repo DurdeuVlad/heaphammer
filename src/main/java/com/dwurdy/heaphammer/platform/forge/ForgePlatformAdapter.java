@@ -60,9 +60,29 @@ public class ForgePlatformAdapter implements PlatformAdapter {
                 .build();
     }
 
+    /**
+     * Reads the build-time version filtered into heaphammer-version.properties
+     * so the legacy adapter cannot drift from the release artifact metadata.
+     */
+    private static String heapHammerVersion() {
+        Properties props = new Properties();
+        try (java.io.InputStream in = ForgePlatformAdapter.class
+                .getResourceAsStream("/heaphammer-version.properties")) {
+            if (in != null) {
+                props.load(in);
+                String version = props.getProperty("mod_version");
+                if (version != null && !version.trim().isEmpty() && !version.contains("${")) {
+                    return version.trim();
+                }
+            }
+        } catch (java.io.IOException ignored) {
+        }
+        return "dev";
+    }
+
     @Override
     public EnvironmentFingerprint captureFingerprint() {
-        String heapHammerVersion = "1.0.1";
+        String heapHammerVersion = heapHammerVersion();
         String mcVersion = "1.12.2";
         String loaderVersion = "forge-14.23.5.2860";
         String javaVersion = System.getProperty("java.version", "8");
