@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -21,6 +23,7 @@ public class ReflectiveForgeTicketBridge1710 implements ForgeTicketBridge1710 {
     private Method forceChunkMethod;
     private Method unforceChunkMethod;
     private Method releaseTicketMethod;
+    private Method setForcedChunkLoadingCallbackMethod;
     private Method getWorldMethod;
     private Constructor<?> chunkCoordConstructor;
     private Object normalTicketType;
@@ -39,6 +42,7 @@ public class ReflectiveForgeTicketBridge1710 implements ForgeTicketBridge1710 {
             Class<?> forgeChunkManagerClass = Class.forName("net.minecraftforge.common.ForgeChunkManager");
             Class<?> ticketTypeClass = Class.forName("net.minecraftforge.common.ForgeChunkManager$Type");
             Class<?> ticketClass = Class.forName("net.minecraftforge.common.ForgeChunkManager$Ticket");
+            Class<?> loadingCallbackClass = Class.forName("net.minecraftforge.common.ForgeChunkManager$LoadingCallback");
             Class<?> dimensionManagerClass = Class.forName("net.minecraftforge.common.DimensionManager");
             Class<?> worldClass = Class.forName("net.minecraft.world.World");
 
@@ -61,8 +65,16 @@ public class ReflectiveForgeTicketBridge1710 implements ForgeTicketBridge1710 {
             forceChunkMethod = forgeChunkManagerClass.getMethod("forceChunk", ticketClass, chunkCoordClass);
             unforceChunkMethod = forgeChunkManagerClass.getMethod("unforceChunk", ticketClass, chunkCoordClass);
             releaseTicketMethod = forgeChunkManagerClass.getMethod("releaseTicket", ticketClass);
+            setForcedChunkLoadingCallbackMethod = forgeChunkManagerClass.getMethod(
+                    "setForcedChunkLoadingCallback", Object.class, loadingCallbackClass);
             getWorldMethod = dimensionManagerClass.getMethod("getWorld", int.class);
             chunkCoordConstructor = chunkCoordClass.getConstructor(int.class, int.class);
+
+            Object loadingCallback = Proxy.newProxyInstance(
+                    loadingCallbackClass.getClassLoader(),
+                    new Class<?>[]{loadingCallbackClass},
+                    new ForgeLoadingCallbackInvocationHandler(ticket -> releaseTicketMethod.invoke(null, ticket)));
+            setForcedChunkLoadingCallbackMethod.invoke(null, modInstance, loadingCallback);
 
             initialized = true;
             LOGGER.info("ReflectiveForgeTicketBridge1710 initialized successfully for Forge 1.7.10.");
@@ -151,5 +163,40 @@ public class ReflectiveForgeTicketBridge1710 implements ForgeTicketBridge1710 {
     @Override
     public boolean isDimensionLoaded(String dimension) {
         return getWorld(dimension) != null;
+    }
+}
+
+/**
+ * Releases only tickets restored for HeapHammer's own Forge 1.7.10 mod instance.
+ * The callback deliberately does not retain a world or any game object.
+ */
+final class ForgeLoadingCallbackInvocationHandler implements InvocationHandler {
+    interface TicketReleaser {
+        void release(Object ticket) throws Exception;
+    }
+
+    private final TicketReleaser ticketReleaser;
+
+    ForgeLoadingCallbackInvocationHandler(TicketReleaser ticketReleaser) {
+        this.ticketReleaser = ticketReleaser;
+    }
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) {
+        if ("ticketsLoaded".equals(method.getName()) && args != null && args.length > 0 && args[0] instanceof Iterable) {
+            for (Object ticket : (Iterable<?>) args[0]) {
+                try {
+                    ticketReleaser.release(ticket);
+                } catch (Exception e) {
+                    LoggerFactory.getLogger("heaphammer-forge1710-tickets")
+                            .warn("Failed to release a restored Forge ticket: {}", e.getMessage());
+                }
+            }
+            return null;
+        }
+        if ("toString".equals(method.getName())) return "HeapHammerForge1710LoadingCallback";
+        if ("hashCode".equals(method.getName())) return System.identityHashCode(proxy);
+        if ("equals".equals(method.getName())) return proxy == (args == null ? null : args[0]);
+        return null;
     }
 }
