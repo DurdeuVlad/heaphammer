@@ -8,8 +8,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,6 +43,52 @@ class CrashRecoveryJournalTest {
         assertTrue(Files.exists(journalFile));
 
         journal.recordFinish();
+        assertFalse(journal.hasInterruptedRun());
+        assertFalse(Files.exists(journalFile));
+    }
+
+    @Test
+    @DisplayName("CrashRecoveryJournal serializes finish with queued persistence")
+    void testFinishSerializesWithQueuedPersistence(@TempDir Path tempDir) throws Exception {
+        Path journalFile = tempDir.resolve("active_run.json");
+        CountDownLatch writeStarted = new CountDownLatch(1);
+        CountDownLatch allowWrite = new CountDownLatch(1);
+        CrashRecoveryJournal journal = new CrashRecoveryJournal(journalFile) {
+            @Override
+            protected void writeJournal(String json) throws IOException {
+                writeStarted.countDown();
+                try {
+                    if (!allowWrite.await(5, TimeUnit.SECONDS)) {
+                        throw new IOException("Timed out waiting to release test journal write");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting to release test journal write", e);
+                }
+                super.writeJournal(json);
+            }
+        };
+        ExperimentPlan plan = new ExperimentPlan(
+                ExperimentId.of("hh-race-test"),
+                System.currentTimeMillis(),
+                ExperimentSpec.builder().build(),
+                List.of(),
+                100,
+                5
+        );
+
+        journal.recordStart(plan);
+        journal.recordEntitySpawned(UUID.randomUUID());
+        assertTrue(writeStarted.await(5, TimeUnit.SECONDS));
+
+        Thread finishThread = new Thread(journal::recordFinish, "hh-journal-finish-test");
+        finishThread.start();
+        Thread.sleep(100);
+        assertTrue(finishThread.isAlive(), "finish must wait for an in-flight journal write");
+
+        allowWrite.countDown();
+        finishThread.join(5_000);
+        assertFalse(finishThread.isAlive());
         assertFalse(journal.hasInterruptedRun());
         assertFalse(Files.exists(journalFile));
     }
