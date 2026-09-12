@@ -272,7 +272,7 @@ public class HeapHammerCommands {
 
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
         EnvironmentFingerprint env = platform.captureFingerprint();
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / %s)",
                         env.heapHammerVersion(), env.minecraftVersion(), env.loaderVersion()))
                 .withStyle(ChatFormatting.GOLD), false);
@@ -316,7 +316,7 @@ public class HeapHammerCommands {
                     .append(": ").append(entry.getValue().supported() ? "supported" : "unsupported")
                     .append(" (").append(entry.getValue().reason()).append(")\n");
         }
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "HeapHammer Capabilities:\n" +
                 "- JVM Max Memory: " + maxMb + " MB (Allocated: " + totalMb + " MB)\n" +
                 "- Platform: " + platform.captureFingerprint().loaderVersion() + " (Server-side only)\n" +
@@ -434,7 +434,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdScenarioDescribePlayers(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                 "Scenario: players\n" +
                 "Runs deterministic test-player lifecycle actions through the server's real login/logout path. " +
                 "Use --logins-per-cycle and --actions=join,respawn,teleport,dimchange,quit; the platform must report PLAYER_LIFECYCLE support."
@@ -535,7 +535,7 @@ public class HeapHammerCommands {
                     (int) Math.floor(pos.x), (int) Math.floor(pos.z), baseSpec.radius());
             ExperimentPlan plan = playerPlanner.plan(spec);
             Path path = planStorage.savePlan(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                     "Player Plan Created: " + plan.id() + "\n" +
                     "- Operations: " + plan.totalOperations() + "\n" +
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
@@ -573,7 +573,7 @@ public class HeapHammerCommands {
             planStorage.savePlan(plan);
             checkpointService.configure(plan.spec(), platform);
             experimentService.start(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(Component.literal(
                     "Started Player Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " +
                             spec.loginsPerCycle() + " logins/cycle)"
             ).withStyle(ChatFormatting.GOLD), true);
@@ -712,7 +712,7 @@ public class HeapHammerCommands {
             checkpointService.clear();
             ScenarioExecutor executor = replayService.replay(target);
             checkpointService.configure(executor.getPlan().spec(), platform);
-            ctx.getSource().sendSuccess(() -> Component.literal("Replaying plan: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
+            ctx.getSource().sendSuccess(Component.literal("Replaying plan: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
         } catch (Exception e) {
             ctx.getSource().sendFailure(Component.literal("Replay failed: " + e.getMessage()));
         }
@@ -724,7 +724,7 @@ public class HeapHammerCommands {
             checkpointService.clear();
             ScenarioExecutor executor = replayService.rerun(target);
             checkpointService.configure(executor.getPlan().spec(), platform);
-            ctx.getSource().sendSuccess(() -> Component.literal("Rerunning spec for: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
+            ctx.getSource().sendSuccess(Component.literal("Rerunning spec for: " + executor.getPlan().id()).withStyle(ChatFormatting.GOLD), true);
         } catch (Exception e) {
             ctx.getSource().sendFailure(Component.literal("Rerun failed: " + e.getMessage()));
         }
