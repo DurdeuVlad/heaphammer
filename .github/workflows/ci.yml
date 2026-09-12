@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - master
+      - 'release/**'
       - 'ver/**'
   pull_request:
     branches:
       - master
+      - 'release/**'
       - 'ver/**'
 
 permissions:
@@ -38,6 +40,15 @@ jobs:
 
       - name: Build Mod & Synthetic Testmod Jars
         run: ./gradlew build buildTestmods --no-daemon
+
+      - name: Build & Test Nested Loader JARs
+        run: |
+          for d in loaders/*/; do
+            if [ -f "${d}settings.gradle" ]; then
+              echo "=== Nested loader build: ${d} ==="
+              (cd "$d" && ../../gradlew build --no-daemon)
+            fi
+          done
 
       - name: Upload Test Results
         if: always()

@@ -2,11 +2,11 @@ package com.dwurdy.testmod.chunkcache;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
@@ -31,7 +31,8 @@ public class ChunkCacheLeakMod implements ModInitializer {
         LOGGER.info("[TestMod-ChunkCache] Initializing single-subsystem chunk cache leak mod.");
 
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
-            if (LEAK_ENABLED.get() && chunk instanceof LevelChunk levelChunk) {
+            if (LEAK_ENABLED.get() && chunk instanceof LevelChunk) {
+                LevelChunk levelChunk = (LevelChunk) chunk;
                 ChunkPos pos = levelChunk.getPos();
                 CACHE.put(pos, new RetainedChunkEntry(pos, world.dimension(), levelChunk));
                 LOGGER.debug("[TestMod-ChunkCache] Cached chunk at {} (Total cached: {})", pos, CACHE.size());
@@ -41,7 +42,7 @@ public class ChunkCacheLeakMod implements ModInitializer {
         // Deliberately DO NOT register ServerChunkEvents.CHUNK_UNLOAD!
         // This causes genuine LevelChunk retention in static memory.
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
             registerCommands(dispatcher);
         });
     }
@@ -53,25 +54,25 @@ public class ChunkCacheLeakMod implements ModInitializer {
                 .then(Commands.literal("status").executes(ctx -> {
                     int count = CACHE.size();
                     boolean enabled = LEAK_ENABLED.get();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(new TextComponent(
                         String.format("[TestMod-ChunkCache] Status: enabled=%b, cached_chunks=%d",
                             enabled, count)), false);
                     return count;
                 }))
                 .then(Commands.literal("enable").executes(ctx -> {
                     LEAK_ENABLED.set(true);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-ChunkCache] Leak ENABLED"), false);
+                    ctx.getSource().sendSuccess(new TextComponent("[TestMod-ChunkCache] Leak ENABLED"), false);
                     return 1;
                 }))
                 .then(Commands.literal("disable").executes(ctx -> {
                     LEAK_ENABLED.set(false);
-                    ctx.getSource().sendSuccess(() -> Component.literal("[TestMod-ChunkCache] Leak DISABLED"), false);
+                    ctx.getSource().sendSuccess(new TextComponent("[TestMod-ChunkCache] Leak DISABLED"), false);
                     return 0;
                 }))
                 .then(Commands.literal("clear").executes(ctx -> {
                     int size = CACHE.size();
                     CACHE.clear();
-                    ctx.getSource().sendSuccess(() -> Component.literal(
+                    ctx.getSource().sendSuccess(new TextComponent(
                         String.format("[TestMod-ChunkCache] Cleared %d cached chunks", size)), false);
                     return size;
                 }))
