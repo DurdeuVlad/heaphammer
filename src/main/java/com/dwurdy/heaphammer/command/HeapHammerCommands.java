@@ -311,6 +311,12 @@ public class HeapHammerCommands {
         Runtime rt = Runtime.getRuntime();
         long maxMb = rt.maxMemory() / (1024 * 1024);
         long totalMb = rt.totalMemory() / (1024 * 1024);
+        StringBuilder capabilities = new StringBuilder();
+        for (var entry : platform.getCapabilities().statuses().entrySet()) {
+            capabilities.append("- ").append(entry.getKey().name().toLowerCase(Locale.ROOT))
+                    .append(": ").append(entry.getValue().supported() ? "supported" : "unsupported")
+                    .append(" (").append(entry.getValue().reason()).append(")\n");
+        }
         ctx.getSource().sendSuccess(new TextComponent(
                 "HeapHammer Capabilities:\n" +
                 "- JVM Max Memory: " + maxMb + " MB (Allocated: " + totalMb + " MB)\n" +
@@ -430,7 +436,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdScenarioDescribePlayers(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(new TextComponent(
                 "Scenario: players\n" +
                 "Runs deterministic test-player lifecycle actions through the server's real login/logout path. " +
                 "Use --logins-per-cycle and --actions=join,respawn,teleport,dimchange,quit; the platform must report PLAYER_LIFECYCLE support."
@@ -455,7 +461,7 @@ public class HeapHammerCommands {
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to persist plan: " + e.getMessage()));
         }
@@ -484,7 +490,7 @@ public class HeapHammerCommands {
                     "Started Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, radius " + spec.radius() + ")"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to start experiment: " + e.getMessage()));
         }
@@ -531,27 +537,27 @@ public class HeapHammerCommands {
                     (int) Math.floor(pos.x), (int) Math.floor(pos.z), baseSpec.radius());
             ExperimentPlan plan = playerPlanner.plan(spec);
             Path path = planStorage.savePlan(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(new TextComponent(
                     "Player Plan Created: " + plan.id() + "\n" +
                     "- Operations: " + plan.totalOperations() + "\n" +
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
-            ctx.getSource().sendFailure(Component.literal("Failed to persist player plan: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Failed to persist player plan: " + e.getMessage()));
         }
         return 1;
     }
 
     private int cmdRunPlayers(CommandContext<CommandSourceStack> ctx, String flagsString) {
         if (experimentService.isExperimentActive()) {
-            ctx.getSource().sendFailure(Component.literal("An experiment is already in progress. Use /hh stop first."));
+            ctx.getSource().sendFailure(new TextComponent("An experiment is already in progress. Use /hh stop first."));
             return 0;
         }
         if (!platform.getPlayerLifecyclePort().isPresent()) {
-            ctx.getSource().sendFailure(Component.literal(
+            ctx.getSource().sendFailure(new TextComponent(
                     "Player lifecycle is unsupported by this platform: " +
                             platform.getCapabilities().status(PlatformCapability.PLAYER_LIFECYCLE).reason()));
             return 0;
@@ -569,14 +575,14 @@ public class HeapHammerCommands {
             planStorage.savePlan(plan);
             checkpointService.configure(plan.spec(), platform);
             experimentService.start(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(new TextComponent(
                     "Started Player Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " +
                             spec.loginsPerCycle() + " logins/cycle)"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("Failed to start player experiment: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Failed to start player experiment: " + e.getMessage()));
         }
         return 1;
     }
@@ -602,7 +608,7 @@ public class HeapHammerCommands {
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to persist entity plan: " + e.getMessage()));
         }
@@ -635,7 +641,7 @@ public class HeapHammerCommands {
                     "Started Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " entities/batch)"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to start entity experiment: " + e.getMessage()));
         }
@@ -663,7 +669,7 @@ public class HeapHammerCommands {
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to persist block entity plan: " + e.getMessage()));
         }
@@ -696,7 +702,7 @@ public class HeapHammerCommands {
                     "Started Block Entity Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " + spec.batchSize() + " block entities/batch)"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
             ctx.getSource().sendFailure(new TextComponent("Failed to start block entity experiment: " + e.getMessage()));
         }
@@ -751,7 +757,7 @@ public class HeapHammerCommands {
                 ctx.getSource().sendSuccess(new TextComponent(summary).withStyle(ChatFormatting.YELLOW), false);
             }
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal(e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent(e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(new TextComponent("Error loading report: " + e.getMessage()));
         }
@@ -926,13 +932,13 @@ public class HeapHammerCommands {
         sb.append("- Max Ops/Tick: ").append(cfg.getMaxOperationsPerTick()).append(" ops (max ").append(cfg.getMaxMillisPerTick()).append(" ms)\n");
         sb.append("- Circuit Breaker: ").append(cfg.isCircuitBreakerEnabled() ? "ENABLED (min free " + cfg.getMinFreeMemoryMb() + " MB)" : "DISABLED").append("\n");
         sb.append("- Auto Cleanup on Startup: ").append(cfg.isAutoCleanupOnStartup() ? "YES" : "NO");
-        ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()).withStyle(ChatFormatting.AQUA), false);
+        ctx.getSource().sendSuccess(new TextComponent(sb.toString()).withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 
     private int cmdConfigReload(CommandContext<CommandSourceStack> ctx) {
         com.dwurdy.heaphammer.infrastructure.config.ConfigManager.reload();
-        ctx.getSource().sendSuccess(() -> Component.literal("HeapHammer configuration reloaded successfully from disk.").withStyle(ChatFormatting.GREEN), true);
+        ctx.getSource().sendSuccess(new TextComponent("HeapHammer configuration reloaded successfully from disk.").withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 
