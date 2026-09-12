@@ -10,6 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
@@ -118,7 +119,7 @@ public class DirectNeoForgePlatformAdapter extends NeoForgePlatformAdapter {
     public List<String> getAvailableEntityTypes() {
         List<String> types = new ArrayList<>();
         for (ResourceLocation key : BuiltInRegistries.ENTITY_TYPE.keySet()) {
-            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(key);
+            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(key);
             if (type != null && type.canSummon() && type != EntityType.PLAYER) {
                 types.add(key.toString());
             }
@@ -135,12 +136,12 @@ public class DirectNeoForgePlatformAdapter extends NeoForgePlatformAdapter {
         ResourceLocation loc = ResourceLocation.tryParse(entityTypeId);
         if (loc == null) return null;
 
-        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(loc);
+        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(loc);
         if (type == null || !type.canSummon() || type == EntityType.PLAYER) {
             return null;
         }
 
-        Entity entity = type.create(level);
+        Entity entity = type.create(level, EntitySpawnReason.COMMAND);
         if (entity == null) return null;
 
         entity.moveTo(x, y, z, 0.0f, 0.0f);
@@ -172,7 +173,7 @@ public class DirectNeoForgePlatformAdapter extends NeoForgePlatformAdapter {
         if (entity == null) return false;
 
         if ("KILL".equalsIgnoreCase(removeMode)) {
-            entity.kill();
+            entity.kill(level);
         } else {
             entity.discard();
         }
@@ -216,7 +217,7 @@ public class DirectNeoForgePlatformAdapter extends NeoForgePlatformAdapter {
         ResourceLocation loc = ResourceLocation.tryParse(blockEntityTypeId);
         if (loc == null) return false;
 
-        BlockEntityType<?> type = BuiltInRegistries.BLOCK_ENTITY_TYPE.get(loc);
+        BlockEntityType<?> type = BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(loc);
         if (type == null) return false;
 
         // Find a valid block state for this block entity type
