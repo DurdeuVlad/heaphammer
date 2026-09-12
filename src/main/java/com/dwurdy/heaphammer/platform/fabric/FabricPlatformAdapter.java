@@ -398,7 +398,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
             for (ServerLevel level : server.getAllLevels()) {
                 for (Entity entity : level.getAllEntities()) {
                     if (entity.getTags().contains(TEST_ENTITY_TAG)) {
-                        entity.discard();
+                        entity.remove();
                         cleaned++;
                     }
                 }
