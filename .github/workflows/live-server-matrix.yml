@@ -134,11 +134,7 @@ jobs:
         env:
           LOADER: ${{ matrix.loader }}
         run: |
-          if [ "$LOADER" = "fabric" ]; then
-            ./gradlew build buildTestmods --no-daemon
-          else
-            ./gradlew build buildTestmods --no-daemon
-          fi
+          ./gradlew build buildTestmods -Pmod_version=1.1.0 --no-daemon
 
       - name: Boot server and execute live matrix
         env:
@@ -149,7 +145,8 @@ jobs:
           python3 tools/live_server_matrix.py \
             --mc-version "$MC_VERSION" \
             --loader "$LOADER" \
-            --leak-fixture "$LEAK_FIXTURE"
+            --leak-fixture "$LEAK_FIXTURE" \
+            --expected-mod-version 1.1.0
 
       - name: Upload live-server evidence
         if: always()

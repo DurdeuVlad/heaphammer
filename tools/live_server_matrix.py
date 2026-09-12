@@ -17,8 +17,8 @@ from queue import Empty, Queue
 
 
 READY_RE = re.compile(r'Done \([0-9.]+s\)! For help, type "help"')
-REPORT_RE = re.compile(r'Report saved successfully')
 CRASH_RE = re.compile(r'(CrashReport|Fatal error|Exception in server thread|OutOfMemoryError)')
+VERSION_RE = re.compile(r'HeapHammer v([^ ]+)')
 FIXTURE_STATUS_RES = {
     "fabric": (
         re.compile(r"\[TestMod-ChunkCache\] Status: enabled=true, cached_chunks=(\d+)"),
@@ -42,6 +42,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         choices=("fabric", "forge1122", "forge1710"),
     )
+    parser.add_argument("--expected-mod-version", required=True)
     parser.add_argument("--boot-timeout", type=int, default=480)
     parser.add_argument("--run-timeout", type=int, default=180)
     return parser.parse_args()
@@ -213,9 +214,15 @@ def main() -> int:
 
     command_output = []
     ready = False
+    observed_mod_version = None
     reports_before = {str(p) for p in (root / "run").rglob("*.json")}
     process = subprocess.Popen(
-        ["./gradlew", "runServer", "--no-daemon"],
+        [
+            "./gradlew",
+            "runServer",
+            f"-Pmod_version={args.expected_mod_version}",
+            "--no-daemon",
+        ],
         cwd=root,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -241,6 +248,9 @@ def main() -> int:
                 break
             command_output.append(line)
             print(line.rstrip(), flush=True)
+            version_match = VERSION_RE.search(line)
+            if version_match:
+                observed_mod_version = version_match.group(1)
             if CRASH_RE.search(line):
                 raise RuntimeError(f"Server crash signature during boot: {line.strip()}")
             if READY_RE.search(line):
@@ -275,11 +285,11 @@ def main() -> int:
                     continue
                 command_output.append(line)
                 print(line.rstrip(), flush=True)
+                version_match = VERSION_RE.search(line)
+                if version_match:
+                    observed_mod_version = version_match.group(1)
                 if CRASH_RE.search(line):
                     raise RuntimeError(f"Server crash signature: {line.strip()}")
-                if wait_for_report and REPORT_RE.search(line):
-                    saw_report = True
-                    break
                 if wait_for_report and has_new_report(root, reports_before_command):
                     # Some historical loader/logging combinations write the
                     # JSON report before forwarding the completion message to
@@ -300,14 +310,21 @@ def main() -> int:
     new_reports = [item for item in reports if item["path"] not in reports_before]
     if not new_reports:
         raise RuntimeError("No new HeapHammer report JSON was produced")
+    if observed_mod_version != args.expected_mod_version:
+        raise RuntimeError(
+            f"Expected HeapHammer v{args.expected_mod_version}, "
+            f"observed {observed_mod_version or 'no version output'}"
+        )
 
     summary = {
         "minecraft": args.mc_version,
         "loader": args.loader,
         "fixture": args.leak_fixture,
+        "modVersion": observed_mod_version,
         "reports": [],
     }
     suspicious = False
+    incomplete_reports = []
     fixture_status_lines = []
     for line in command_output:
         if any(pattern.search(line) for pattern in FIXTURE_STATUS_RES[args.leak_fixture]):
@@ -318,15 +335,28 @@ def main() -> int:
         detection = report.get("detection", {})
         classification = str(detection.get("classification", ""))
         suspicious = suspicious or classification in {"SUSPICIOUS", "FAIL"}
+        cleanup_values = [
+            checkpoint.get("cleanupValid")
+            for checkpoint in report.get("checkpoints", [])
+            if isinstance(checkpoint.get("cleanupValid"), bool)
+        ]
+        cleanup_validation = all(cleanup_values) if cleanup_values else None
+        status = str(report.get("status", ""))
+        if status != "COMPLETED" or cleanup_validation is not True:
+            incomplete_reports.append(
+                f"{report.get('runId', item['path'])}:status={status or 'missing'},"
+                f"cleanup={cleanup_validation}"
+            )
         summary["reports"].append(
             {
                 "path": item["path"],
                 "runId": report.get("runId"),
+                "status": status,
                 "scenario": report.get("spec", {}).get("scenarioId"),
                 "classification": classification,
                 "slopeBytesPerCycle": detection.get("slopeBytesPerCycle"),
                 "rSquared": detection.get("rSquared"),
-                "cleanupValidation": report.get("cleanupValidation"),
+                "cleanupValidation": cleanup_validation,
             }
         )
     summary["fixtureStatusObserved"] = fixture_status_observed
@@ -336,6 +366,8 @@ def main() -> int:
 
     if not fixture_status_observed:
         raise RuntimeError("Leak fixture did not report retained state")
+    if incomplete_reports:
+        raise RuntimeError("Incomplete or uncleared report(s): " + "; ".join(incomplete_reports))
     print(json.dumps(summary, indent=2), flush=True)
     return 0
 
