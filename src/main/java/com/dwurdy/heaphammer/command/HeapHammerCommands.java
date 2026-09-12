@@ -428,7 +428,7 @@ public class HeapHammerCommands {
     }
 
     private int cmdScenarioDescribePlayers(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal(
+        ctx.getSource().sendSuccess(new TextComponent(
                 "Scenario: players\n" +
                 "Runs deterministic test-player lifecycle actions through the server's real login/logout path. " +
                 "Use --logins-per-cycle and --actions=join,respawn,teleport,dimchange,quit; the platform must report PLAYER_LIFECYCLE support."
@@ -529,27 +529,27 @@ public class HeapHammerCommands {
                     (int) Math.floor(pos.x), (int) Math.floor(pos.z), baseSpec.radius());
             ExperimentPlan plan = playerPlanner.plan(spec);
             Path path = planStorage.savePlan(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(new TextComponent(
                     "Player Plan Created: " + plan.id() + "\n" +
                     "- Operations: " + plan.totalOperations() + "\n" +
                     "- Estimated Ticks: " + plan.estimatedDurationTicks() + "\n" +
                     "- Saved to: " + path.getFileName()
             ).withStyle(ChatFormatting.GREEN), false);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (IOException e) {
-            ctx.getSource().sendFailure(Component.literal("Failed to persist player plan: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Failed to persist player plan: " + e.getMessage()));
         }
         return 1;
     }
 
     private int cmdRunPlayers(CommandContext<CommandSourceStack> ctx, String flagsString) {
         if (experimentService.isExperimentActive()) {
-            ctx.getSource().sendFailure(Component.literal("An experiment is already in progress. Use /hh stop first."));
+            ctx.getSource().sendFailure(new TextComponent("An experiment is already in progress. Use /hh stop first."));
             return 0;
         }
         if (!platform.getPlayerLifecyclePort().isPresent()) {
-            ctx.getSource().sendFailure(Component.literal(
+            ctx.getSource().sendFailure(new TextComponent(
                     "Player lifecycle is unsupported by this platform: " +
                             platform.getCapabilities().status(PlatformCapability.PLAYER_LIFECYCLE).reason()));
             return 0;
@@ -567,14 +567,14 @@ public class HeapHammerCommands {
             planStorage.savePlan(plan);
             checkpointService.configure(plan.spec(), platform);
             experimentService.start(plan);
-            ctx.getSource().sendSuccess(() -> Component.literal(
+            ctx.getSource().sendSuccess(new TextComponent(
                     "Started Player Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, " +
                             spec.loginsPerCycle() + " logins/cycle)"
             ).withStyle(ChatFormatting.GOLD), true);
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("Invalid parameter: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Invalid parameter: " + e.getMessage()));
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("Failed to start player experiment: " + e.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent("Failed to start player experiment: " + e.getMessage()));
         }
         return 1;
     }
@@ -1012,27 +1012,15 @@ public class HeapHammerCommands {
                     evidence.warnings()
             );
 
-        String canonical = ReportService.buildCanonicalCommand(plan.spec());
-        ExperimentReport report = new ExperimentReport(
-                plan.id(),
-                plan.createdAtEpochMs(),
-                System.currentTimeMillis(),
-                executor.getStateMachine().getState().name(),
-                plan.spec(),
-                env,
-                cps,
-                detection,
-                canonical,
-                List.of()
-        );
-
-        try {
-            Path path = reportService.saveReport(report);
-            LOGGER.info("Report saved successfully: {}", path.toAbsolutePath());
-            System.out.println("Report saved successfully: " + path.toAbsolutePath());
-        } catch (IOException e) {
-            LOGGER.error("Failed to save experiment report", e);
-            System.err.println("Failed to save experiment report: " + e.getMessage());
-        }
+            try {
+                Path path = reportService.saveReport(report);
+                LOGGER.info("Report saved successfully: {}", path.toAbsolutePath());
+            } catch (IOException e) {
+                LOGGER.error("Failed to save experiment report", e);
+            }
+        }).exceptionally(error -> {
+            LOGGER.error("Asynchronous diagnostic capture failed; report not written", error);
+            return null;
+        });
     }
 }
