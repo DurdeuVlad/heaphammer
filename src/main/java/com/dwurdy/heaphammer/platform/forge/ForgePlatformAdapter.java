@@ -40,6 +40,27 @@ public class ForgePlatformAdapter implements PlatformAdapter {
     }
 
     @Override
+    public com.dwurdy.heaphammer.domain.PlatformCapabilities getCapabilities() {
+        return com.dwurdy.heaphammer.domain.PlatformCapabilities.builder()
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.PLAYER_LIFECYCLE,
+                        "Forge 1.12.2 adapter exposes no authenticated live player loopback")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.PERSISTENT_ENTITIES,
+                        "Forge 1.12.2 adapter has no 1.1 profile-aware live entity port")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.UNTICKED_CHUNKS,
+                        "No stable public unticked-chunk contract")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.HISTOGRAM,
+                        "Diagnostics require a live JVM platform")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.RETENTION,
+                        "Diagnostics require a live JVM platform")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.WORLD_STORE,
+                        "World-store scanner is not wired to this legacy adapter")
+                .unsupported(com.dwurdy.heaphammer.domain.PlatformCapability.EVENT_METRICS,
+                        "Event counters are not wired to this legacy adapter")
+                .supported(com.dwurdy.heaphammer.domain.PlatformCapability.SOAK)
+                .build();
+    }
+
+    @Override
     public EnvironmentFingerprint captureFingerprint() {
         String heapHammerVersion = "1.0.0";
         String mcVersion = "1.12.2";
