@@ -113,6 +113,8 @@ public class HeapHammerCommands {
 
         // Operator control commands
         root.then(Commands.literal("stop").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_STOP)).executes(this::cmdStop));
+        root.then(Commands.literal("abort").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_STOP)).executes(this::cmdStop));
+        root.then(Commands.literal("cancel").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_STOP)).executes(this::cmdStop));
         root.then(Commands.literal("cleanup").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_CLEANUP)).executes(this::cmdCleanup));
         root.then(Commands.literal("checkpoint").requires(s -> CommandPermissions.check(s, "heaphammer.checkpoint"))
                 .executes(this::cmdCheckpoint)
@@ -161,21 +163,21 @@ public class HeapHammerCommands {
 
         // Replay & Rerun
         root.then(Commands.literal("replay").requires(s -> CommandPermissions.check(s, "heaphammer.replay"))
-                .then(Commands.argument("target", StringArgumentType.string())
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdReplay(ctx, StringArgumentType.getString(ctx, "target")))));
 
         root.then(Commands.literal("rerun").requires(s -> CommandPermissions.check(s, "heaphammer.rerun"))
-                .then(Commands.argument("target", StringArgumentType.string())
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdRerun(ctx, StringArgumentType.getString(ctx, "target")))));
 
         // Reports
         var report = Commands.literal("report").requires(s -> CommandPermissions.check(s, CommandPermissions.PERM_REPORT));
         report.then(Commands.literal("list").executes(this::cmdReportList));
         report.then(Commands.literal("show")
-                .then(Commands.argument("target", StringArgumentType.string())
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdReportShow(ctx, StringArgumentType.getString(ctx, "target")))));
         report.then(Commands.literal("export")
-                .then(Commands.argument("target", StringArgumentType.string())
+                .then(Commands.argument("target", StringArgumentType.greedyString())
                         .executes(ctx -> cmdReportExport(ctx, StringArgumentType.getString(ctx, "target")))));
         report.then(Commands.literal("diff")
                 .then(Commands.argument("runA", StringArgumentType.string())
@@ -253,7 +255,10 @@ public class HeapHammerCommands {
     }
 
     private int cmdVersion(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal("HeapHammer v1.1.0-dev (Minecraft 1.21.1 / Fabric)")
+        EnvironmentFingerprint env = platform.captureFingerprint();
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                String.format(Locale.ROOT, "HeapHammer v%s (Minecraft %s / %s)",
+                        env.heapHammerVersion(), env.minecraftVersion(), env.loaderVersion()))
                 .withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
@@ -289,7 +294,7 @@ public class HeapHammerCommands {
                 "HeapHammer Capabilities:\n" +
                 "- Scenario: chunks (v1.0)\n" +
                 "- JVM Max Memory: " + maxMb + " MB (Allocated: " + totalMb + " MB)\n" +
-                "- Platform: Fabric (Server-side only)\n" +
+                "- Platform: " + platform.captureFingerprint().loaderVersion() + " (Server-side only)\n" +
                 "- Ticket Type: heaphammer (distance 1)"
         ).withStyle(ChatFormatting.GREEN), false);
         return 1;
@@ -677,6 +682,8 @@ public class HeapHammerCommands {
                 String summary = reportService.formatSummary(repOpt.get());
                 ctx.getSource().sendSuccess(() -> Component.literal(summary).withStyle(ChatFormatting.YELLOW), false);
             }
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(Component.literal(e.getMessage()));
         } catch (IOException e) {
             ctx.getSource().sendFailure(Component.literal("Error loading report: " + e.getMessage()));
         }

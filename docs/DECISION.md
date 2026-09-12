@@ -26,21 +26,26 @@ This document records the foundational architectural decisions for HeapHammer, d
 
 ---
 
-## ADR-003: Multi-Version Git Branching with Automated PR Sync
+## ADR-003: Dual-Axis Branching Strategy: Production Master & Historical LTS Branches
 
 - **Status**: Accepted & Active
-- **Context**: HeapHammer targets 5 distinct Minecraft eras: `1.21.1` (Trunk), `1.20.1`, `1.18.2`, `1.16.5`, and `1.12.2-forge`. An omni-jar is impossible due to incompatible bytecode targets (Java 21 vs Java 8).
-- **Decision**: Maintain dedicated release branches (`ver/<version>`) alongside `master`. An automated GitHub Actions workflow merges `master` down on every commit. If clean, it pushes automatically; if conflicts arise, it opens an automated PR labeled `needs-version-adaptation`.
+- **Context**: HeapHammer must support both modern production Minecraft (`1.21.1`) and major historical modding eras (`1.20.1`, `1.18.2`, `1.16.5`, and `1.12.2-forge`). Simultaneously, HeapHammer mod releases require stability without branch sprawl. Bytecode and runtime incompatibilities (Java 21 down to Java 8) prevent an omni-jar.
+- **Decision**: 
+  1. **Production Trunk (`master`)**: `master` directly hosts the latest production release of HeapHammer and targets Minecraft `1.21.1` (Java 21). We do not maintain a redundant `ver/1.21.1` branch.
+  2. **Historical LTS Minecraft Branches**: Maintain dedicated downstream branches (`ver/<version>`) **strictly for historical versions that are LTS or actively supported** (`ver/1.20.1`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`). Non-LTS intermediate versions do not receive branches.
+  3. **Historical Mod Release Branches**: Dedicated maintenance branches are kept only for mod release lines officially designated as LTS; EOL releases are archived as Git tags.
+  4. **Automated Upstream-to-Downstream Sync**: An automated GitHub Actions workflow merges `master` down to the 4 historical LTS branches on every push. If clean, it pushes automatically; if conflicts arise, it opens an automated PR labeled `needs-version-adaptation`.
 - **Consequences**:
-  - *Positive*: Zero manual overhead for syncing core improvements down to older Minecraft versions.
-  - *Negative*: Multiple remote Git branches to maintain.
+  - *Positive*: Zero duplication between `master` and modern 1.21.1. Clear boundaries on which historical versions are supported. Automated synchronization of core domain improvements down to older Minecraft versions.
+  - *Negative*: Four historical LTS Git branches must be maintained and synchronized.
 
 ---
 
 ## ADR-004: Dynamic Jenkins JDK Toolchain Resolution
 
-- **Status**: Accepted & Active
-- **Context**: Multibranch Jenkins pipelines must build branches targeting Java 21 (`master`, `ver/1.21.1`), Java 17 (`ver/1.20.1`, `ver/1.18.2`), and Java 8 (`ver/1.16.5`, `ver/1.12.2-forge`).
+- **Status**: Superseded (v1.0.2) — Jenkins pipeline removed; GitHub Actions `ci.yml` performs the same `java_version`-from-`gradle.properties` JDK resolution.
+- **Original Status**: Accepted & Active
+- **Context**: Multibranch Jenkins pipelines must build branches targeting Java 21 (`master`), Java 17 (`ver/1.20.1`, `ver/1.18.2`), and Java 8 (`ver/1.16.5`, `ver/1.12.2-forge`).
 - **Decision**: Dynamically inspect `gradle.properties` (`java_version`) at pipeline startup, map the target version to configured Jenkins JDK Tools (`JDK21`, `JDK17`, `JDK8`), and bind the selected tool to `PATH` and `JAVA_HOME`.
 - **Consequences**:
   - *Positive*: Single declarative `Jenkinsfile` runs universally across all version branches.

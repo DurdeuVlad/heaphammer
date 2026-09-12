@@ -11,7 +11,7 @@ HeapHammer is a **deterministic server workload and retained-memory regression f
 - **Hexagonal Architecture (Ports & Adapters)**:
   - The core domain (`domain`, `scenario`, `detection`, `reporting`, `storage`, `infrastructure`) is **100% pure Java** with **zero** Minecraft (`net.minecraft.*`) or mod loader imports.
   - All game interactions pass through explicit port interfaces in `com.dwurdy.heaphammer.platform` (`PlatformAdapter`, `ChunkTicketManager`).
-  - This guarantees binary portability across all 5 supported Minecraft version branches (`master` / `1.21.1`, `1.20.1`, `1.18.2`, `1.16.5`, `1.12.2-forge`).
+  - This guarantees binary portability across all 14 supported Minecraft version branches (`master` / `1.21.1` + `ver/1.21.4` … `ver/1.14.4`, `ver/1.12.2-forge`, `ver/1.7.10-forge`).
 
 ---
 
@@ -49,6 +49,14 @@ HeapHammer is a **deterministic server workload and retained-memory regression f
 7. **Cross-Version Java Compatibility**:
    - Shared domain code must remain compatible with Java 17 and Java 8 backports.
    - Isolate loader-specific code inside `platform.fabric` or `platform.forge`.
+   - **Nested Loader Builds (`loaders/`)**: Real loader implementations (`net.neoforged.*`, `net.minecraftforge.*` imports, `@Mod` entrypoints, `neoforge.mods.toml`/`mods.toml`) live exclusively in `loaders/<loader>/src/` — independent Gradle projects that compile `../src` minus foreign-loader packages. `src/main/java` must **never** import `net.neoforged.*` or `net.minecraftforge.*`; shared `platform/neoforge` and `platform/forge` classes stay pure-Java or reflection-only so they compile under every toolchain.
+   - Modern loaders build with [ModDevGradle](https://github.com/neoforged/ModDevGradle): `net.neoforged.moddev` for NeoForge (MC ≥ 1.20.2), `net.neoforged.moddev.legacyforge` for MinecraftForge 1.17–1.20.1. MC 1.16.5 Forge uses ForgeGradle; 1.12.2/1.7.10 use RetroFuturaGradle as the root build. See [docs/BUILD_TARGETS.md](docs/BUILD_TARGETS.md) for the full matrix.
+   - Per-branch loader pins live in `loaders/<loader>/gradle.properties`; nested builds read `mod_version`/`maven_group`/`archives_base_name` from the root `gradle.properties` (overridable via `-P`).
+   - Nested builds run automatically: `ci.yml`, `release.yml`, `sync-version-branches.yml`, and `tools/*.ps1` discover `loaders/*/settings.gradle` dynamically — adding a loader needs no workflow edits. On branches where a loader cannot exist, delete its `loaders/<loader>/` dir in the adaptation PR.
+   - Forge 1.12.2 and 1.7.10 branches use [RetroFuturaGradle](https://github.com/GTNewHorizons/RetroFuturaGradle) 1.4.9 with Gradle 8.8.
+   - Forge branches use [Jabel](https://github.com/bsideup/jabel) 0.4.2 to compile Java 17 records down to Java 8 bytecode (`@Desugar` annotation required on all record types).
+   - Java 9+ APIs (`List.of()`, `Map.of()`, `String.isBlank()`, `Stream.toList()`, `Optional.isEmpty()`, `Files.writeString/readString`, `CompletableFuture.failedFuture`) must be replaced with Java 8 equivalents on Forge branches.
+   - Live server verification: `powershell -ExecutionPolicy Bypass -File tools/verify-live-server-commands.ps1`
 
 ---
 
@@ -115,7 +123,7 @@ When drafting an issue or milestone task for agent or contributor handoff, follo
 - **Never Discard Uncommitted Changes**: Never run `git reset --hard`, `git clean -fd`, or discard uncommitted changes in the primary checkout without explicit authorization.
 - **No Direct Pushes to `master` or Release Branches**:
   - `master` and release branches (`release/v*`) are protected trunks. AI agents must **never** push directly to `master`.
-  - Always work on dedicated branches (`feat/<name>`, `fix/<issue>-<name>`) targeting the active release line (`release/v1.1.0`) or `master`.
+  - Always work on dedicated branches (`feat/<name>`, `fix/<issue>-<name>`) targeting `master` or the active release line (`release/v1.0.0`).
   - Run verification (`./gradlew test`) and prepare the branch/PR for human review.
 - **Conventional Commits**: Format commit messages as `<type>(<scope>): <subject>` (e.g., `fix(platform): release chunk tickets cleanly on emergency abort`).
 
