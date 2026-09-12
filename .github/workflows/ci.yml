@@ -26,9 +26,17 @@ jobs:
       - name: Resolve Target Java Version
         id: java_target
         run: |
-          TARGET_JAVA=$(grep '^java_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
-          echo "version=${TARGET_JAVA:-21}" >> $GITHUB_OUTPUT
-          echo "Target Java version: ${TARGET_JAVA:-21}"
+          TARGET_JAVA=$(grep '^java_version=' gradle.properties | cut -d'=' -f2 | tr -d \r\n')
+          # java_version is the bytecode target (--release). Loom and MDG both
+          # require running Gradle itself on JDK 21+, so the runner JVM differs
+          # from the target on branches like 1.20.1 (java_version=17).
+          if grep -qE '^(loom_version|mdg_version)=' gradle.properties; then
+            RUNNER_JAVA=21
+          else
+            RUNNER_JAVA=${TARGET_JAVA:-21}
+          fi
+          echo "version=${RUNNER_JAVA}" >> $GITHUB_OUTPUT
+          echo "Bytecode target: ${TARGET_JAVA:-21} — Gradle runner JDK: ${RUNNER_JAVA}"
 
       - name: Set up JDK
         uses: actions/setup-java@v4
