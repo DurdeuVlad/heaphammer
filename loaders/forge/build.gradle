@@ -56,6 +56,9 @@ sourceSets {
 			exclude 'com/dwurdy/heaphammer/HeapHammer.java'
 			exclude 'com/dwurdy/heaphammer/mixin/**'
 			exclude 'com/dwurdy/heaphammer/platform/fabric/**'
+			// CommandPermissions is Mojmap-only and the 1.16.5 Forge
+			// toolchain does not expose CommandSourceStack.
+			exclude 'com/dwurdy/heaphammer/command/CommandPermissions.java'
 			// FG 1.16.5 'official' mappings rename members only — class names stay
 			// SRG (ForgeGradle#795), so the shared Mojmap-named command tree cannot
 			// compile here. ForgeHeapHammerCommands is the SRG-named equivalent.
