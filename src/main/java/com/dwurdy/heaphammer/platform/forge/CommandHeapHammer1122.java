@@ -3,6 +3,7 @@ package com.dwurdy.heaphammer.platform.forge;
 import com.dwurdy.heaphammer.application.ExperimentService;
 import com.dwurdy.heaphammer.application.ReplayService;
 import com.dwurdy.heaphammer.command.argument.FlagParser;
+import com.dwurdy.heaphammer.detection.TrendAnalyzer;
 import com.dwurdy.heaphammer.domain.*;
 import com.dwurdy.heaphammer.domain.Checkpoint;
 import com.dwurdy.heaphammer.domain.CheckpointPhase;
@@ -42,6 +43,7 @@ public class CommandHeapHammer1122 extends CommandBase {
     private final ChunkWorkloadPlanner chunkPlanner;
     private final EntityScenarioPlanner entityPlanner;
     private final BlockEntityScenarioPlanner blockEntityPlanner;
+    private final TrendAnalyzer trendAnalyzer;
 
     public CommandHeapHammer1122(
             PlatformAdapter platform,
@@ -60,6 +62,15 @@ public class CommandHeapHammer1122 extends CommandBase {
         this.chunkPlanner = new ChunkWorkloadPlanner();
         this.entityPlanner = new EntityScenarioPlanner();
         this.blockEntityPlanner = new BlockEntityScenarioPlanner();
+        this.trendAnalyzer = new TrendAnalyzer();
+
+        experimentService.setCheckpointListener((phase, iteration) -> {
+            Optional<ScenarioExecutor> active = experimentService.getActiveExecutor();
+            String dimension = active.isPresent() ? active.get().getPlan().spec().dimension() : "minecraft:overworld";
+            boolean explicitGc = active.isPresent() && active.get().getPlan().spec().explicitGc();
+            checkpointService.recordCheckpoint(phase, iteration, dimension, explicitGc);
+        });
+        experimentService.setCompletionListener(this::onExperimentFinished);
     }
 
     @Override
@@ -460,20 +471,9 @@ public class CommandHeapHammer1122 extends CommandBase {
 
             checkpointService.clear();
             planStorage.savePlan(plan);
+            checkpointService.configure(plan.spec(), platform);
             experimentService.start(plan);
             send(sender, "Started Experiment: " + plan.id() + " (" + spec.iterations() + " cycles, radius " + spec.radius() + ")");
-
-            // Wait for completion (synchronous for 1.12.2 command dispatch)
-            ScenarioExecutor executor = experimentService.getActiveExecutor().orElse(null);
-            if (executor != null) {
-                int waitMs = 0;
-                while (executor.getStateMachine().getState().isActive() && waitMs < 30000) {
-                    Thread.sleep(200);
-                    waitMs += 200;
-                }
-            }
-
-            send(sender, "Report saved successfully: " + getLatestReportPath());
         } catch (IllegalArgumentException e) {
             send(sender, "Â§cInvalid parameter: " + e.getMessage());
         } catch (Exception e) {
@@ -491,6 +491,35 @@ public class CommandHeapHammer1122 extends CommandBase {
         } catch (IOException ignored) {
         }
         return "run/heaphammer/reports/latest.json";
+    }
+
+    private void onExperimentFinished(ScenarioExecutor executor) {
+        ExperimentPlan plan = executor.getPlan();
+        EnvironmentFingerprint environment = platform.captureFingerprint();
+        checkpointService.awaitDiagnostics().thenAccept(evidence -> {
+            List<Checkpoint> checkpoints = checkpointService.getCheckpoints();
+            DetectionResult detection = trendAnalyzer.analyze(plan.spec(), checkpoints, evidence);
+            ExperimentReport report = new ExperimentReport(
+                    plan.id(),
+                    plan.createdAtEpochMs(),
+                    System.currentTimeMillis(),
+                    executor.getStateMachine().getState().name(),
+                    plan.spec(),
+                    environment,
+                    checkpoints,
+                    detection,
+                    DiagnosticRefs.EMPTY,
+                    evidence,
+                    ReportService.buildCanonicalCommand(plan.spec()),
+                    evidence.warnings()
+            );
+            try {
+                Path path = reportService.saveReport(report);
+                LOGGER.info("Report saved successfully: {}", path.toAbsolutePath());
+            } catch (IOException e) {
+                LOGGER.error("Failed to save experiment report", e);
+            }
+        });
     }
 
     private void handleReport(ICommandSender sender, String[] args) {
