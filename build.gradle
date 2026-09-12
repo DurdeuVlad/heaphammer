@@ -73,6 +73,12 @@ sourceSets {
             srcDirs = ['src/test/resources']
         }
     }
+    testmodForge1710 {
+        java.srcDirs = ['testmods/leak-forge1710/src/main/java']
+        resources.srcDirs = ['testmods/leak-forge1710/src/main/resources']
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath.filter { !it.name.contains('jabel') }
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
 }
 
 dependencies {
@@ -116,6 +122,24 @@ processResources {
 // Stub task for Jenkins pipeline compatibility across version branches
 task buildTestmods {
     description = 'Stub task for testmod packaging on Forge 1.7.10 branch'
+}
+
+task jarForge1710(type: Jar) {
+    dependsOn tasks.named('testmodForge1710Classes')
+    archiveBaseName = 'testmod-leak-forge1710'
+    archiveVersion = '1.0.0'
+    destinationDirectory = file('build/testmods')
+    from sourceSets.testmodForge1710.output
+}
+
+tasks.named('compileTestmodForge1710Java') {
+    options.annotationProcessorPath = files()
+    options.release = 8
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('buildTestmods') {
+    dependsOn tasks.named('jarForge1710')
 }
 
 // RFG's patched MC and launcher sources require Java 8 (package-private access)
