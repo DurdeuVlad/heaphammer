@@ -1,0 +1,10 @@
+# HeapHammer Code Owners
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default global code owner for all files across branches
+*       @DurdeuVlad
+
+# Core domain, platform adapters, and workflows
+/src/   @DurdeuVlad
+/.github/ @DurdeuVlad
+/docs/  @DurdeuVlad

@@ -11,8 +11,8 @@ body:
     id: version
     attributes:
       label: "HeapHammer Version"
-      description: "Which version of HeapHammer are you running? (e.g. 1.0.0-alpha.1)"
-      placeholder: "1.0.0-alpha.1"
+      description: "Which version of HeapHammer are you running? (e.g. 1.0.0)"
+      placeholder: "1.0.0"
     validations:
       required: true
   - type: dropdown
@@ -20,9 +20,31 @@ body:
     attributes:
       label: "Minecraft Version"
       options:
-        - "1.21.1"
-        - "1.21.0"
+        - "1.21.4"
+        - "1.21.1 (Production Trunk)"
+        - "1.20.6"
         - "1.20.4"
+        - "1.20.1 (Modern LTS Gold Standard)"
+        - "1.19.4"
+        - "1.19.2 (Modern LTS Bridge)"
+        - "1.18.2 (World-Gen Overhaul LTS)"
+        - "1.17.1"
+        - "1.16.5 (Nether Legacy LTS)"
+        - "1.15.2"
+        - "1.14.4"
+        - "1.12.2 (Classic Titan Forge LTS)"
+        - "1.7.10 (Golden Age Titan Forge LTS)"
+        - "Other"
+    validations:
+      required: true
+  - type: dropdown
+    id: loader
+    attributes:
+      label: "Mod Loader"
+      options:
+        - "Fabric"
+        - "NeoForge"
+        - "Forge"
         - "Other"
     validations:
       required: true
@@ -30,8 +52,8 @@ body:
     id: environment
     attributes:
       label: "Environment Details"
-      description: "Fabric Loader version, Java version, and server type (Dedicated vs Integrated/Singleplayer)"
-      placeholder: "Fabric Loader 0.19.5, OpenJDK 21, Dedicated Linux Server"
+      description: "Loader version, Java version, and server type (Dedicated vs Integrated/Singleplayer)"
+      placeholder: "NeoForge 21.1.248, OpenJDK 21, Dedicated Linux Server"
     validations:
       required: true
   - type: textarea

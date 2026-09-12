@@ -3,6 +3,7 @@ package com.dwurdy.heaphammer.scenario.entities;
 import com.dwurdy.heaphammer.domain.ExperimentId;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
+import com.dwurdy.heaphammer.domain.EntityWorkloadProfile;
 
 import java.util.*;
 
@@ -75,8 +76,27 @@ public class EntityScenarioPlanner {
                         typeId,
                         ResolvedEntityOperation.ACTION_SPAWN,
                         spec.holdTicks(),
-                        removeMode
+                        removeMode,
+                        spec.entityProfile()
                 ));
+            }
+
+            if (spec.entityProfile() != EntityWorkloadProfile.TRANSIENT) {
+                for (int b = 0; b < spec.batchSize(); b++) {
+                    operations.add(new ResolvedEntityOperation(
+                            iter,
+                            stepIndex++,
+                            spec.dimension(),
+                            spec.centerX() + b,
+                            64.0,
+                            spec.centerZ(),
+                            "ANY",
+                            ResolvedEntityOperation.ACTION_CYCLE_CHUNK,
+                            0,
+                            removeMode,
+                            spec.entityProfile()
+                    ));
+                }
             }
 
             // Phase 2: Remove batch
@@ -91,7 +111,8 @@ public class EntityScenarioPlanner {
                         "ANY",
                         ResolvedEntityOperation.ACTION_REMOVE,
                         0,
-                        removeMode
+                        removeMode,
+                        spec.entityProfile()
                 ));
             }
         }

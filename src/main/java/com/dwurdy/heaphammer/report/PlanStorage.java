@@ -25,14 +25,20 @@ public class PlanStorage {
     }
 
     public Path savePlan(ExperimentPlan plan) throws IOException {
-        Path target = rootDir.resolve(plan.id().value() + ".json");
+        Path target = rootDir.resolve(plan.id().value() + ".json").normalize();
+        if (!target.startsWith(rootDir.normalize())) {
+            throw new SecurityException("Path traversal attempt detected in plan ID: " + plan.id());
+        }
         String json = GsonCodec.toJson(plan);
         FileStorage.writeStringAtomic(target, json);
         return target;
     }
 
     public Optional<ExperimentPlan> loadPlan(ExperimentId id) throws IOException {
-        Path target = rootDir.resolve(id.value() + ".json");
+        Path target = rootDir.resolve(id.value() + ".json").normalize();
+        if (!target.startsWith(rootDir.normalize())) {
+            throw new SecurityException("Path traversal attempt detected in plan ID: " + id);
+        }
         if (!Files.exists(target)) {
             return Optional.empty();
         }

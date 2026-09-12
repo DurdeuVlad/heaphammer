@@ -8,12 +8,14 @@ The HeapHammer maintainers take security, memory safety, and server denial-of-se
 
 HeapHammer provides active security updates and patch releases for the following versions:
 
-| Version | Minecraft Version | Support Status |
-|---|---|---|
-| `1.0.x` | `1.21.1` | :white_check_mark: Actively Supported |
-| `1.0.x` | `1.21.0` | :white_check_mark: Maintained |
-| `1.0.x` | `1.20.4` | :warning: Critical Security Only |
-| `< 1.0.0` | Pre-release | :x: End of Life |
+| Mod Version | Minecraft Version | Git Branch / Line | Support Status |
+|---|---|---|---|
+| `1.0.x` | `1.21.1` | `master` | :white_check_mark: Active Production |
+| `1.0.x` | `1.20.1` | `ver/1.20.1` | :white_check_mark: Modern LTS Gold Standard |
+| `1.0.x` | `1.18.2` | `ver/1.18.2` | :white_check_mark: World-Gen Overhaul LTS |
+| `1.0.x` | `1.16.5` | `ver/1.16.5` | :white_check_mark: Nether Legacy LTS |
+| `1.0.x` | `1.12.2` | `ver/1.12.2-forge` | :white_check_mark: Classic Titan LTS |
+| `< 1.0.0` | Any | Pre-release | :x: End of Life |
 
 ---
 

@@ -1,19 +1,16 @@
-# Minecraft 1.12.2 Forge Bridge Architecture Specification
+# Minecraft 1.12.2 Forge Bridge Specification
 
-Minecraft 1.12.2 is the most played classic modpack version in the history of modded Minecraft (powering iconic mega-packs such as *GregTech: New Horizons*, *SevTech: Ages*, and *Enigmatica 2: Expert*).
-
-Because Minecraft 1.12.2 predates the Fabric Loader and modern Mojang mappings, HeapHammer interfaces with 1.12.2 via a dedicated **Forge Platform Adapter**.
+Minecraft 1.12.2 remains the classic standard for complex technical mega-packs (*GregTech: New Horizons*, *SevTech: Ages*, *Enigmatica 2*). Because 1.12.2 predates Fabric Loader and modern Mojmap naming, HeapHammer interfaces with it through an isolated **Forge Platform Adapter**.
 
 ---
 
 ## 1. Architectural Boundary
 
-HeapHammer's Hexagonal Architecture guarantees that the domain layer does not change:
+Hexagonal architecture guarantees that core domain logic remains 100% shared:
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│          SHARED PORTABLE DOMAIN (100% Shared Logic)         │
-│                                                             │
+│          SHARED PORTABLE DOMAIN (100% Pure Java)            │
 │   • ExperimentPlan / ExperimentStateMachine                 │
 │   • ChunkScenarioGenerator (Spiral, Ring, Hotspot)          │
 │   • OrdinaryLeastSquares / TrendDetectionEngine             │
@@ -23,33 +20,31 @@ HeapHammer's Hexagonal Architecture guarantees that the domain layer does not ch
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │             ForgePlatformAdapter (1.12.2 Implementation)    │
-│                                                             │
-│   • Event Bus: @SubscribeEvent on FML Lifecycle / Forge Bus │
+│   • Lifecycle: @Mod and @SubscribeEvent on MinecraftForge Bus│
 │   • Chunk Tickets: net.minecraftforge.common.ForgeChunkManager
-│   • Entity Lifecycle: EntityJoinWorldEvent                  │
 │   • Command Dispatcher: CommandBase ("hh")                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Platform Subsystem Mapping Table
+## 2. Platform Subsystem Mapping
 
-| Subsystem | Modern Fabric (1.20–1.21) | Classic MinecraftForge (1.12.2) |
+| Subsystem | Modern Fabric (1.20–1.21) | Classic Forge (1.12.2) |
 |---|---|---|
-| **Mod Initialization** | `net.fabricmc.api.ModInitializer` | `@Mod(modid = "heaphammer", version = "...")` |
-| **Server Ticks** | `ServerTickEvents.END_SERVER_TICK` | `@SubscribeEvent public void onTick(TickEvent.ServerTickEvent e)` |
+| **Initialization** | `ModInitializer` | `@Mod(modid = "heaphammer")` |
+| **Server Ticks** | `ServerTickEvents.END_SERVER_TICK` | `@SubscribeEvent public void onTick(ServerTickEvent e)` |
 | **Chunk Tickets** | `TicketType<ChunkPos>` | `ForgeChunkManager.requestTicket` / `forceChunk` |
-| **Ticket Release** | `serverLevel.getChunkSource().removeRegionTicket` | `ForgeChunkManager.releaseTicket(ticket)` |
+| **Ticket Release** | `removeRegionTicket` | `ForgeChunkManager.releaseTicket(ticket)` |
 | **Command System** | Brigadier (`LiteralArgumentBuilder`) | `net.minecraft.command.CommandBase` |
 | **Registries** | `BuiltInRegistries.BLOCK` | `GameRegistry.findRegistry(Block.class)` |
-| **JVM Target** | Java 17 / 21 | Java 8 (or CleanroomMC Java 17/21 backport) |
+| **JVM Target** | Java 17 / 21 | Java 8 (or CleanroomMC Java 17/21) |
 
 ---
 
 ## 3. Forge Chunk Ticket Adapter Pattern
 
-In Minecraft 1.12.2, chunk tickets are registered per-mod through `ForgeChunkManager`:
+Chunk tickets are managed safely per-mod via `ForgeChunkManager`:
 
 ```java
 package com.dwurdy.heaphammer.platform.forge;
@@ -64,9 +59,6 @@ import net.minecraftforge.common.ForgeChunkManager.Type;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 1.12.2 Forge implementation of ChunkTicketManager using ForgeChunkManager.
- */
 public class ForgeChunkTicketManager implements ChunkTicketManager {
     private final Object modInstance;
     private final Map<ChunkPos, Ticket> activeTickets = new ConcurrentHashMap<>();
@@ -118,9 +110,8 @@ public class ForgeChunkTicketManager implements ChunkTicketManager {
 
 ---
 
-## 4. Build Tooling Strategy for 1.12.2
+## 4. Build Tooling Strategy
 
-For building 1.12.2 Forge:
-1. **CleanroomMC Loom** or **ForgeGradle 2.3**: Modern Gradle-compatible plugins capable of compiling 1.12.2 Forge without legacy Gradle 4 incompatibilities.
-2. **Dedicated Branch**: `ver/1.12.2-forge` branch maintaining the ForgeGradle/Loom configuration and `ForgePlatformAdapter`.
-3. **Jenkins Matrix Pipeline**: Detected automatically via `Jenkinsfile` binding `JDK8`.
+1. **Gradle Tooling**: Uses CleanroomMC Loom or ForgeGradle 2.3 for modern Gradle daemon compatibility.
+2. **Dedicated Branch**: `ver/1.12.2-forge` maintains the Forge adapter and build script.
+3. **CI Integration**: Built by GitHub Actions on JDK 17 (`ci.yml` resolves `java_version` from `gradle.properties`).

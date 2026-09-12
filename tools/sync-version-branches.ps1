@@ -2,7 +2,12 @@
 # Local companion script to synchronize master into version branches and verify tests
 
 param (
-    [string[]]$TargetBranches = @("ver/1.21.1", "ver/1.20.1", "ver/1.18.2", "ver/1.16.5", "ver/1.12.2-forge"),
+    [string[]]$TargetBranches = @(
+        "ver/1.21.4", "ver/1.20.6", "ver/1.20.4", "ver/1.20.1",
+        "ver/1.19.4", "ver/1.19.2", "ver/1.18.2", "ver/1.17.1",
+        "ver/1.16.5", "ver/1.15.2", "ver/1.14.4",
+        "ver/1.12.2-forge", "ver/1.7.10-forge"
+    ),
     [switch]$Push,
     [switch]$DryRun
 )
@@ -100,14 +105,35 @@ try {
         # Run verification tests
         Write-Host "  Running test suite verification on $branch..." -ForegroundColor Cyan
         ./gradlew test --no-daemon
-        if ($LASTEXITCODE -ne 0) {
+        $testsOk = ($LASTEXITCODE -eq 0)
+
+        # Nested loader builds are part of the branch's verified surface
+        if ($testsOk -and (Test-Path "$WorkspaceRoot/loaders")) {
+            Get-ChildItem "$WorkspaceRoot/loaders" -Directory | ForEach-Object {
+                if ($testsOk -and (Test-Path "$($_.FullName)/settings.gradle")) {
+                    Write-Host "  Running nested loader tests: loaders/$($_.Name)..." -ForegroundColor Cyan
+                    Push-Location $_.FullName
+                    try {
+                        # Prefer a nested wrapper when present — ForgeGradle (1.16.5)
+                        # requires Gradle 8.x while the repo-root wrapper is Gradle 9.
+                        $gradlew = if (Test-Path "$($_.FullName)/gradlew.bat") { "$($_.FullName)/gradlew.bat" } else { "$WorkspaceRoot/gradlew.bat" }
+                        & $gradlew test --no-daemon
+                        if ($LASTEXITCODE -ne 0) { $testsOk = $false }
+                    } finally {
+                        Pop-Location
+                    }
+                }
+            }
+        }
+
+        if (-not $testsOk) {
             Write-Warning "  Test suite failed on $branch after merge!"
             git reset --hard HEAD~1
             Write-Warning "  Rolled back merge on $branch due to test failures."
             continue
         }
 
-        Write-Host "  [SUCCESS] $branch cleanly merged and verified with ./gradlew test!" -ForegroundColor Green
+        Write-Host "  [SUCCESS] $branch cleanly merged and verified (root + nested loaders)!" -ForegroundColor Green
 
         if ($Push) {
             Write-Host "  Pushing $branch to remote origin..." -ForegroundColor Yellow

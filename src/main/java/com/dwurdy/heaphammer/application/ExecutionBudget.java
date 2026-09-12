@@ -12,8 +12,14 @@ public class ExecutionBudget {
     public ExecutionBudget(int maxOperationsPerTick, long maxMillisPerTick) {
         if (maxOperationsPerTick <= 0) throw new IllegalArgumentException("maxOperationsPerTick must be > 0");
         if (maxMillisPerTick <= 0) throw new IllegalArgumentException("maxMillisPerTick must be > 0");
-        this.maxOperationsPerTick = maxOperationsPerTick;
-        this.maxNanosPerTick = maxMillisPerTick * 1_000_000L;
+
+        com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig config =
+                com.dwurdy.heaphammer.infrastructure.config.ConfigManager.getActiveConfig();
+        int maxOpsCeiling = config != null ? config.getMaxOperationsPerTick() : 50;
+        long maxMsCeiling = config != null ? config.getMaxMillisPerTick() : 35;
+
+        this.maxOperationsPerTick = Math.min(maxOpsCeiling, maxOperationsPerTick);
+        this.maxNanosPerTick = Math.min(maxMsCeiling, maxMillisPerTick) * 1_000_000L;
     }
 
     public void startTick() {

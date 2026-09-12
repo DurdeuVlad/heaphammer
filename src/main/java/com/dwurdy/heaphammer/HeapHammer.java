@@ -38,8 +38,26 @@ public class HeapHammer implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Initializing HeapHammer (com.dwurdy.heaphammer)...");
 
+		// Load or generate configuration from config/heaphammer.json
+		com.dwurdy.heaphammer.infrastructure.config.ConfigManager.load(
+				java.nio.file.Paths.get(com.dwurdy.heaphammer.infrastructure.config.HeapHammerConfig.DEFAULT_CONFIG_PATH)
+		);
+
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
 			currentServer = server;
+		});
+
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			if (experimentService != null && platform != null) {
+				boolean autoCleanup = com.dwurdy.heaphammer.infrastructure.config.ConfigManager.getActiveConfig().isAutoCleanupOnStartup();
+				if (autoCleanup || experimentService.getRecoveryJournal().hasInterruptedRun()) {
+					LOGGER.info("Executing startup failure recovery and orphaned test state sweep...");
+					int cleaned = experimentService.getRecoveryJournal().recoverIfInterrupted(platform);
+					if (cleaned > 0) {
+						LOGGER.info("Startup recovery successfully cleaned up {} leftover test objects.", cleaned);
+					}
+				}
+			}
 		});
 
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
