@@ -29,7 +29,14 @@ public record ExperimentSpec(
         boolean explicitGc,
         double coverage,
         List<String> includeMods,
-        List<String> excludeMods
+        List<String> excludeMods,
+        EntityWorkloadProfile entityProfile,
+        int loginsPerCycle,
+        List<PlayerAction> playerActions,
+        long durationSeconds,
+        long intervalSeconds,
+        List<DiagnosticCollector> diagnosticCollectors,
+        List<String> trackedClasses
 ) {
     public static final String DEFAULT_DIMENSION = "minecraft:overworld";
     public static final String DEFAULT_STRATEGY = "SPIRAL";
@@ -91,6 +98,9 @@ public record ExperimentSpec(
         if (coverage <= 0.0 || coverage > 1.0) coverage = 1.0;
         includeMods = (includeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(includeMods));
         excludeMods = (excludeMods == null) ? List.of() : Collections.unmodifiableList(List.copyOf(excludeMods));
+        playerActions = (playerActions == null) ? List.of(PlayerAction.JOIN, PlayerAction.QUIT) : Collections.unmodifiableList(List.copyOf(playerActions));
+        diagnosticCollectors = (diagnosticCollectors == null) ? List.of() : Collections.unmodifiableList(List.copyOf(diagnosticCollectors));
+        trackedClasses = (trackedClasses == null) ? List.of() : Collections.unmodifiableList(List.copyOf(trackedClasses));
     }
 
     public ExperimentSpec(
@@ -112,7 +122,9 @@ public record ExperimentSpec(
     ) {
         this(scenarioId, seed, dimension, centerX, centerZ, radius, iterations, batchSize,
                 strategy, warmupIterations, holdTicks, settleTicks, maxOperationsPerTick,
-                maxMillisPerTick, explicitGc, 1.0, List.of(), List.of());
+                maxMillisPerTick, explicitGc, 1.0, List.of(), List.of(),
+                EntityWorkloadProfile.TRANSIENT, batchSize, List.of(PlayerAction.JOIN, PlayerAction.QUIT),
+                0L, 0L, List.of(), List.of());
     }
 
     public static Builder builder() {
@@ -138,6 +150,13 @@ public record ExperimentSpec(
         private double coverage = 1.0;
         private List<String> includeMods = new ArrayList<>();
         private List<String> excludeMods = new ArrayList<>();
+        private EntityWorkloadProfile entityProfile = EntityWorkloadProfile.TRANSIENT;
+        private int loginsPerCycle = 1;
+        private List<PlayerAction> playerActions = new ArrayList<>(List.of(PlayerAction.JOIN, PlayerAction.QUIT));
+        private long durationSeconds = 0L;
+        private long intervalSeconds = 0L;
+        private List<DiagnosticCollector> diagnosticCollectors = new ArrayList<>();
+        private List<String> trackedClasses = new ArrayList<>();
 
         public Builder scenarioId(ScenarioId scenarioId) { this.scenarioId = scenarioId; return this; }
         public Builder seed(long seed) { this.seed = seed; return this; }
@@ -158,13 +177,26 @@ public record ExperimentSpec(
         public Builder coverage(double coverage) { this.coverage = coverage; return this; }
         public Builder includeMods(List<String> includeMods) { this.includeMods = (includeMods == null) ? new ArrayList<>() : new ArrayList<>(includeMods); return this; }
         public Builder excludeMods(List<String> excludeMods) { this.excludeMods = (excludeMods == null) ? new ArrayList<>() : new ArrayList<>(excludeMods); return this; }
+        public Builder entityProfile(EntityWorkloadProfile profile) { this.entityProfile = profile; return this; }
+        public Builder loginsPerCycle(int loginsPerCycle) { this.loginsPerCycle = loginsPerCycle; return this; }
+        public Builder playerActions(List<PlayerAction> actions) { this.playerActions = (actions == null) ? new ArrayList<>() : new ArrayList<>(actions); return this; }
+        public Builder durationSeconds(long durationSeconds) { this.durationSeconds = durationSeconds; return this; }
+        public Builder intervalSeconds(long intervalSeconds) { this.intervalSeconds = intervalSeconds; return this; }
+        public Builder diagnosticCollectors(List<DiagnosticCollector> collectors) { this.diagnosticCollectors = (collectors == null) ? new ArrayList<>() : new ArrayList<>(collectors); return this; }
+        public Builder trackedClasses(List<String> classes) { this.trackedClasses = (classes == null) ? new ArrayList<>() : new ArrayList<>(classes); return this; }
 
         public ExperimentSpec build() {
             return new ExperimentSpec(
                     scenarioId, seed, dimension, centerX, centerZ, radius, iterations, batchSize,
                     strategy, warmupIterations, holdTicks, settleTicks, maxOperationsPerTick,
-                    maxMillisPerTick, explicitGc, coverage, includeMods, excludeMods
+                    maxMillisPerTick, explicitGc, coverage, includeMods, excludeMods,
+                    entityProfile, loginsPerCycle, playerActions, durationSeconds, intervalSeconds,
+                    diagnosticCollectors, trackedClasses
             );
         }
+    }
+
+    public boolean isSoak() {
+        return durationSeconds > 0L;
     }
 }

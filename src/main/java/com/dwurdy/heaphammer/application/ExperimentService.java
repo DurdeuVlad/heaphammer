@@ -3,11 +3,15 @@ package com.dwurdy.heaphammer.application;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.domain.ExperimentState;
 import com.dwurdy.heaphammer.domain.ScenarioId;
+import com.dwurdy.heaphammer.domain.EntityWorkloadProfile;
+import com.dwurdy.heaphammer.domain.PlatformCapability;
 import com.dwurdy.heaphammer.platform.PlatformAdapter;
 import com.dwurdy.heaphammer.scenario.ScenarioExecutor;
 import com.dwurdy.heaphammer.scenario.blockentities.BlockEntityScenarioExecutor;
 import com.dwurdy.heaphammer.scenario.chunks.ChunkScenarioExecutor;
 import com.dwurdy.heaphammer.scenario.entities.EntityScenarioExecutor;
+import com.dwurdy.heaphammer.scenario.players.PlayerScenarioExecutor;
+import com.dwurdy.heaphammer.scenario.soak.SoakScenarioExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +19,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Orchestrator service managing experiment execution across server ticks.
@@ -59,63 +64,17 @@ public class ExperimentService {
         LOGGER.info("Starting experiment {} ({}, iterations: {}, batch: {}, radius: {})",
                 plan.id(), plan.spec().scenarioId(), plan.spec().iterations(), plan.spec().batchSize(), plan.spec().radius());
 
+        Function<BiConsumer<com.dwurdy.heaphammer.domain.CheckpointPhase, Integer>, ScenarioExecutor> factory =
+                checkpoint -> createExecutor(plan, checkpoint, state -> {});
         ScenarioExecutor executor;
-        Optional<com.dwurdy.heaphammer.adapter.WorkloadAdapter> customAdapter =
-                com.dwurdy.heaphammer.adapter.WorkloadAdapterRegistry.getInstance()
-                        .findAdapterForScenario(plan.spec().scenarioId().value());
-
-        if (customAdapter.isPresent()) {
-            Optional<ScenarioExecutor> customExecutor = customAdapter.get().createExecutor(
-                    plan,
-                    platform,
-                    (phase, iter) -> checkpointListener.accept(phase, iter),
-                    state -> onExecutorFinished(state)
-            );
-            if (customExecutor.isPresent()) {
-                executor = customExecutor.get();
-            } else if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
-                executor = new EntityScenarioExecutor(
-                        plan,
-                        platform,
-                        (phase, iter) -> checkpointListener.accept(phase, iter),
-                        state -> onExecutorFinished(state)
-                );
-            } else if (plan.spec().scenarioId() == ScenarioId.BLOCK_ENTITIES) {
-                executor = new BlockEntityScenarioExecutor(
-                        plan,
-                        platform,
-                        (phase, iter) -> checkpointListener.accept(phase, iter),
-                        state -> onExecutorFinished(state)
-                );
-            } else {
-                executor = new ChunkScenarioExecutor(
-                        plan,
-                        platform.getChunkTicketManager(),
-                        (phase, iter) -> checkpointListener.accept(phase, iter),
-                        state -> onExecutorFinished(state)
-                );
-            }
-        } else if (plan.spec().scenarioId() == ScenarioId.ENTITIES) {
-            executor = new EntityScenarioExecutor(
-                    plan,
-                    platform,
-                    (phase, iter) -> checkpointListener.accept(phase, iter),
-                    state -> onExecutorFinished(state)
-            );
-        } else if (plan.spec().scenarioId() == ScenarioId.BLOCK_ENTITIES) {
-            executor = new BlockEntityScenarioExecutor(
-                    plan,
-                    platform,
-                    (phase, iter) -> checkpointListener.accept(phase, iter),
-                    state -> onExecutorFinished(state)
-            );
+        if (plan.spec().isSoak()) {
+            executor = new SoakScenarioExecutor(plan, factory,
+                    (phase, iteration) -> checkpointListener.accept(phase, iteration),
+                    this::onExecutorFinished);
         } else {
-            executor = new ChunkScenarioExecutor(
-                    plan,
-                    platform.getChunkTicketManager(),
-                    (phase, iter) -> checkpointListener.accept(phase, iter),
-                    state -> onExecutorFinished(state)
-            );
+            executor = createExecutor(plan,
+                    (phase, iteration) -> checkpointListener.accept(phase, iteration),
+                    this::onExecutorFinished);
         }
 
         boolean isWarmup = plan.spec().warmupIterations() > 0;
