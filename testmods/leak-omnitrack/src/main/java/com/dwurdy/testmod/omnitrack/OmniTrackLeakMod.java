@@ -34,6 +34,11 @@ public class OmniTrackLeakMod implements ModInitializer {
     // Subsystem 2: Entity Tracking
     private static final Map<UUID, EntityTrackingRecord> ENTITY_TRACKER = new ConcurrentHashMap<>();
 
+    // Subsystem 2b: Player lifecycle retention. Deliberately retains only
+    // server-player entities so the v1.1 players workload has an isolated
+    // fixture signal in addition to the generic entity tracker above.
+    private static final Map<UUID, Object> PLAYER_RETENTION = new ConcurrentHashMap<>();
+
     // Subsystem 3: Tick Event Buffer
     private static final TickEventBuffer TICK_BUFFER = new TickEventBuffer();
 
@@ -55,6 +60,9 @@ public class OmniTrackLeakMod implements ModInitializer {
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
             if (LEAK_ENABLED.get()) {
                 ENTITY_TRACKER.put(entity.getUUID(), new EntityTrackingRecord(entity, world.dimension()));
+                if (entity.getClass().getName().contains("ServerPlayer")) {
+                    PLAYER_RETENTION.put(entity.getUUID(), entity);
+                }
             }
         });
 
@@ -79,12 +87,13 @@ public class OmniTrackLeakMod implements ModInitializer {
                     int chunks = CHUNK_AUDIT_LOG.size();
                     int entities = ENTITY_TRACKER.size();
                     int ticks = TICK_BUFFER.size();
+                    int players = PLAYER_RETENTION.size();
                     boolean enabled = LEAK_ENABLED.get();
 
                     ctx.getSource().sendSuccess(() -> Component.literal(
-                        String.format("[TestMod-OmniTrack] Status: enabled=%b, chunks=%d, entities=%d, ticks=%d",
-                            enabled, chunks, entities, ticks)), false);
-                    return chunks + entities + ticks;
+                        String.format("[TestMod-OmniTrack] Status: enabled=%b, chunks=%d, entities=%d, ticks=%d, players=%d",
+                            enabled, chunks, entities, ticks, players)), false);
+                    return chunks + entities + ticks + players;
                 }))
                 .then(Commands.literal("enable").executes(ctx -> {
                     LEAK_ENABLED.set(true);
@@ -100,13 +109,15 @@ public class OmniTrackLeakMod implements ModInitializer {
                     int chunks = CHUNK_AUDIT_LOG.size();
                     int entities = ENTITY_TRACKER.size();
                     int ticks = TICK_BUFFER.size();
+                    int players = PLAYER_RETENTION.size();
                     CHUNK_AUDIT_LOG.clear();
                     ENTITY_TRACKER.clear();
+                    PLAYER_RETENTION.clear();
                     TICK_BUFFER.clear();
                     ctx.getSource().sendSuccess(() -> Component.literal(
-                        String.format("[TestMod-OmniTrack] Cleared records (chunks=%d, entities=%d, ticks=%d)",
-                            chunks, entities, ticks)), false);
-                    return chunks + entities + ticks;
+                        String.format("[TestMod-OmniTrack] Cleared records (chunks=%d, entities=%d, ticks=%d, players=%d)",
+                            chunks, entities, ticks, players)), false);
+                    return chunks + entities + ticks + players;
                 }))
         );
     }
@@ -119,6 +130,10 @@ public class OmniTrackLeakMod implements ModInitializer {
         return ENTITY_TRACKER.size();
     }
 
+    public static int getPlayerRetentionCount() {
+        return PLAYER_RETENTION.size();
+    }
+
     public static int getTickBufferSize() {
         return TICK_BUFFER.size();
     }
@@ -126,6 +141,7 @@ public class OmniTrackLeakMod implements ModInitializer {
     public static void clearAll() {
         CHUNK_AUDIT_LOG.clear();
         ENTITY_TRACKER.clear();
+        PLAYER_RETENTION.clear();
         TICK_BUFFER.clear();
     }
 
