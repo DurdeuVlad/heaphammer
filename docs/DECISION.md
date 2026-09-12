@@ -43,7 +43,8 @@ This document records the foundational architectural decisions for HeapHammer, d
 
 ## ADR-004: Dynamic Jenkins JDK Toolchain Resolution
 
-- **Status**: Accepted & Active
+- **Status**: Superseded (v1.0.2) — Jenkins pipeline removed; GitHub Actions `ci.yml` performs the same `java_version`-from-`gradle.properties` JDK resolution.
+- **Original Status**: Accepted & Active
 - **Context**: Multibranch Jenkins pipelines must build branches targeting Java 21 (`master`), Java 17 (`ver/1.20.1`, `ver/1.18.2`), and Java 8 (`ver/1.16.5`, `ver/1.12.2-forge`).
 - **Decision**: Dynamically inspect `gradle.properties` (`java_version`) at pipeline startup, map the target version to configured Jenkins JDK Tools (`JDK21`, `JDK17`, `JDK8`), and bind the selected tool to `PATH` and `JAVA_HOME`.
 - **Consequences**:
