@@ -32,6 +32,7 @@ public class CrashRecoveryJournal {
         public String dimension;
         public long startedTimestamp;
         public Set<String> activeEntityUuids = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        public Set<String> activePlayerUuids = Collections.newSetFromMap(new ConcurrentHashMap<>());
         public Set<BlockPosRecord> activeBlockPositions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
         public JournalState() {}
@@ -76,6 +77,20 @@ public class CrashRecoveryJournal {
     public synchronized void recordEntityRemoved(UUID uuid) {
         if (currentState != null && uuid != null) {
             currentState.activeEntityUuids.remove(uuid.toString());
+            persist();
+        }
+    }
+
+    public synchronized void recordPlayerJoined(UUID uuid) {
+        if (currentState != null && uuid != null) {
+            currentState.activePlayerUuids.add(uuid.toString());
+            persist();
+        }
+    }
+
+    public synchronized void recordPlayerRemoved(UUID uuid) {
+        if (currentState != null && uuid != null) {
+            currentState.activePlayerUuids.remove(uuid.toString());
             persist();
         }
     }
@@ -133,6 +148,17 @@ public class CrashRecoveryJournal {
                         try {
                             UUID uuid = UUID.fromString(uuidStr);
                             if (platform.removeEntity(state.dimension, uuid, "DISCARD")) {
+                                cleanedCount++;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+                if (state.activePlayerUuids != null) {
+                    for (String uuidStr : state.activePlayerUuids) {
+                        try {
+                            UUID uuid = UUID.fromString(uuidStr);
+                            if (platform.getPlayerLifecyclePort().isPresent()
+                                    && platform.getPlayerLifecyclePort().get().quit(state.dimension, uuid)) {
                                 cleanedCount++;
                             }
                         } catch (Exception ignored) {}

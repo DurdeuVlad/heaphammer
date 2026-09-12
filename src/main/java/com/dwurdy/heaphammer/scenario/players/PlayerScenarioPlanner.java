@@ -55,7 +55,7 @@ public final class PlayerScenarioPlanner {
     }
 
     private static List<PlayerAction> normalizedActions(List<PlayerAction> requested) {
-        List<PlayerAction> actions = new ArrayList<>(requested == null ? List.of() : requested);
+        List<PlayerAction> actions = new ArrayList<>(requested == null ? com.dwurdy.heaphammer.infrastructure.LegacyCollections.list() : requested);
         if (actions.isEmpty() || actions.get(0) != PlayerAction.JOIN) {
             actions.add(0, PlayerAction.JOIN);
         }

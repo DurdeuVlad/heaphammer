@@ -1,6 +1,9 @@
 package com.dwurdy.heaphammer.domain;
 
+import com.github.bsideup.jabel.Desugar;
+
 /** Bounded wall-clock schedule for repeating lightweight workload bursts. */
+@Desugar
 public record SoakSchedule(long durationSeconds, long intervalSeconds) {
     public SoakSchedule {
         if (durationSeconds <= 0L) {
