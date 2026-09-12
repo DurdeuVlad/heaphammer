@@ -14,13 +14,13 @@ logoFile = "assets/heaphammer/icon.png"
 [[dependencies.heaphammer]]
 modId = "neoforge"
 type = "required"
-versionRange = "[21.1.0,)"
+versionRange = "${neoforge_version_range}"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.heaphammer]]
 modId = "minecraft"
 type = "required"
-versionRange = "[1.21.1,)"
+versionRange = "${mc_version_range}"
 ordering = "NONE"
 side = "BOTH"
