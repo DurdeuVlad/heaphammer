@@ -139,6 +139,7 @@ def main() -> int:
     root = Path.cwd()
     evidence = root / "build" / "live-server"
     evidence.mkdir(parents=True, exist_ok=True)
+    (root / "run").mkdir(parents=True, exist_ok=True)
     (root / "run" / "eula.txt").write_text(
         "# Disposable CI server only; this file is never committed.\neula=true\n",
         encoding="utf-8",
