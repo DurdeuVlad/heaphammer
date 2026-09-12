@@ -10,7 +10,7 @@
 
 **Deterministic Minecraft server stress testing and retained-memory regression detection.**
 
-[![Release](https://img.shields.io/badge/release-v1.0.0-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.0-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
 [![CurseForge](https://img.shields.io/badge/CurseForge-HeapHammer-F16436?style=flat-square&logo=curseforge&logoColor=white)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CurseForge Downloads](https://img.shields.io/curseforge/dt/1687734?style=flat-square&logo=curseforge&logoColor=white&color=F16436&label=downloads)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CI](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml/badge.svg)](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml)
@@ -131,7 +131,7 @@ HeapHammer is **100% server-side only**. Connecting players do **not** need it i
 ### 1. Install
 Download the compiled JAR from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer) or [GitHub Releases](https://github.com/DurdeuVlad/heaphammer/releases) and place it into your server's `mods/` directory:
 ```bash
-cp heaphammer-1.0.0.jar /path/to/server/mods/
+cp heaphammer-1.1.0.jar /path/to/server/mods/
 ```
 
 ### 2. Run Stress Test
@@ -257,7 +257,10 @@ Execute via `/hh` in-game or `hh` directly from the dedicated server console:
 | `hh doctor` | Checks server readiness, loaded chunks, and ticket health. | `hh doctor` |
 | `hh run chunks [flags]` | Executes deterministic chunk churn workload. | `hh run chunks --iterations=5 --batch=10 --radius=8 --strategy=spiral` |
 | `hh run entities [flags]` | Executes entity lifecycle stress workload. | `hh run entities --iterations=5 --batch=50 --hold=20` |
+| `hh run entities --profile=...` | Runs persistent or capability-gated unticked-ring entity profiles. | `hh run entities --profile=persistent --diagnostics=world-store` |
 | `hh run blockentities [flags]` | Executes block entity placement and destruction stress. | `hh run blockentities --iterations=5 --batch=20` |
+| `hh run players [flags]` | Exercises real test-player login/logout lifecycle actions where supported. | `hh run players --logins-per-cycle=5 --actions=join,respawn,quit` |
+| `hh run ... --duration=... --interval=...` | Repeats bounded workload bursts for a finite soak schedule. | `hh run chunks --duration=10m --interval=30s` |
 | `hh status` | Displays active test progress, current cycle, and tickets. | `hh status` |
 | `hh stop` | Immediately halts test and releases all tickets. | `hh stop` |
 | `hh cleanup` | Forcibly purges all active HeapHammer tickets and entities across all dimensions. | `hh cleanup` |
@@ -265,6 +268,7 @@ Execute via `/hh` in-game or `hh` directly from the dedicated server console:
 | `hh config reload` | Hot-reloads safety configuration from `config/heaphammer.json`. | `hh config reload` |
 | `hh report show <id\|last>` | Displays memory retention slope, $R^2$, and verdict. | `hh report show last` |
 | `hh report diff <runA> <runB>` | Compares two runs to detect regressions between modpack updates. | `hh report diff run-01 run-02` |
+| `hh compare <runA> <runB>` | Alias for evidence-backed report comparison, including R² and diagnostic deltas. | `hh compare run-01 run-02` |
 | `hh replay <run-id>` | Replays the exact resolved operation sequence. | `hh replay run-01` |
 | `hh diagnostics histogram` | Samples top 10 JVM class instances and memory size. | `hh diagnostics histogram` |
 | `hh diagnostics heapdump` | Dumps a standard HotSpot `.hprof` snapshot for MAT/JProfiler. | `hh diagnostics heapdump` |
