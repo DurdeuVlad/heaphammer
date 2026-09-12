@@ -21,14 +21,20 @@ public class ReportService {
     }
 
     public Path saveReport(ExperimentReport report) throws IOException {
-        Path target = reportsDir.resolve(report.runId().value() + ".json");
+        Path target = reportsDir.resolve(report.runId().value() + ".json").normalize();
+        if (!target.startsWith(reportsDir.normalize())) {
+            throw new SecurityException("Path traversal attempt detected in report ID: " + report.runId());
+        }
         String json = GsonCodec.toJson(report);
         FileStorage.writeStringAtomic(target, json);
         return target;
     }
 
     public Optional<ExperimentReport> loadReport(ExperimentId runId) throws IOException {
-        Path target = reportsDir.resolve(runId.value() + ".json");
+        Path target = reportsDir.resolve(runId.value() + ".json").normalize();
+        if (!target.startsWith(reportsDir.normalize())) {
+            throw new SecurityException("Path traversal attempt detected in report ID: " + runId);
+        }
         if (!Files.exists(target)) {
             return Optional.empty();
         }

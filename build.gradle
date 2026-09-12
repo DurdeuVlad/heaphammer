@@ -48,6 +48,7 @@ sourceSets {
             exclude 'com/dwurdy/heaphammer/HeapHammer.java'
             exclude 'com/dwurdy/heaphammer/HeapHammerForge.java'
             exclude 'com/dwurdy/heaphammer/command/HeapHammerCommands.java'
+            exclude 'com/dwurdy/heaphammer/command/CommandPermissions.java'
             exclude 'com/dwurdy/heaphammer/mixin/**'
             exclude 'com/dwurdy/heaphammer/diagnostics/JfrTrigger.java'
         }
@@ -64,6 +65,9 @@ sourceSets {
             srcDirs = ['src/test/java']
             exclude 'com/dwurdy/heaphammer/ModMatrixVerificationTest.java'
             exclude 'com/dwurdy/heaphammer/platform/forge/**'
+            // CommandPermissions is excluded from main (references Mojmap-only
+            // CommandSourceStack); its test cannot compile without it.
+            exclude 'com/dwurdy/heaphammer/command/CommandPermissionsTest.java'
         }
         resources {
             srcDirs = ['src/test/resources']
@@ -93,13 +97,18 @@ dependencies {
 }
 
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
 }
 
 processResources {
     inputs.property "mod_version", project.mod_version
 
     filesMatching("mcmod.info") {
+        expand "mod_version": project.mod_version
+    }
+    filesMatching("heaphammer-version.properties") {
         expand "mod_version": project.mod_version
     }
 }

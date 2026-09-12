@@ -2,12 +2,17 @@ package com.dwurdy.heaphammer.command.argument;
 
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.*;
 
 /**
  * Parses named flags from command line arguments (e.g. --seed=123 --radius=6 --center=0,0).
  */
 public class FlagParser {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("heaphammer-flags");
 
     public static Map<String, String> parseRawFlags(String[] args, int startIndex) {
         Map<String, String> flags = new HashMap<>();
@@ -53,36 +58,48 @@ public class FlagParser {
         }
         if (flags.containsKey("radius")) {
             try {
-                builder.radius(Math.max(1, Integer.parseInt(flags.get("radius"))));
-            } catch (NumberFormatException ignored) {}
+                builder.radius(Integer.parseInt(flags.get("radius")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--radius': " + flags.get("radius"));
+            }
         }
         if (flags.containsKey("iterations")) {
             try {
-                builder.iterations(Math.max(1, Integer.parseInt(flags.get("iterations"))));
-            } catch (NumberFormatException ignored) {}
+                builder.iterations(Integer.parseInt(flags.get("iterations")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--iterations': " + flags.get("iterations"));
+            }
         }
         if (flags.containsKey("batch")) {
             try {
-                builder.batchSize(Math.max(1, Integer.parseInt(flags.get("batch"))));
-            } catch (NumberFormatException ignored) {}
+                builder.batchSize(Integer.parseInt(flags.get("batch")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--batch': " + flags.get("batch"));
+            }
         }
         if (flags.containsKey("strategy")) {
             builder.strategy(flags.get("strategy").toUpperCase(Locale.ROOT));
         }
         if (flags.containsKey("warmup")) {
             try {
-                builder.warmupIterations(Math.max(0, Integer.parseInt(flags.get("warmup"))));
-            } catch (NumberFormatException ignored) {}
+                builder.warmupIterations(Integer.parseInt(flags.get("warmup")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--warmup': " + flags.get("warmup"));
+            }
         }
         if (flags.containsKey("hold")) {
             try {
-                builder.holdTicks(Math.max(0, Integer.parseInt(flags.get("hold"))));
-            } catch (NumberFormatException ignored) {}
+                builder.holdTicks(Integer.parseInt(flags.get("hold")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--hold': " + flags.get("hold"));
+            }
         }
         if (flags.containsKey("settle")) {
             try {
-                builder.settleTicks(Math.max(0, Integer.parseInt(flags.get("settle"))));
-            } catch (NumberFormatException ignored) {}
+                builder.settleTicks(Integer.parseInt(flags.get("settle")));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid integer for flag '--settle': " + flags.get("settle"));
+            }
         }
         if (flags.containsKey("explicit-gc")) {
             builder.explicitGc(Boolean.parseBoolean(flags.get("explicit-gc")));
