@@ -1,8 +1,17 @@
 package com.dwurdy.heaphammer.platform.fabric;
 
 import com.dwurdy.heaphammer.domain.EnvironmentFingerprint;
+import com.dwurdy.heaphammer.domain.PlatformCapabilities;
+import com.dwurdy.heaphammer.domain.PlatformCapability;
+import com.dwurdy.heaphammer.diagnostics.EventMetricsCounter;
+import com.dwurdy.heaphammer.infrastructure.worldstore.AnvilWorldStoreScanner;
 import com.dwurdy.heaphammer.platform.ChunkTicketManager;
+import com.dwurdy.heaphammer.platform.EntityLifecyclePort;
+import com.dwurdy.heaphammer.platform.EventMetricsPort;
 import com.dwurdy.heaphammer.platform.PlatformAdapter;
+import com.dwurdy.heaphammer.platform.PlayerLifecyclePort;
+import com.dwurdy.heaphammer.platform.RetentionObservationPort;
+import com.dwurdy.heaphammer.platform.WorldStoreMetricsPort;
 import com.google.common.collect.Iterables;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -35,15 +44,22 @@ public class FabricPlatformAdapter implements PlatformAdapter {
     private final Supplier<MinecraftServer> serverSupplier;
     private final FabricChunkTicketManager ticketManager;
     private final List<Consumer<Long>> tickListeners = new CopyOnWriteArrayList<>();
+    private final FabricPlayerLifecyclePort playerLifecyclePort;
+    private final FabricEntityLifecyclePort entityLifecyclePort;
+    private final EventMetricsCounter eventMetrics = new EventMetricsCounter();
     private long serverTickCounter = 0;
 
     public FabricPlatformAdapter(Supplier<MinecraftServer> serverSupplier) {
         this.serverSupplier = Objects.requireNonNull(serverSupplier, "serverSupplier must not be null");
         this.ticketManager = new FabricChunkTicketManager(serverSupplier);
+        this.playerLifecyclePort = new FabricPlayerLifecyclePort(serverSupplier);
+        this.entityLifecyclePort = new FabricEntityLifecyclePort(serverSupplier);
+        eventMetrics.recordRegistration("fabric:ServerTickEvents.END_SERVER_TICK");
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server == serverSupplier.get()) {
                 serverTickCounter++;
+                eventMetrics.recordDispatch("fabric:ServerTickEvents.END_SERVER_TICK");
                 for (Consumer<Long> listener : tickListeners) {
                     try {
                         listener.accept(serverTickCounter);
@@ -191,7 +207,6 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         entity.moveTo(x, y, z, 0.0f, 0.0f);
         if (entity instanceof Mob mob) {
             mob.setNoAi(true);
-            mob.setPersistenceRequired();
         }
         entity.addTag(TEST_ENTITY_TAG);
 
