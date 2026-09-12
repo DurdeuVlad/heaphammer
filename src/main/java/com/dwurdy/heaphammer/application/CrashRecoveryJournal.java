@@ -200,16 +200,24 @@ public record BlockPosRecord(int x, int y, int z) {}
         long generation = persistenceGeneration.incrementAndGet();
         JournalState snapshot = copyState(currentState);
         persistenceExecutor.execute(() -> {
-            if (generation != persistenceGeneration.get()) return;
             try {
                 String json = GsonCodec.toJson(snapshot);
-                if (generation == persistenceGeneration.get()) {
-                    FileStorage.writeStringAtomic(journalPath, json);
+                synchronized (CrashRecoveryJournal.this) {
+                    // Serialize the final generation check with recordFinish().
+                    // Otherwise a write that passed the check before finish could
+                    // recreate the journal after recordFinish() deleted it.
+                    if (generation == persistenceGeneration.get()) {
+                        writeJournal(json);
+                    }
                 }
             } catch (IOException e) {
                 LOGGER.warn("Failed to persist crash recovery journal: {}", e.getMessage());
             }
         });
+    }
+
+    protected void writeJournal(String json) throws IOException {
+        FileStorage.writeStringAtomic(journalPath, json);
     }
 
     private synchronized void persistInitial() {
