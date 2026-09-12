@@ -45,10 +45,10 @@ public class CrossModConsumerMod implements ModInitializer {
                 LevelChunk levelChunk = (LevelChunk) chunk;
                 if (CORE_MOD_ACTIVE.get()) {
                     // Collision mode: register uncleaned closure into Mod A's bus
-                    ChunkListenerBridge.registerChunkSubscription(world, levelChunk);
+                    ChunkListenerBridge.registerChunkSubscription(world, chunk);
                 } else {
                     // Clean fallback mode: record transient timestamp
-                    FALLBACK_TRANSIENT_MAP.put(levelChunk.getPos(), System.currentTimeMillis());
+                    FALLBACK_TRANSIENT_MAP.put(chunk.getPos(), System.currentTimeMillis());
                 }
             }
         });

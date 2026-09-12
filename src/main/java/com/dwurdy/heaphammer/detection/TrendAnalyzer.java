@@ -5,6 +5,9 @@ import com.dwurdy.heaphammer.domain.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import com.dwurdy.heaphammer.diagnostics.RetentionClassEntry;
+import com.dwurdy.heaphammer.diagnostics.RetentionSnapshot;
+import com.dwurdy.heaphammer.domain.RunDiagnostics;
 
 /**
  * Retained-heap trend analysis, plateau detection, and leak heuristic engine (BR-004, Section 6, Section 27).
@@ -145,6 +148,44 @@ public class TrendAnalyzer {
                         "INCONCLUSIVE: Heap variance observed (slope = %.2f MB/cycle, R² = %.2f, net delta = %.2f MB) without definitive linear trend.",
                         slopeMb, rSquared, netDeltaMb)
         );
+    }
+
+    /**
+     * Adds weak-reference retention evidence to the ordinary heap verdict. A positive,
+     * well-fitted live-reference trend is treated as a stronger signal than GC-noisy heap
+     * samples, while histogram/world/event evidence remains attribution-only.
+     */
+    public DetectionResult analyze(ExperimentSpec spec, List<Checkpoint> checkpoints, RunDiagnostics evidence) {
+        DetectionResult heapResult = analyze(spec, checkpoints);
+        if (evidence == null || evidence.retentionSeries().size() < 3
+                || heapResult.classification() == DetectionClassification.CLEANUP_FAILED) {
+            return heapResult;
+        }
+
+        List<RetentionSnapshot> series = evidence.retentionSeries();
+        double[] x = new double[series.size()];
+        double[] y = new double[series.size()];
+        for (int i = 0; i < series.size(); i++) {
+            x[i] = i;
+            y[i] = series.get(i).entries().values().stream()
+                    .mapToLong(RetentionClassEntry::liveCount).sum();
+        }
+        LinearRegression retentionRegression = LinearRegression.compute(x, y);
+        if (retentionRegression.slope() > 0.0 && retentionRegression.rSquared() >= minRSquared) {
+            String rationale = heapResult.rationale() + String.format(Locale.ROOT,
+                    " Weak-reference retention census also grew by %.2f live objects/checkpoint (R² = %.2f).",
+                    retentionRegression.slope(), retentionRegression.rSquared());
+            return new DetectionResult(
+                    DetectionClassification.SUSPICIOUS,
+                    Math.max(heapResult.confidence(), Math.min(0.99, retentionRegression.rSquared())),
+                    heapResult.slopeBytesPerCycle(),
+                    heapResult.rSquared(),
+                    heapResult.netDeltaBytes(),
+                    false,
+                    rationale
+            );
+        }
+        return heapResult;
     }
 
     private boolean detectPlateau(double[] x, double[] y, double threshold) {
