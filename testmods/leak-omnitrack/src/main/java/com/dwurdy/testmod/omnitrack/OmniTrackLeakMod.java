@@ -38,7 +38,7 @@ public class OmniTrackLeakMod implements ModInitializer {
     // Subsystem 2b: Player lifecycle retention. Deliberately retains only
     // server-player entities so the v1.1 players workload has an isolated
     // fixture signal in addition to the generic entity tracker above.
-    private static final Map<UUID, Object> PLAYER_RETENTION = new ConcurrentHashMap<>();
+    private static final List<Object> PLAYER_RETENTION = new CopyOnWriteArrayList<>();
 
     // Subsystem 3: Tick Event Buffer
     private static final TickEventBuffer TICK_BUFFER = new TickEventBuffer();
@@ -63,9 +63,6 @@ public class OmniTrackLeakMod implements ModInitializer {
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
             if (LEAK_ENABLED.get()) {
                 ENTITY_TRACKER.put(entity.getUUID(), new EntityTrackingRecord(entity, world.dimension()));
-                if (entity.getClass().getName().contains("ServerPlayer")) {
-                    PLAYER_RETENTION.put(entity.getUUID(), entity);
-                }
             }
         });
 
@@ -125,22 +122,6 @@ public class OmniTrackLeakMod implements ModInitializer {
         );
     }
 
-    private static Object invokeNoArgs(Object target, String name) {
-        if (target == null) {
-            return null;
-        }
-        for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
-            try {
-                java.lang.reflect.Method method = type.getDeclaredMethod(name);
-                method.setAccessible(true);
-                return method.invoke(target);
-            } catch (Exception ignored) {
-                // Search the superclass hierarchy for version-specific visibility.
-            }
-        }
-        return null;
-    }
-
     private static void retainJoinedPlayer(Object player) {
         // The lifecycle port only invokes this callback for successfully joined
         // test players. Do not inspect the runtime class name: production Fabric
@@ -148,10 +129,10 @@ public class OmniTrackLeakMod implements ModInitializer {
         if (!LEAK_ENABLED.get() || player == null) {
             return;
         }
-        Object uuid = invokeNoArgs(player, "getUUID");
-        if (uuid instanceof UUID) {
-            PLAYER_RETENTION.put((UUID) uuid, player);
-        }
+        // Retain the callback object directly. This fixture intentionally models
+        // a third-party registry leak, and avoiding UUID reflection keeps the
+        // signal stable across intermediary and obfuscated historical runtimes.
+        PLAYER_RETENTION.add(player);
     }
 
     public static int getChunkAuditCount() {

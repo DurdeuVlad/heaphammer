@@ -59,6 +59,7 @@ jobs:
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            server-java-opts: '-Xmx2G'
           - branch: ver/1.17.1
             mc-version: '1.17.1'
             loader: fabric
@@ -149,6 +150,7 @@ jobs:
           MC_VERSION: ${{ matrix.mc-version }}
           LOADER: ${{ matrix.loader }}
           LEAK_FIXTURE: ${{ matrix.leak-mod }}
+          JAVA_TOOL_OPTIONS: ${{ matrix.server-java-opts }}
         run: |
           python3 tools/live_server_matrix.py \
             --mc-version "$MC_VERSION" \
