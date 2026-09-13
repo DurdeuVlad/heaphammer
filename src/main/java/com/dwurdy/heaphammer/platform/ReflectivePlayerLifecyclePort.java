@@ -162,22 +162,57 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
     }
 
     private static boolean disconnect(Object player, String message) {
-        Object connection = fieldValue(player, "connection");
-        if (connection == null) return false;
-        for (Method method : methods(connection.getClass(), "onDisconnect")) {
+        Object listener = fieldValue(player, "connection");
+        if (listener == null) return false;
+        for (Method method : methods(listener.getClass(), "onDisconnect")) {
             if (method.getParameterTypes().length != 1) continue;
             Class<?> parameter = method.getParameterTypes()[0];
             Object reason = disconnectReason(parameter, message);
             if (reason == null && parameter.isPrimitive()) continue;
             try {
                 method.setAccessible(true);
-                method.invoke(connection, reason);
+                method.invoke(listener, reason);
+                closeNetworkConnection(listener, message);
+                releaseDisconnectedReferences(listener);
                 return true;
             } catch (Exception ignored) {
                 // Try another overload, if present.
             }
         }
         return false;
+    }
+
+    /**
+     * The synthetic player path invokes the server listener directly because
+     * there is no real client event loop. Close the underlying transport too;
+     * otherwise the listener/connection pair can keep a disconnected player
+     * reachable after PlayerList removes it.
+     */
+    private static void closeNetworkConnection(Object listener, String message) {
+        Object networkConnection = fieldValue(listener, "connection");
+        if (networkConnection == null) return;
+        for (Method method : methods(networkConnection.getClass(), "disconnect")) {
+            if (method.getParameterTypes().length != 1) continue;
+            Object reason = disconnectReason(method.getParameterTypes()[0], message);
+            if (reason == null && method.getParameterTypes()[0].isPrimitive()) continue;
+            try {
+                method.setAccessible(true);
+                method.invoke(networkConnection, reason);
+                return;
+            } catch (Exception ignored) {
+                // Older runtimes may not expose a compatible transport close.
+            }
+        }
+    }
+
+    /** Break the synthetic listener graph after the authoritative disconnect callback. */
+    private static void releaseDisconnectedReferences(Object listener) {
+        Object networkConnection = fieldValue(listener, "connection");
+        if (networkConnection != null) {
+            setFieldValue(networkConnection, "packetListener", null);
+            setFieldValue(networkConnection, "disconnectListener", null);
+        }
+        setFieldValue(listener, "player", null);
     }
 
     private static Object disconnectReason(Class<?> parameter, String message) {
@@ -318,7 +353,20 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             for (String flowName : new String[]{"SERVERBOUND", "CLIENTBOUND"}) {
                 Object flow = enumConstant(packetFlowType, flowName);
                 Object key = value(invokeStatic(connectionType, "getProtocolKey", flow));
-                if (key == null) key = value(invokeStatic(connectionType, "getProtocolAttributeKey", flow));
+                if (key == null) {
+                    Object networkSide = enumConstant("net.minecraft.network.NetworkSide", flowName);
+                    if (networkSide == null) {
+                        networkSide = enumConstant("net.minecraft.network.protocol.NetworkSide", flowName);
+                    }
+                    key = value(invokeStatic(connectionType, "getProtocolAttributeKey", networkSide));
+                }
+                if (key == null) {
+                    String primaryField = "SERVERBOUND".equals(flowName)
+                            ? "ATTRIBUTE_SERVERBOUND_PROTOCOL" : "ATTRIBUTE_CLIENTBOUND_PROTOCOL";
+                    String legacyField = "SERVERBOUND".equals(flowName)
+                            ? "SERVERBOUND_PROTOCOL_KEY" : "CLIENTBOUND_PROTOCOL_KEY";
+                    key = staticFieldValue(connectionType, primaryField, legacyField);
+                }
                 Object codec = value(invoke(play, "codec", flow));
                 if (codec == null) codec = value(invoke(play, "getHandler", flow));
                 if (key == null || codec == null) {
@@ -356,6 +404,23 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
                 return field.get(target);
             } catch (Exception ignored) {
                 // Search the superclass hierarchy.
+            }
+        }
+        return null;
+    }
+
+    private static Object staticFieldValue(Class<?> type, String... names) {
+        if (type == null) return null;
+        for (Class<?> cursor = type; cursor != null; cursor = cursor.getSuperclass()) {
+            for (String name : names) {
+                try {
+                    Field field = cursor.getDeclaredField(name);
+                    if (!Modifier.isStatic(field.getModifiers())) continue;
+                    field.setAccessible(true);
+                    return field.get(null);
+                } catch (Exception ignored) {
+                    // Try the next mapped field name or superclass.
+                }
             }
         }
         return null;
