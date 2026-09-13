@@ -23,6 +23,22 @@ import java.util.function.Supplier;
  */
 public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort {
     private static final String TEST_NAME_PREFIX = "hh_test_";
+    private static final String[] PLAYER_CLASS_NAMES = {
+            "net.minecraft.server.level.ServerPlayer",
+            "net.minecraft.server.network.ServerPlayerEntity"
+    };
+    private static final String[] PLAYER_GAME_MODE_CLASS_NAMES = {
+            "net.minecraft.server.level.ServerPlayerGameMode",
+            "net.minecraft.server.network.ServerPlayerInteractionManager"
+    };
+    private static final String[] CONNECTION_CLASS_NAMES = {
+            "net.minecraft.network.Connection",
+            "net.minecraft.network.ClientConnection"
+    };
+    private static final String[] PACKET_FLOW_CLASS_NAMES = {
+            "net.minecraft.network.protocol.PacketFlow",
+            "net.minecraft.network.packet.PacketFlow"
+    };
     private final Supplier<?> serverSupplier;
     private volatile RetentionTracker retentionTracker;
 
@@ -53,15 +69,8 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         Invocation loginCheck = invoke(playerList, "canPlayerLogin", new InetSocketAddress("127.0.0.1", 0), profile);
         if (loginCheck.found && loginCheck.value != null) return null;
 
-        // CommonListenerCookie and ClientInformation were added after the
-        // older ServerPlayer/PlayerList lifecycle. Keep the modern path while
-        // falling back to the three-argument constructor used by 1.16-1.20.1.
-        Object player = construct("net.minecraft.server.level.ServerPlayer", server, level, profile, clientInformation);
-        if (player == null) {
-            player = construct("net.minecraft.server.level.ServerPlayer", server, level, profile);
-        }
-        Object packetFlow = enumConstant("net.minecraft.network.protocol.PacketFlow", "SERVERBOUND");
-        Object connection = construct("net.minecraft.network.Connection", packetFlow);
+        Object player = constructPlayer(server, level, profile, clientInformation);
+        Object connection = constructConnection();
         if (player == null || connection == null) return null;
 
         invoke(player, "setPos", x, y, z);
@@ -213,6 +222,41 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         Object profile = value(invoke(player, "getGameProfile"));
         Object name = value(invoke(profile, "getName"));
         return name != null && String.valueOf(name).startsWith(TEST_NAME_PREFIX);
+    }
+
+    private static Object constructPlayer(Object server, Object level, Object profile, Object clientInformation) {
+        for (String className : PLAYER_CLASS_NAMES) {
+            // CommonListenerCookie and ClientInformation are used by the
+            // modern player lifecycle.
+            Object player = construct(className, server, level, profile, clientInformation);
+            if (player != null) return player;
+
+            // The 1.16-1.20.1 lifecycle predates both types.
+            player = construct(className, server, level, profile);
+            if (player != null) return player;
+
+            // Minecraft 1.16.5 additionally requires an explicit game-mode
+            // manager when constructing its server player.
+            for (String gameModeClassName : PLAYER_GAME_MODE_CLASS_NAMES) {
+                Object gameMode = construct(gameModeClassName, level);
+                if (gameMode == null) continue;
+                player = construct(className, server, level, profile, gameMode);
+                if (player != null) return player;
+            }
+        }
+        return null;
+    }
+
+    private static Object constructConnection() {
+        for (String packetFlowClassName : PACKET_FLOW_CLASS_NAMES) {
+            Object packetFlow = enumConstant(packetFlowClassName, "SERVERBOUND");
+            if (packetFlow == null) continue;
+            for (String connectionClassName : CONNECTION_CLASS_NAMES) {
+                Object connection = construct(connectionClassName, packetFlow);
+                if (connection != null) return connection;
+            }
+        }
+        return null;
     }
 
     private static List<Object> iterable(Object value) {
