@@ -59,7 +59,7 @@ jobs:
             loader: fabric
             java-version: '21'
             leak-mod: fabric
-            server-java-opts: '-Xmx2G'
+            server-java-opts: '-Xmx4G'
           - branch: ver/1.17.1
             mc-version: '1.17.1'
             loader: fabric
