@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 
@@ -36,9 +37,12 @@ public final class NeoForgeEntityLifecyclePort implements EntityLifecyclePort {
         ServerLevel level = server == null ? null : getLevel(server, dimension);
         if (level == null) return null;
         ResourceLocation location = ResourceLocation.tryParse(entityTypeId);
-        EntityType<?> type = location == null ? null : BuiltInRegistries.ENTITY_TYPE.get(location);
+        EntityType<?> type = null;
+        if (location != null) {
+            type = BuiltInRegistries.ENTITY_TYPE.get(location).map(reference -> reference.value()).orElse(null);
+        }
         if (type == null || type == EntityType.PLAYER || !type.canSummon()) return null;
-        Entity entity = type.create(level);
+        Entity entity = type.create(level, EntitySpawnReason.COMMAND);
         if (entity == null) return null;
         entity.moveTo(x, y, z, 0.0F, 0.0F);
         if (entity instanceof Mob mob) {
