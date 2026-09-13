@@ -34,6 +34,9 @@ public class OmniTrackLeakMod implements ModInitializer {
     // Subsystem 2: Entity Tracking
     private static final Map<UUID, EntityTrackingRecord> ENTITY_TRACKER = new ConcurrentHashMap<>();
 
+    // Subsystem 2b: Player lifecycle retention for the v1.1 players workload.
+    private static final Map<UUID, Object> PLAYER_RETENTION = new ConcurrentHashMap<>();
+
     // Subsystem 3: Tick Event Buffer
     private static final TickEventBuffer TICK_BUFFER = new TickEventBuffer();
 
@@ -62,6 +65,7 @@ public class OmniTrackLeakMod implements ModInitializer {
         // Subsystem 3: Tick event buffer
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (LEAK_ENABLED.get()) {
+                observeOnlinePlayers(server);
                 long t = TICK_COUNTER.incrementAndGet();
                 TICK_BUFFER.recordTick(t);
             }
@@ -80,12 +84,13 @@ public class OmniTrackLeakMod implements ModInitializer {
                     int chunks = CHUNK_AUDIT_LOG.size();
                     int entities = ENTITY_TRACKER.size();
                     int ticks = TICK_BUFFER.size();
+                    int players = PLAYER_RETENTION.size();
                     boolean enabled = LEAK_ENABLED.get();
 
                     ctx.getSource().sendSuccess(new TextComponent(
-                        String.format("[TestMod-OmniTrack] Status: enabled=%b, chunks=%d, entities=%d, ticks=%d",
-                            enabled, chunks, entities, ticks)), false);
-                    return chunks + entities + ticks;
+                        String.format("[TestMod-OmniTrack] Status: enabled=%b, chunks=%d, entities=%d, ticks=%d, players=%d",
+                            enabled, chunks, entities, ticks, players)), false);
+                    return chunks + entities + ticks + players;
                 }))
                 .then(Commands.literal("enable").executes(ctx -> {
                     LEAK_ENABLED.set(true);
@@ -101,15 +106,46 @@ public class OmniTrackLeakMod implements ModInitializer {
                     int chunks = CHUNK_AUDIT_LOG.size();
                     int entities = ENTITY_TRACKER.size();
                     int ticks = TICK_BUFFER.size();
+                    int players = PLAYER_RETENTION.size();
                     CHUNK_AUDIT_LOG.clear();
                     ENTITY_TRACKER.clear();
+                    PLAYER_RETENTION.clear();
                     TICK_BUFFER.clear();
                     ctx.getSource().sendSuccess(new TextComponent(
-                        String.format("[TestMod-OmniTrack] Cleared records (chunks=%d, entities=%d, ticks=%d)",
-                            chunks, entities, ticks)), false);
-                    return chunks + entities + ticks;
+                        String.format("[TestMod-OmniTrack] Cleared records (chunks=%d, entities=%d, ticks=%d, players=%d)",
+                            chunks, entities, ticks, players)), false);
+                    return chunks + entities + ticks + players;
                 }))
         );
+    }
+
+    /**
+     * The synthetic player port inserts players directly into the server's
+     * player list, so the entity-load event is not guaranteed to observe it.
+     * Keep this adapter cross-version by using stable method names reflectively.
+     */
+    private static void observeOnlinePlayers(Object server) {
+        try {
+            Object playerList = server.getClass().getMethod("getPlayerList").invoke(server);
+            Object players = playerList.getClass().getMethod("getPlayers").invoke(playerList);
+            if (!(players instanceof Iterable<?>)) {
+                return;
+            }
+            for (Object player : (Iterable<?>) players) {
+                if (player != null && player.getClass().getName().contains("ServerPlayer")) {
+                    Object uuid = player.getClass().getMethod("getUUID").invoke(player);
+                    if (uuid instanceof UUID) {
+                        PLAYER_RETENTION.put((UUID) uuid, player);
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | SecurityException ignored) {
+            // Optional diagnostics must not interfere with the server tick loop.
+        }
+    }
+
+    public static int getPlayerRetentionCount() {
+        return PLAYER_RETENTION.size();
     }
 
     public static int getChunkAuditCount() {
@@ -127,6 +163,7 @@ public class OmniTrackLeakMod implements ModInitializer {
     public static void clearAll() {
         CHUNK_AUDIT_LOG.clear();
         ENTITY_TRACKER.clear();
+        PLAYER_RETENTION.clear();
         TICK_BUFFER.clear();
     }
 
