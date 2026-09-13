@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class OmniTrackLeakMod implements ModInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger("TestMod-OmniTrack");
+    private static final String TEST_NAME_PREFIX = "hh_test_";
 
     // Subsystem 1: Chunk Auditing
     private static final List<ChunkAuditRecord> CHUNK_AUDIT_LOG = new CopyOnWriteArrayList<>();
@@ -51,6 +53,18 @@ public class OmniTrackLeakMod implements ModInitializer {
         LOGGER.info("[TestMod-OmniTrack] Initializing multi-subsystem memory leak testmod.");
 
         PlayerLifecycleObservers.registerJoinObserver(OmniTrackLeakMod::retainJoinedPlayer);
+        // The 1.20.4 synthetic login path can complete before its PlayerList
+        // becomes reflectively observable, so retain the same test players at
+        // Fabric's post-login boundary as a compatibility fallback.
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            if (handler == null || handler.getPlayer() == null) {
+                return;
+            }
+            String playerName = handler.getPlayer().getGameProfile().getName();
+            if (playerName != null && playerName.startsWith(TEST_NAME_PREFIX)) {
+                retainJoinedPlayer(handler.getPlayer());
+            }
+        });
 
         // Subsystem 1: Chunk Load hook (omits CHUNK_UNLOAD)
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
@@ -132,7 +146,9 @@ public class OmniTrackLeakMod implements ModInitializer {
         // Retain the callback object directly. This fixture intentionally models
         // a third-party registry leak, and avoiding UUID reflection keeps the
         // signal stable across intermediary and obfuscated historical runtimes.
-        PLAYER_RETENTION.add(player);
+        if (!PLAYER_RETENTION.contains(player)) {
+            PLAYER_RETENTION.add(player);
+        }
     }
 
     public static int getChunkAuditCount() {
