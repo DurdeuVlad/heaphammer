@@ -104,6 +104,14 @@ jobs:
           git fetch origin master --depth=1
           git show origin/master:tools/live_server_matrix.py > tools/live_server_matrix.py
 
+      - name: Load canonical player leak fixture
+        if: matrix.loader == 'fabric'
+        run: |
+          # Historical branches retain version-specific fixture edits. Stage
+          # the canonical v1.1 player-retention fixture so every Fabric server
+          # gets the same feature-targeted leak oracle.
+          git show origin/master:testmods/leak-omnitrack/src/main/java/com/dwurdy/testmod/omnitrack/OmniTrackLeakMod.java > testmods/leak-omnitrack/src/main/java/com/dwurdy/testmod/omnitrack/OmniTrackLeakMod.java
+
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
         with:
