@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "id": "testmod-crossmod-consumer",
+  "id": "testmod-leak-persistententity",
   "version": "1.0.0",
-  "name": "TestMod CrossMod Consumer",
-  "description": "Consumer mod for cross-mod collision testing. Clean alone, leaks when paired with testmod-crossmod-core.",
+  "name": "TestMod Leak PersistentEntity",
+  "description": "Synthetic persistent-entity retention leak fixture for HeapHammer",
   "authors": [
     "dwurdy"
   ],
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.dwurdy.testmod.crossmod.consumer.CrossModConsumerMod"
+      "com.dwurdy.testmod.persistententity.PersistentEntityLeakMod"
     ]
   },
   "depends": {

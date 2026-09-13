@@ -50,11 +50,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Build Synthetic Testmod Jars
+        run: ./gradlew buildTestmods --no-daemon
+
       - name: Compile and Run Unit Tests
         run: ./gradlew check test --no-daemon
 
-      - name: Build Mod & Synthetic Testmod Jars
-        run: ./gradlew build buildTestmods --no-daemon
+      - name: Build Mod Jars
+        run: ./gradlew build --no-daemon
 
       - name: Build & Test Nested Loader JARs
         run: |
