@@ -76,7 +76,7 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         invoke(player, "setPos", x, y, z);
         Invocation placed = invoke(playerList, "placeNewPlayer", connection, player, cookie);
         if (!placed.found && placed.failure == null) placed = invoke(playerList, "placeNewPlayer", connection, player);
-        if (!placed.found || value(invoke(playerList, "getPlayer", playerId)) == null) return null;
+        if (!placed.found || !isPlayerTracked(playerList, player, playerId)) return null;
 
         PlayerLifecycleObservers.notifyJoined(player);
         RetentionTracker tracker = retentionTracker;
@@ -217,6 +217,23 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             if (dimension.equals(String.valueOf(location))) return level;
         }
         return null;
+    }
+
+    /**
+     * Confirms that PlayerList accepted the player. Some historical runtimes
+     * populate the iterable player list before their UUID lookup is visible,
+     * so the direct getPlayer(UUID) result cannot be the only confirmation.
+     */
+    static boolean isPlayerTracked(Object playerList, Object player, UUID playerId) {
+        if (playerList == null || player == null) return false;
+        if (value(invoke(playerList, "getPlayer", playerId)) != null) return true;
+        for (Object listedPlayer : iterable(value(invoke(playerList, "getPlayers")))) {
+            if (listedPlayer == player) return true;
+            Object profile = value(invoke(listedPlayer, "getGameProfile"));
+            Object listedId = value(invoke(profile, "getId"));
+            if (playerId.equals(listedId)) return true;
+        }
+        return false;
     }
 
     private static boolean isTestPlayer(Object player) {
