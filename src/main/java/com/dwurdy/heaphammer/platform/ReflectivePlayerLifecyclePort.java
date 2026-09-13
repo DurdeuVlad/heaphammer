@@ -75,9 +75,7 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
 
         invoke(player, "setPos", x, y, z);
         Invocation placed = invoke(playerList, "placeNewPlayer", connection, player, cookie);
-        if (!placed.found) {
-            placed = invoke(playerList, "placeNewPlayer", connection, player);
-        }
+        if (!placed.found && placed.failure == null) placed = invoke(playerList, "placeNewPlayer", connection, player);
         if (!placed.found || value(invoke(playerList, "getPlayer", playerId)) == null) return null;
 
         PlayerLifecycleObservers.notifyJoined(player);
@@ -194,10 +192,13 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         if (profile == null) return null;
         Class<?> cookieClass = load("net.minecraft.server.network.CommonListenerCookie");
         if (cookieClass == null) return null;
-        for (Method method : cookieClass.getMethods()) {
-            if (!Modifier.isStatic(method.getModifiers()) || !"createInitial".equals(method.getName())) continue;
+        for (Method method : cookieClass.getDeclaredMethods()) {
+            if (!Modifier.isStatic(method.getModifiers()) || !cookieClass.isAssignableFrom(method.getReturnType())) continue;
             Class<?>[] types = method.getParameterTypes();
-            if ((types.length != 1 && types.length != 2) || !types[0].isAssignableFrom(profile.getClass())) continue;
+            if ((types.length != 1 && types.length != 2) || !types[0].isAssignableFrom(profile.getClass())) {
+                continue;
+            }
+            if (types.length == 2 && !isBoolean(types[1])) continue;
             try {
                 method.setAccessible(true);
                 return types.length == 1 ? method.invoke(null, profile) : method.invoke(null, profile, Boolean.FALSE);
@@ -253,7 +254,10 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             if (packetFlow == null) continue;
             for (String connectionClassName : CONNECTION_CLASS_NAMES) {
                 Object connection = construct(connectionClassName, packetFlow);
-                if (connection != null) return connection;
+                Object channel = construct("io.netty.channel.embedded.EmbeddedChannel");
+                if (connection != null && channel != null && setFieldValue(connection, "channel", channel)) {
+                    return connection;
+                }
             }
         }
         return null;
@@ -280,32 +284,51 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         return null;
     }
 
+    private static boolean setFieldValue(Object target, String name, Object value) {
+        if (target == null) return false;
+        for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
+            try {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                field.set(target, value);
+                return true;
+            } catch (Exception ignored) {
+                // Search the superclass hierarchy.
+            }
+        }
+        return false;
+    }
+
     private static Invocation invoke(Object target, String name, Object... args) {
         if (target == null) return Invocation.ABSENT;
+        Throwable failure = null;
         for (Method method : methods(target.getClass(), name)) {
             if (!compatible(method.getParameterTypes(), args)) continue;
             try {
                 method.setAccessible(true);
                 return new Invocation(true, method.invoke(target, args));
-            } catch (Exception ignored) {
+            } catch (Exception exception) {
+                failure = rootCause(exception);
                 // Try another overload, if present.
             }
         }
-        return Invocation.ABSENT;
+        return failure == null ? Invocation.ABSENT : new Invocation(false, null, failure);
     }
 
     private static Invocation invokeStatic(Class<?> type, String name, Object... args) {
         if (type == null) return Invocation.ABSENT;
+        Throwable failure = null;
         for (Method method : methods(type, name)) {
             if (!Modifier.isStatic(method.getModifiers()) || !compatible(method.getParameterTypes(), args)) continue;
             try {
                 method.setAccessible(true);
                 return new Invocation(true, method.invoke(null, args));
-            } catch (Exception ignored) {
+            } catch (Exception exception) {
+                failure = rootCause(exception);
                 // Try another overload, if present.
             }
         }
-        return Invocation.ABSENT;
+        return failure == null ? Invocation.ABSENT : new Invocation(false, null, failure);
     }
 
     private static Invocation invokeStatic(String className, String name, Object... args) {
@@ -406,14 +429,26 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         return invocation == null ? null : invocation.value;
     }
 
+    private static Throwable rootCause(Exception exception) {
+        Throwable cause = exception;
+        while (cause.getCause() != null) cause = cause.getCause();
+        return cause;
+    }
+
     private static final class Invocation {
         private static final Invocation ABSENT = new Invocation(false, null);
         private final boolean found;
         private final Object value;
+        private final Throwable failure;
 
         private Invocation(boolean found, Object value) {
+            this(found, value, null);
+        }
+
+        private Invocation(boolean found, Object value, Throwable failure) {
             this.found = found;
             this.value = value;
+            this.failure = failure;
         }
     }
 }
