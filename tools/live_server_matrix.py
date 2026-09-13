@@ -69,8 +69,12 @@ def fixture_jars(root: Path, fixture: str) -> list[Path]:
             "testmod-leak-omnitrack-1.0.0.jar",
         )
         advanced_names = (
-            "testmod-leak-playersession-1.0.0.jar",
-            "testmod-leak-persistententity-1.0.0.jar",
+            (
+                "testmod-leak-playersession-1.0.0.jar",
+                "testmod-leak-persistententity-1.0.0.jar",
+            )
+            if is_canonical_fabric_build(root, fixture)
+            else ()
         )
     elif fixture == "forge1122":
         required_names = ("testmod-leak-forge1122-1.0.0.jar",)
@@ -89,14 +93,17 @@ def fixture_jars(root: Path, fixture: str) -> list[Path]:
         path = root / "build" / "testmods" / name
         if path.is_file():
             result.append(path)
-        elif args_are_canonical_fabric(root, fixture):
+        elif is_canonical_fabric_build(root, fixture):
             raise RuntimeError(f"Required canonical advanced fixture was not built: {path}")
     return result
 
 
-def args_are_canonical_fabric(root: Path, fixture: str) -> bool:
+def is_canonical_fabric_build(root: Path, fixture: str) -> bool:
     """Advanced fixtures are intentionally required only by the 1.21.1 root build."""
-    return fixture == "fabric" and (root / "gradle.properties").is_file() and "minecraft_version=1.21.1" in (root / "gradle.properties").read_text(encoding="utf-8")
+    if fixture != "fabric" or not (root / "gradle.properties").is_file():
+        return False
+    properties = (root / "gradle.properties").read_text(encoding="utf-8")
+    return "minecraft_version=1.21.1" in properties
 
 
 def stage_mods(root: Path, loader: str, fixture: str) -> None:

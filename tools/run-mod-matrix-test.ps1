@@ -33,6 +33,19 @@ if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
+$CanonicalAdvancedFixtureBuild = (Get-Content -Path "$WorkspaceRoot/gradle.properties" -Raw) -match "(?m)^minecraft_version=1\.21\.1\s*$"
+if ($CanonicalAdvancedFixtureBuild) {
+    foreach ($advancedFixture in @(
+        "testmod-leak-playersession-1.0.0.jar",
+        "testmod-leak-persistententity-1.0.0.jar"
+    )) {
+        if (-not (Test-Path "$TestModsDir/$advancedFixture")) {
+            Write-Error "Canonical advanced fixture jar not found: $TestModsDir/$advancedFixture"
+            exit 1
+        }
+    }
+}
+
 $MatrixScenarios = @(
     @{
         Name = "01_Baseline_Clean";
@@ -253,6 +266,15 @@ Function Run-ServerScenario {
 
     # Read and inspect JSON
     $json = Get-Content -Path $destReport -Raw | ConvertFrom-Json
+    if ($json.status -ne "COMPLETED") {
+        Write-Error "Scenario $name did not complete: status=$($json.status)"
+        return $false
+    }
+    $invalidCleanup = @($json.checkpoints | Where-Object { $_.cleanupValid -ne $true })
+    if ($invalidCleanup.Count -gt 0) {
+        Write-Error "Scenario $name has invalid cleanup checkpoints"
+        return $false
+    }
     $verdict = $json.detection.classification
     $slope = $json.detection.slopeBytesPerCycle
     $slopeMb = [math]::Round($slope / (1024.0 * 1024.0), 2)
@@ -267,6 +289,10 @@ Function Run-ServerScenario {
     }
 
     return $true
+}
+
+if (-not $CanonicalAdvancedFixtureBuild) {
+    $MatrixScenarios = @($MatrixScenarios | Where-Object { $_.Name -notmatch '^(10|11|12|13)_' })
 }
 
 # Main execution loop

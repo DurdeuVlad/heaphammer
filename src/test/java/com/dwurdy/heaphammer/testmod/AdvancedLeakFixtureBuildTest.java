@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.jar.JarFile;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AdvancedLeakFixtureBuildTest {
 
@@ -17,9 +18,7 @@ class AdvancedLeakFixtureBuildTest {
     void testPlayerSessionJarPackaging() throws IOException {
         Path jarPath = Path.of("build/testmods/testmod-leak-playersession-1.0.0.jar");
         File jarFile = jarPath.toFile();
-        if (!jarFile.exists()) {
-            return;
-        }
+        assertTrue(jarFile.exists(), "Run buildTestmods before packaging assertions");
 
         try (JarFile jar = new JarFile(jarFile)) {
             assertNotNull(jar.getJarEntry("fabric.mod.json"));
@@ -35,9 +34,7 @@ class AdvancedLeakFixtureBuildTest {
     void testPersistentEntityJarPackaging() throws IOException {
         Path jarPath = Path.of("build/testmods/testmod-leak-persistententity-1.0.0.jar");
         File jarFile = jarPath.toFile();
-        if (!jarFile.exists()) {
-            return;
-        }
+        assertTrue(jarFile.exists(), "Run buildTestmods before packaging assertions");
 
         try (JarFile jar = new JarFile(jarFile)) {
             assertNotNull(jar.getJarEntry("fabric.mod.json"));

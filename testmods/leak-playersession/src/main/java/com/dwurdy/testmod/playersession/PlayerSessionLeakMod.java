@@ -1,16 +1,21 @@
 package com.dwurdy.testmod.playersession;
 
+import com.dwurdy.heaphammer.platform.PlayerLifecycleObservers;
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,13 +23,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Synthetic player-session leak fixture for HeapHammer's authentic login/logout
- * workload. It can model both correct disconnect cleanup and a leaked session.
+ * workload. It uses HeapHammer's loader-neutral join observer so the fixture
+ * sees the same synthetic player path as production integrations.
  */
 public final class PlayerSessionLeakMod implements ModInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger("TestMod-PlayerSessionLeak");
     private static final String TEST_NAME_PREFIX = "hh_test_";
-    private static final ConcurrentHashMap<java.util.UUID, PlayerSessionRecord> CLEAN_SESSIONS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, PlayerSessionRecord> CLEAN_SESSIONS = new ConcurrentHashMap<>();
     private static final CopyOnWriteArrayList<PlayerSessionRecord> LEAKED_SESSIONS = new CopyOnWriteArrayList<>();
+    private static final Set<UUID> ACTIVE_TEST_PLAYERS = ConcurrentHashMap.newKeySet();
     private static final AtomicBoolean ACTIVE = new AtomicBoolean(false);
     private static final AtomicBoolean LEAK_ENABLED = new AtomicBoolean(false);
     private static final AtomicLong JOIN_COUNT = new AtomicLong();
@@ -34,39 +41,57 @@ public final class PlayerSessionLeakMod implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("[TestMod-PlayerSessionLeak] Initializing player-session retention fixture (mode=OFF).");
 
+        PlayerLifecycleObservers.registerJoinObserver(PlayerSessionLeakMod::observeJoinedPlayer);
+        // This fallback covers real Fabric client logins on runtimes that emit
+        // the Fabric networking event in addition to HeapHammer's observer.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            if (!isEnabled() || handler == null || handler.getPlayer() == null) {
-                return;
-            }
-            ServerPlayer player = handler.getPlayer();
-            String name = player.getGameProfile().getName();
-            if (!isTestPlayer(name)) {
-                return;
-            }
-
-            PlayerSessionRecord record = new PlayerSessionRecord(player, JOIN_COUNT.incrementAndGet());
-            if (LEAK_ENABLED.get()) {
-                // Deliberately omit a disconnect cleanup hook in LEAK mode.
-                LEAKED_SESSIONS.add(record);
-            } else {
-                CLEAN_SESSIONS.put(player.getUUID(), record);
+            if (handler != null) {
+                observeJoinedPlayer(handler.getPlayer());
             }
         });
-
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            if (!isEnabled() || handler == null || handler.getPlayer() == null) {
-                return;
-            }
-            String name = handler.getPlayer().getGameProfile().getName();
-            if (isTestPlayer(name)) {
-                DISCONNECT_COUNT.incrementAndGet();
-                if (!LEAK_ENABLED.get()) {
-                    CLEAN_SESSIONS.remove(handler.getPlayer().getUUID());
-                }
-            }
-        });
+        // Synthetic connections do not always emit a Fabric disconnect event,
+        // so clean mode reconciles UUIDs against the authoritative player list.
+        ServerTickEvents.END_SERVER_TICK.register(PlayerSessionLeakMod::reconcileDisconnects);
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> registerCommands(dispatcher));
+    }
+
+    private static void observeJoinedPlayer(Object value) {
+        if (!isEnabled() || !(value instanceof ServerPlayer player)) {
+            return;
+        }
+        String name = player.getGameProfile().getName();
+        if (!isTestPlayer(name) || !ACTIVE_TEST_PLAYERS.add(player.getUUID())) {
+            return;
+        }
+
+        PlayerSessionRecord record = new PlayerSessionRecord(player, JOIN_COUNT.incrementAndGet());
+        if (LEAK_ENABLED.get()) {
+            // Deliberately omit disconnect cleanup in LEAK mode.
+            LEAKED_SESSIONS.add(record);
+        } else {
+            CLEAN_SESSIONS.put(player.getUUID(), record);
+        }
+    }
+
+    private static void reconcileDisconnects(MinecraftServer server) {
+        if (!isEnabled() || ACTIVE_TEST_PLAYERS.isEmpty()) {
+            return;
+        }
+        Set<UUID> connected = ConcurrentHashMap.newKeySet();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (isTestPlayer(player.getGameProfile().getName())) {
+                connected.add(player.getUUID());
+            }
+        }
+        for (UUID playerId : ACTIVE_TEST_PLAYERS.toArray(new UUID[0])) {
+            if (!connected.contains(playerId) && ACTIVE_TEST_PLAYERS.remove(playerId)) {
+                DISCONNECT_COUNT.incrementAndGet();
+                if (!LEAK_ENABLED.get()) {
+                    CLEAN_SESSIONS.remove(playerId);
+                }
+            }
+        }
     }
 
     private static boolean isEnabled() {
@@ -121,6 +146,8 @@ public final class PlayerSessionLeakMod implements ModInitializer {
         ACTIVE.set(active);
         if (leak) {
             CLEAN_SESSIONS.clear();
+        } else {
+            LEAKED_SESSIONS.clear();
         }
         if (announce) {
             context.getSource().sendSuccess(() -> Component.literal(
@@ -136,5 +163,6 @@ public final class PlayerSessionLeakMod implements ModInitializer {
     public static void clearAll() {
         CLEAN_SESSIONS.clear();
         LEAKED_SESSIONS.clear();
+        ACTIVE_TEST_PLAYERS.clear();
     }
 }

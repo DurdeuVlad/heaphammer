@@ -7,6 +7,7 @@ import java.util.UUID;
 /** Strong-reference session record used only by the intentional test fixture. */
 public final class PlayerSessionRecord {
     private final ServerPlayer player;
+    private final Object connection;
     private final UUID playerId;
     private final String playerName;
     private final long joinNumber;
@@ -14,6 +15,7 @@ public final class PlayerSessionRecord {
 
     public PlayerSessionRecord(ServerPlayer player, long joinNumber) {
         this.player = player;
+        this.connection = player.connection;
         this.playerId = player.getUUID();
         this.playerName = player.getGameProfile().getName();
         this.joinNumber = joinNumber;

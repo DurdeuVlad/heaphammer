@@ -123,6 +123,8 @@ public final class PersistentEntityLeakMod implements ModInitializer {
         ACTIVE.set(active);
         if (leak) {
             CLEAN_ENTITIES.clear();
+        } else {
+            LEAKED_ENTITIES.clear();
         }
         if (announce) {
             context.getSource().sendSuccess(() -> Component.literal(

@@ -132,8 +132,8 @@ if (project.minecraft_version == '1.21.1') {
 		testmodPlayerSession {
 			java.srcDirs = ['testmods/leak-playersession/src/main/java']
 			resources.srcDirs = ['testmods/leak-playersession/src/main/resources']
-			compileClasspath += sourceSets.main.compileClasspath
-			runtimeClasspath += sourceSets.main.runtimeClasspath
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
 		}
 		testmodPersistentEntity {
 			java.srcDirs = ['testmods/leak-persistententity/src/main/java']
