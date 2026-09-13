@@ -353,7 +353,20 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             for (String flowName : new String[]{"SERVERBOUND", "CLIENTBOUND"}) {
                 Object flow = enumConstant(packetFlowType, flowName);
                 Object key = value(invokeStatic(connectionType, "getProtocolKey", flow));
-                if (key == null) key = value(invokeStatic(connectionType, "getProtocolAttributeKey", flow));
+                if (key == null) {
+                    Object networkSide = enumConstant("net.minecraft.network.NetworkSide", flowName);
+                    if (networkSide == null) {
+                        networkSide = enumConstant("net.minecraft.network.protocol.NetworkSide", flowName);
+                    }
+                    key = value(invokeStatic(connectionType, "getProtocolAttributeKey", networkSide));
+                }
+                if (key == null) {
+                    String primaryField = "SERVERBOUND".equals(flowName)
+                            ? "ATTRIBUTE_SERVERBOUND_PROTOCOL" : "ATTRIBUTE_CLIENTBOUND_PROTOCOL";
+                    String legacyField = "SERVERBOUND".equals(flowName)
+                            ? "SERVERBOUND_PROTOCOL_KEY" : "CLIENTBOUND_PROTOCOL_KEY";
+                    key = staticFieldValue(connectionType, primaryField, legacyField);
+                }
                 Object codec = value(invoke(play, "codec", flow));
                 if (codec == null) codec = value(invoke(play, "getHandler", flow));
                 if (key == null || codec == null) {
@@ -391,6 +404,23 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
                 return field.get(target);
             } catch (Exception ignored) {
                 // Search the superclass hierarchy.
+            }
+        }
+        return null;
+    }
+
+    private static Object staticFieldValue(Class<?> type, String... names) {
+        if (type == null) return null;
+        for (Class<?> cursor = type; cursor != null; cursor = cursor.getSuperclass()) {
+            for (String name : names) {
+                try {
+                    Field field = cursor.getDeclaredField(name);
+                    if (!Modifier.isStatic(field.getModifiers())) continue;
+                    field.setAccessible(true);
+                    return field.get(null);
+                } catch (Exception ignored) {
+                    // Try the next mapped field name or superclass.
+                }
             }
         }
         return null;
