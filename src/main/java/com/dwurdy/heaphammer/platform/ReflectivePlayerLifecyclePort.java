@@ -276,12 +276,68 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             for (String connectionClassName : CONNECTION_CLASS_NAMES) {
                 Object connection = construct(connectionClassName, packetFlow);
                 Object channel = construct("io.netty.channel.embedded.EmbeddedChannel");
-                if (connection != null && channel != null && setFieldValue(connection, "channel", channel)) {
+                if (connection != null && channel != null && configureConnectionChannel(connection, channel)) {
                     return connection;
                 }
             }
         }
         return null;
+    }
+
+    /**
+     * Installs the synthetic channel and initializes the protocol attributes
+     * expected by the server's authoritative player-placement path. Older
+     * runtimes may not expose the protocol helpers, so the channel field and
+     * initializer remain compatibility fallbacks where those helpers exist.
+     */
+    static boolean configureConnectionChannel(Object connection, Object channel) {
+        if (connection == null || channel == null) return false;
+        if (!setFieldValue(connection, "channel", channel)) return false;
+
+        Invocation initializer = invoke(connection, "setInitialProtocolAttributes", channel);
+        if (!initializer.found && initializer.failure == null) {
+            initializer = invoke(connection, "setHandlers", channel);
+        }
+        if (initializer.failure != null) return false;
+
+        Class<?> protocolType = load("net.minecraft.network.ConnectionProtocol");
+        Object play = enumConstant(protocolType, "PLAY");
+        if (play != null && !configurePlayProtocol(connection, channel, play)) return false;
+        return true;
+    }
+
+    private static boolean configurePlayProtocol(Object connection, Object channel, Object play) {
+        Class<?> connectionType = connection.getClass();
+        boolean metadataAvailableOnAnyCandidate = false;
+        for (String packetFlowClassName : PACKET_FLOW_CLASS_NAMES) {
+            Class<?> packetFlowType = load(packetFlowClassName);
+            if (packetFlowType == null || !packetFlowType.isEnum()) continue;
+
+            boolean configured = true;
+            boolean metadataAvailable = false;
+            for (String flowName : new String[]{"SERVERBOUND", "CLIENTBOUND"}) {
+                Object flow = enumConstant(packetFlowType, flowName);
+                Object key = value(invokeStatic(connectionType, "getProtocolKey", flow));
+                if (key == null) key = value(invokeStatic(connectionType, "getProtocolAttributeKey", flow));
+                Object codec = value(invoke(play, "codec", flow));
+                if (codec == null) codec = value(invoke(play, "getHandler", flow));
+                if (key == null || codec == null) {
+                    configured = false;
+                    break;
+                }
+                metadataAvailable = true;
+                metadataAvailableOnAnyCandidate = true;
+                Object attribute = value(invoke(channel, "attr", key));
+                if (attribute == null
+                        || !invoke(attribute, "set", codec).found) {
+                    configured = false;
+                    break;
+                }
+            }
+            if (configured) return true;
+            if (metadataAvailable) metadataAvailableOnAnyCandidate = true;
+        }
+        return !metadataAvailableOnAnyCandidate;
     }
 
     private static List<Object> iterable(Object value) {
