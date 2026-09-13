@@ -28,6 +28,13 @@ PLAYER_FIXTURE_STATUS_RE = re.compile(
 PERSISTENT_FIXTURE_STATUS_RE = re.compile(
     r"\[TestMod-PersistentEntityLeak\] mode=(\w+), retained_entities=(\d+), loads=(\d+), unloads=(\d+)"
 )
+ADVANCED_FABRIC_MINECRAFT_VERSIONS = {
+    "1.21.4",
+    "1.21.1",
+    "1.20.6",
+    "1.20.4",
+    "1.20.1",
+}
 FIXTURE_STATUS_RES = {
     "fabric": (
         re.compile(r"\[TestMod-ChunkCache\] Status: enabled=true, cached_chunks=(\d+)"),
@@ -79,7 +86,7 @@ def fixture_jars(root: Path, fixture: str) -> list[Path]:
                 "testmod-leak-playersession-1.0.0.jar",
                 "testmod-leak-persistententity-1.0.0.jar",
             )
-            if is_canonical_fabric_build(root, fixture)
+            if is_advanced_fabric_build(root, fixture)
             else ()
         )
     elif fixture == "forge1122":
@@ -99,17 +106,18 @@ def fixture_jars(root: Path, fixture: str) -> list[Path]:
         path = root / "build" / "testmods" / name
         if path.is_file():
             result.append(path)
-        elif is_canonical_fabric_build(root, fixture):
-            raise RuntimeError(f"Required canonical advanced fixture was not built: {path}")
+        elif is_advanced_fabric_build(root, fixture):
+            raise RuntimeError(f"Required advanced fixture was not built: {path}")
     return result
 
 
-def is_canonical_fabric_build(root: Path, fixture: str) -> bool:
-    """Advanced fixtures are intentionally required only by the 1.21.1 root build."""
+def is_advanced_fabric_build(root: Path, fixture: str) -> bool:
+    """Advanced fixtures are required on the modern Fabric target wave."""
     if fixture != "fabric" or not (root / "gradle.properties").is_file():
         return False
     properties = (root / "gradle.properties").read_text(encoding="utf-8")
-    return "minecraft_version=1.21.1" in properties
+    match = re.search(r"(?m)^minecraft_version=([^\r\n]+)", properties)
+    return bool(match and match.group(1).strip() in ADVANCED_FABRIC_MINECRAFT_VERSIONS)
 
 
 def stage_mods(root: Path, loader: str, fixture: str) -> None:
@@ -212,7 +220,7 @@ def main() -> int:
 
     advanced_fixtures = False
     if args.loader == "fabric":
-        advanced_fixtures = is_canonical_fabric_build(root, args.leak_fixture) and all(
+        advanced_fixtures = is_advanced_fabric_build(root, args.leak_fixture) and all(
             (root / "build" / "testmods" / name).is_file()
             for name in (
                 "testmod-leak-playersession-1.0.0.jar",
@@ -489,9 +497,9 @@ def main() -> int:
         raise RuntimeError("Player scenario ran but the player-retention fixture retained no players")
     if advanced_fixtures:
         if not player_fixture_status:
-            raise RuntimeError("Canonical run did not report player-session fixture state")
+            raise RuntimeError("Modern Fabric run did not report player-session fixture state")
         if not persistent_fixture_status:
-            raise RuntimeError("Canonical run did not report persistent-entity fixture state")
+            raise RuntimeError("Modern Fabric run did not report persistent-entity fixture state")
         if not any(
             state["mode"] == "LEAK" and state["retainedSessions"] > 0
             for state in player_fixture_status
@@ -506,9 +514,9 @@ def main() -> int:
         ):
             raise RuntimeError("Persistent-entity fixture reported no retained leak records")
         if not advanced_player_reports:
-            raise RuntimeError("Canonical run did not produce an advanced player diagnostic report")
+            raise RuntimeError("Modern Fabric run did not produce an advanced player diagnostic report")
         if not advanced_persistent_reports:
-            raise RuntimeError("Canonical run did not produce an advanced persistent-entity report")
+            raise RuntimeError("Modern Fabric run did not produce an advanced persistent-entity report")
         if not any(
             item["report"].get("detection", {}).get("classification") in {"SUSPICIOUS", "FAIL"}
             for item in advanced_player_reports

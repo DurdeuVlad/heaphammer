@@ -33,8 +33,12 @@ if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
-$CanonicalAdvancedFixtureBuild = (Get-Content -Path "$WorkspaceRoot/gradle.properties" -Raw) -match "(?m)^minecraft_version=1\.21\.1\s*$"
-if ($CanonicalAdvancedFixtureBuild) {
+$AdvancedFabricMinecraftVersions = @("1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.20.1")
+$MinecraftVersion = (Get-Content -Path "$WorkspaceRoot/gradle.properties" |
+    Where-Object { $_ -match '^minecraft_version=' } |
+    Select-Object -First 1) -replace '^minecraft_version=', ''
+$AdvancedFixtureBuild = $AdvancedFabricMinecraftVersions -contains $MinecraftVersion.Trim()
+if ($AdvancedFixtureBuild) {
     foreach ($advancedFixture in @(
         "testmod-leak-playersession-1.0.0.jar",
         "testmod-leak-persistententity-1.0.0.jar"
@@ -291,9 +295,9 @@ Function Run-ServerScenario {
     return $true
 }
 
-if (-not $CanonicalAdvancedFixtureBuild) {
+if (-not $AdvancedFixtureBuild) {
     if ($SpecificScenario -match '^(10|11|12|13)_') {
-        Write-Error "Scenario $SpecificScenario requires the canonical Minecraft 1.21.1 build"
+        Write-Error "Scenario $SpecificScenario requires a modern Fabric build (1.20.1+ target wave)"
         exit 1
     }
     $MatrixScenarios = @($MatrixScenarios | Where-Object { $_.Name -notmatch '^(10|11|12|13)_' })

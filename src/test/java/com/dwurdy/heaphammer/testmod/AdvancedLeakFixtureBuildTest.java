@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.jar.JarFile;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -20,7 +21,7 @@ class AdvancedLeakFixtureBuildTest {
     @Test
     @DisplayName("Verify player-session leak fixture jar packaging and manifest")
     void testPlayerSessionJarPackaging() throws IOException {
-        assumeCanonicalFixtureBuild();
+        assumeAdvancedFixtureBuild();
         Path jarPath = Paths.get("build/testmods/testmod-leak-playersession-1.0.0.jar");
         File jarFile = jarPath.toFile();
         assertTrue(jarFile.exists(), "Run buildTestmods before packaging assertions");
@@ -37,7 +38,7 @@ class AdvancedLeakFixtureBuildTest {
     @Test
     @DisplayName("Verify persistent-entity leak fixture jar packaging and manifest")
     void testPersistentEntityJarPackaging() throws IOException {
-        assumeCanonicalFixtureBuild();
+        assumeAdvancedFixtureBuild();
         Path jarPath = Paths.get("build/testmods/testmod-leak-persistententity-1.0.0.jar");
         File jarFile = jarPath.toFile();
         assertTrue(jarFile.exists(), "Run buildTestmods before packaging assertions");
@@ -51,12 +52,17 @@ class AdvancedLeakFixtureBuildTest {
         }
     }
 
-    private static void assumeCanonicalFixtureBuild() throws IOException {
+    private static void assumeAdvancedFixtureBuild() throws IOException {
         Path properties = Paths.get("gradle.properties");
-        boolean canonical = Files.isRegularFile(properties)
-                && Files.readAllLines(properties, StandardCharsets.UTF_8).stream()
-                .anyMatch(line -> "minecraft_version=1.21.1".equals(line.trim()));
-        Assumptions.assumeTrue(canonical,
-                "Advanced fixture packaging is only defined for the canonical 1.21.1 build");
+        String minecraftVersion = Files.isRegularFile(properties)
+                ? Files.readAllLines(properties, StandardCharsets.UTF_8).stream()
+                .filter(line -> line.trim().startsWith("minecraft_version="))
+                .map(line -> line.trim().substring("minecraft_version=".length()))
+                .findFirst()
+                .orElse("")
+                : "";
+        Assumptions.assumeTrue(Arrays.asList("1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.20.1")
+                        .contains(minecraftVersion),
+                "Advanced fixture packaging is defined for modern Fabric targets only");
     }
 }
