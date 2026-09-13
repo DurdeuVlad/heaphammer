@@ -2,10 +2,12 @@ package com.dwurdy.heaphammer.platform;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +29,25 @@ class ReflectivePlayerLifecyclePortTest {
         assertTrue(ReflectivePlayerLifecyclePort.configureConnectionChannel(connection, channel));
         assertSame(channel, connection.channel);
         assertSame(channel, FakeConnection.configuredChannel);
+    }
+
+    @Test
+    void releasesSyntheticDisconnectReferenceGraph() throws Exception {
+        FakeListener listener = new FakeListener();
+        FakeNetworkConnection networkConnection = new FakeNetworkConnection();
+        listener.connection = networkConnection;
+        listener.player = new Object();
+        networkConnection.packetListener = listener;
+        networkConnection.disconnectListener = listener;
+
+        Method release = ReflectivePlayerLifecyclePort.class
+                .getDeclaredMethod("releaseDisconnectedReferences", Object.class);
+        release.setAccessible(true);
+        release.invoke(null, listener);
+
+        assertNull(listener.player);
+        assertNull(networkConnection.packetListener);
+        assertNull(networkConnection.disconnectListener);
     }
 
     private static final class FakePlayerList {
@@ -80,6 +101,16 @@ class ReflectivePlayerLifecyclePortTest {
         public static Object getProtocolKey(Object flow) {
             return flow;
         }
+    }
+
+    private static final class FakeListener {
+        private Object connection;
+        private Object player;
+    }
+
+    private static final class FakeNetworkConnection {
+        private Object packetListener;
+        private Object disconnectListener;
     }
 
     private static final class FakeChannel {

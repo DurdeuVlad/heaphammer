@@ -162,22 +162,57 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
     }
 
     private static boolean disconnect(Object player, String message) {
-        Object connection = fieldValue(player, "connection");
-        if (connection == null) return false;
-        for (Method method : methods(connection.getClass(), "onDisconnect")) {
+        Object listener = fieldValue(player, "connection");
+        if (listener == null) return false;
+        for (Method method : methods(listener.getClass(), "onDisconnect")) {
             if (method.getParameterTypes().length != 1) continue;
             Class<?> parameter = method.getParameterTypes()[0];
             Object reason = disconnectReason(parameter, message);
             if (reason == null && parameter.isPrimitive()) continue;
             try {
                 method.setAccessible(true);
-                method.invoke(connection, reason);
+                method.invoke(listener, reason);
+                closeNetworkConnection(listener, message);
+                releaseDisconnectedReferences(listener);
                 return true;
             } catch (Exception ignored) {
                 // Try another overload, if present.
             }
         }
         return false;
+    }
+
+    /**
+     * The synthetic player path invokes the server listener directly because
+     * there is no real client event loop. Close the underlying transport too;
+     * otherwise the listener/connection pair can keep a disconnected player
+     * reachable after PlayerList removes it.
+     */
+    private static void closeNetworkConnection(Object listener, String message) {
+        Object networkConnection = fieldValue(listener, "connection");
+        if (networkConnection == null) return;
+        for (Method method : methods(networkConnection.getClass(), "disconnect")) {
+            if (method.getParameterTypes().length != 1) continue;
+            Object reason = disconnectReason(method.getParameterTypes()[0], message);
+            if (reason == null && method.getParameterTypes()[0].isPrimitive()) continue;
+            try {
+                method.setAccessible(true);
+                method.invoke(networkConnection, reason);
+                return;
+            } catch (Exception ignored) {
+                // Older runtimes may not expose a compatible transport close.
+            }
+        }
+    }
+
+    /** Break the synthetic listener graph after the authoritative disconnect callback. */
+    private static void releaseDisconnectedReferences(Object listener) {
+        Object networkConnection = fieldValue(listener, "connection");
+        if (networkConnection != null) {
+            setFieldValue(networkConnection, "packetListener", null);
+            setFieldValue(networkConnection, "disconnectListener", null);
+        }
+        setFieldValue(listener, "player", null);
     }
 
     private static Object disconnectReason(Class<?> parameter, String message) {
