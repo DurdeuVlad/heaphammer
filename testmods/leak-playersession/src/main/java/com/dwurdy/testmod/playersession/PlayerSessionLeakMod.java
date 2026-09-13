@@ -49,8 +49,9 @@ public final class PlayerSessionLeakMod implements ModInitializer {
                 observeJoinedPlayer(handler.getPlayer());
             }
         });
-        // Synthetic connections do not always emit a Fabric disconnect event,
-        // so clean mode reconciles UUIDs against the authoritative player list.
+        // Synthetic connections do not always emit Fabric join/disconnect
+        // events, so reconcile both joins and UUIDs against the authoritative
+        // player list at the end of each server tick.
         ServerTickEvents.END_SERVER_TICK.register(PlayerSessionLeakMod::reconcileDisconnects);
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> registerCommands(dispatcher));
@@ -75,7 +76,15 @@ public final class PlayerSessionLeakMod implements ModInitializer {
     }
 
     private static void reconcileDisconnects(MinecraftServer server) {
-        if (!isEnabled() || ACTIVE_TEST_PLAYERS.isEmpty()) {
+        if (!isEnabled()) {
+            return;
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (isTestPlayer(player.getGameProfile().getName())) {
+                observeJoinedPlayer(player);
+            }
+        }
+        if (ACTIVE_TEST_PLAYERS.isEmpty()) {
             return;
         }
         Set<UUID> connected = ConcurrentHashMap.newKeySet();
