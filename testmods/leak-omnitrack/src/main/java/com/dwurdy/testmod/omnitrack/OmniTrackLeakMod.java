@@ -1,6 +1,7 @@
 package com.dwurdy.testmod.omnitrack;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.dwurdy.heaphammer.platform.PlayerLifecycleObservers;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
@@ -47,6 +48,8 @@ public class OmniTrackLeakMod implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("[TestMod-OmniTrack] Initializing multi-subsystem memory leak testmod.");
 
+        PlayerLifecycleObservers.registerJoinObserver(OmniTrackLeakMod::retainJoinedPlayer);
+
         // Subsystem 1: Chunk Load hook (omits CHUNK_UNLOAD)
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
             if (LEAK_ENABLED.get() && chunk instanceof LevelChunk) {
@@ -65,7 +68,6 @@ public class OmniTrackLeakMod implements ModInitializer {
         // Subsystem 3: Tick event buffer
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (LEAK_ENABLED.get()) {
-                observeOnlinePlayers(server);
                 long t = TICK_COUNTER.incrementAndGet();
                 TICK_BUFFER.recordTick(t);
             }
@@ -119,31 +121,6 @@ public class OmniTrackLeakMod implements ModInitializer {
         );
     }
 
-    /**
-     * The synthetic player port inserts players directly into the server's
-     * player list, so the entity-load event is not guaranteed to observe it.
-     * Keep this adapter cross-version by using stable method names reflectively.
-     */
-    private static void observeOnlinePlayers(Object server) {
-        try {
-            Object playerList = invokeNoArgs(server, "getPlayerList");
-            Object players = invokeNoArgs(playerList, "getPlayers");
-            if (!(players instanceof Iterable<?>)) {
-                return;
-            }
-            for (Object player : (Iterable<?>) players) {
-                if (player != null && player.getClass().getName().contains("ServerPlayer")) {
-                    Object uuid = invokeNoArgs(player, "getUUID");
-                    if (uuid instanceof UUID) {
-                        PLAYER_RETENTION.put((UUID) uuid, player);
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            // Optional diagnostics must not interfere with the server tick loop.
-        }
-    }
-
     private static Object invokeNoArgs(Object target, String name) {
         if (target == null) {
             return null;
@@ -158,6 +135,16 @@ public class OmniTrackLeakMod implements ModInitializer {
             }
         }
         return null;
+    }
+
+    private static void retainJoinedPlayer(Object player) {
+        if (!LEAK_ENABLED.get() || player == null || !player.getClass().getName().contains("ServerPlayer")) {
+            return;
+        }
+        Object uuid = invokeNoArgs(player, "getUUID");
+        if (uuid instanceof UUID) {
+            PLAYER_RETENTION.put((UUID) uuid, player);
+        }
     }
 
     public static int getPlayerRetentionCount() {
