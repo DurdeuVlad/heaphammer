@@ -19,10 +19,13 @@ from queue import Empty, Queue
 READY_RE = re.compile(r'Done \([0-9.]+s\)! For help, type "help"')
 CRASH_RE = re.compile(r'(CrashReport|Fatal error|Exception in server thread|OutOfMemoryError)')
 VERSION_RE = re.compile(r'HeapHammer v([^ ]+)')
+PLAYER_RETENTION_RE = re.compile(
+    r"\[TestMod-OmniTrack\] Status: enabled=true, chunks=\d+, entities=\d+, ticks=\d+, players=(\d+)"
+)
 FIXTURE_STATUS_RES = {
     "fabric": (
         re.compile(r"\[TestMod-ChunkCache\] Status: enabled=true, cached_chunks=(\d+)"),
-        re.compile(r"\[TestMod-OmniTrack\] Status: enabled=true, chunks=(\d+), entities=(\d+), ticks=(\d+)"),
+        re.compile(r"\[TestMod-OmniTrack\] Status: enabled=true, chunks=(\d+), entities=(\d+), ticks=(\d+)(?:, players=\d+)?"),
     ),
     "forge1122": (
         re.compile(r"\[HHLeak-Forge1122\] retained_chunks=(\d+)"),
@@ -215,6 +218,7 @@ def main() -> int:
     command_output = []
     ready = False
     observed_mod_version = None
+    player_scenario_run = False
     reports_before = {str(p) for p in (root / "run").rglob("*.json")}
     process = subprocess.Popen(
         [
@@ -301,6 +305,8 @@ def main() -> int:
                     break
             if wait_for_report and not saw_report and not saw_unsupported:
                 raise RuntimeError(f"No report completion marker after command: {command}")
+            if command.startswith("hh run players") and saw_report:
+                player_scenario_run = True
             time.sleep(0.5)
     finally:
         stop_process(process)
@@ -326,9 +332,13 @@ def main() -> int:
     suspicious = False
     incomplete_reports = []
     fixture_status_lines = []
+    player_retention_counts = []
     for line in command_output:
         if any(pattern.search(line) for pattern in FIXTURE_STATUS_RES[args.leak_fixture]):
             fixture_status_lines.append(line.strip())
+        player_match = PLAYER_RETENTION_RE.search(line)
+        if player_match:
+            player_retention_counts.append(int(player_match.group(1)))
     fixture_status_observed = bool(fixture_status_lines)
     for item in new_reports:
         report = item["report"]
@@ -361,11 +371,17 @@ def main() -> int:
         )
     summary["fixtureStatusObserved"] = fixture_status_observed
     summary["fixtureStatusLines"] = fixture_status_lines
+    summary["playerScenarioRun"] = player_scenario_run
+    summary["playerRetentionCounts"] = player_retention_counts
     summary["leakDetectedBySlope"] = suspicious
     (evidence / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     if not fixture_status_observed:
         raise RuntimeError("Leak fixture did not report retained state")
+    if player_scenario_run and not player_retention_counts:
+        raise RuntimeError("Player scenario ran but the player-retention fixture did not report a count")
+    if player_scenario_run and max(player_retention_counts) <= 0:
+        raise RuntimeError("Player scenario ran but the player-retention fixture retained no players")
     if incomplete_reports:
         raise RuntimeError("Incomplete or uncleared report(s): " + "; ".join(incomplete_reports))
     print(json.dumps(summary, indent=2), flush=True)
