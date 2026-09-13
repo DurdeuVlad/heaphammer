@@ -24,72 +24,86 @@ jobs:
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.21.4
             mc-version: '1.21.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.20.6
             mc-version: '1.20.6'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.20.4
             mc-version: '1.20.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.20.1
             mc-version: '1.20.1'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.19.4
             mc-version: '1.19.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.19.2
             mc-version: '1.19.2'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.18.2
             mc-version: '1.18.2'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
             server-java-opts: '-Xmx4G'
           - branch: ver/1.17.1
             mc-version: '1.17.1'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.16.5
             mc-version: '1.16.5'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.15.2
             mc-version: '1.15.2'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.14.4
             mc-version: '1.14.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.12.2-forge
             mc-version: '1.12.2'
             loader: forge
             java-version: '17'
             leak-mod: forge1122
+            advanced-fixtures: false
           - branch: ver/1.7.10-forge
             mc-version: '1.7.10'
             loader: forge
             java-version: '17'
             leak-mod: forge1710
+            advanced-fixtures: false
 
     steps:
       - name: Checkout version branch
@@ -105,13 +119,14 @@ jobs:
           git fetch origin master --depth=1
           git show origin/master:tools/live_server_matrix.py > tools/live_server_matrix.py
 
-      - name: Load canonical player leak fixture
-        if: matrix.loader == 'fabric' && (matrix.mc-version == '1.21.1' || matrix.mc-version == '1.20.6' || matrix.mc-version == '1.20.4' || matrix.mc-version == '1.20.1')
+      - name: Require modern Fabric advanced fixture adapters
+        if: matrix.advanced-fixtures == true
         run: |
-          # These branches share the current Fabric command API. Older
-          # branches keep their version-specific fixture adapters until their
-          # player-retention observer is backported.
-          git show origin/master:testmods/leak-omnitrack/src/main/java/com/dwurdy/testmod/omnitrack/OmniTrackLeakMod.java > testmods/leak-omnitrack/src/main/java/com/dwurdy/testmod/omnitrack/OmniTrackLeakMod.java
+          # Each selected modern Fabric branch carries version-adapted source
+          # for both advanced fixtures. Do not copy 1.21.1 sources across
+          # mappings; this gate makes missing branch adaptations explicit.
+          test -d testmods/leak-playersession
+          test -d testmods/leak-persistententity
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
@@ -144,6 +159,13 @@ jobs:
           LOADER: ${{ matrix.loader }}
         run: |
           ./gradlew build buildTestmods -Pmod_version=1.1.0 --no-daemon
+
+      - name: Require modern Fabric advanced fixture jars
+        if: matrix.advanced-fixtures == true
+        run: |
+          # The live harness stages and exercises both jars for these rows.
+          test -f build/testmods/testmod-leak-playersession-1.0.0.jar
+          test -f build/testmods/testmod-leak-persistententity-1.0.0.jar
 
       - name: Boot server and execute live matrix
         env:
