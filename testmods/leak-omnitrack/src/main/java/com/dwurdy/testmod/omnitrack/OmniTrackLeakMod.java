@@ -126,22 +126,38 @@ public class OmniTrackLeakMod implements ModInitializer {
      */
     private static void observeOnlinePlayers(Object server) {
         try {
-            Object playerList = server.getClass().getMethod("getPlayerList").invoke(server);
-            Object players = playerList.getClass().getMethod("getPlayers").invoke(playerList);
+            Object playerList = invokeNoArgs(server, "getPlayerList");
+            Object players = invokeNoArgs(playerList, "getPlayers");
             if (!(players instanceof Iterable<?>)) {
                 return;
             }
             for (Object player : (Iterable<?>) players) {
                 if (player != null && player.getClass().getName().contains("ServerPlayer")) {
-                    Object uuid = player.getClass().getMethod("getUUID").invoke(player);
+                    Object uuid = invokeNoArgs(player, "getUUID");
                     if (uuid instanceof UUID) {
                         PLAYER_RETENTION.put((UUID) uuid, player);
                     }
                 }
             }
-        } catch (ReflectiveOperationException | SecurityException ignored) {
+        } catch (Exception ignored) {
             // Optional diagnostics must not interfere with the server tick loop.
         }
+    }
+
+    private static Object invokeNoArgs(Object target, String name) {
+        if (target == null) {
+            return null;
+        }
+        for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
+            try {
+                java.lang.reflect.Method method = type.getDeclaredMethod(name);
+                method.setAccessible(true);
+                return method.invoke(target);
+            } catch (Exception ignored) {
+                // Search the superclass hierarchy for version-specific visibility.
+            }
+        }
+        return null;
     }
 
     public static int getPlayerRetentionCount() {
