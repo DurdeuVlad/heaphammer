@@ -69,6 +69,7 @@ public class OmniTrackLeakMod implements ModInitializer {
         // Subsystem 3: Tick event buffer
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (LEAK_ENABLED.get()) {
+                observeOnlinePlayers(server);
                 long t = TICK_COUNTER.incrementAndGet();
                 TICK_BUFFER.recordTick(t);
             }
@@ -120,6 +121,33 @@ public class OmniTrackLeakMod implements ModInitializer {
                     return chunks + entities + ticks + players;
                 }))
         );
+    }
+
+    /**
+     * The synthetic player port inserts players directly into the server's
+     * player list, so Fabric's entity-load event is not guaranteed to observe
+     * that lifecycle. Keep this test fixture cross-version by using the
+     * stable server/player-list method names reflectively.
+     */
+    private static void observeOnlinePlayers(Object server) {
+        try {
+            Object playerList = server.getClass().getMethod("getPlayerList").invoke(server);
+            Object players = playerList.getClass().getMethod("getPlayers").invoke(playerList);
+            if (!(players instanceof Iterable<?>)) {
+                return;
+            }
+            for (Object player : (Iterable<?>) players) {
+                if (player != null && player.getClass().getName().contains("ServerPlayer")) {
+                    Object uuid = player.getClass().getMethod("getUUID").invoke(player);
+                    if (uuid instanceof UUID) {
+                        PLAYER_RETENTION.put((UUID) uuid, player);
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | SecurityException ignored) {
+            // The fixture is optional diagnostics; an unmapped legacy method
+            // must not interfere with the server's tick loop.
+        }
     }
 
     public static int getChunkAuditCount() {
