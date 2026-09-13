@@ -46,20 +46,29 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         Object profile = construct("com.mojang.authlib.GameProfile", playerId, profileName);
         Object cookie = createInitialCookie(profile);
         Object clientInformation = value(invoke(cookie, "clientInformation"));
-        if (level == null || profile == null || cookie == null || clientInformation == null) {
+        if (level == null || profile == null) {
             return null;
         }
 
         Invocation loginCheck = invoke(playerList, "canPlayerLogin", new InetSocketAddress("127.0.0.1", 0), profile);
         if (loginCheck.found && loginCheck.value != null) return null;
 
+        // CommonListenerCookie and ClientInformation were added after the
+        // older ServerPlayer/PlayerList lifecycle. Keep the modern path while
+        // falling back to the three-argument constructor used by 1.16-1.20.1.
         Object player = construct("net.minecraft.server.level.ServerPlayer", server, level, profile, clientInformation);
+        if (player == null) {
+            player = construct("net.minecraft.server.level.ServerPlayer", server, level, profile);
+        }
         Object packetFlow = enumConstant("net.minecraft.network.protocol.PacketFlow", "SERVERBOUND");
         Object connection = construct("net.minecraft.network.Connection", packetFlow);
         if (player == null || connection == null) return null;
 
         invoke(player, "setPos", x, y, z);
         Invocation placed = invoke(playerList, "placeNewPlayer", connection, player, cookie);
+        if (!placed.found) {
+            placed = invoke(playerList, "placeNewPlayer", connection, player);
+        }
         if (!placed.found || value(invoke(playerList, "getPlayer", playerId)) == null) return null;
 
         PlayerLifecycleObservers.notifyJoined(player);
