@@ -58,7 +58,13 @@ jobs:
         id: merge_attempt
         run: |
           TARGET_BRANCH="${{ matrix.branch }}"
-          echo "Syncing master into $TARGET_BRANCH..."
+          MASTER_SHA="${{ github.sha }}"
+          echo "Syncing master into $TARGET_BRANCH at $MASTER_SHA..."
+
+          # actions/checkout can leave origin/master one push behind while
+          # this matrix is starting. Fetch and merge the exact event commit
+          # so a sync cannot silently publish stale master content.
+          git fetch origin "$MASTER_SHA" --depth=1
 
           # Check if remote branch exists
           if git ls-remote --heads origin "$TARGET_BRANCH" | grep -q "$TARGET_BRANCH"; then
@@ -84,7 +90,7 @@ jobs:
           done
 
           # Attempt merge from master
-          if git merge origin/master -m "chore(sync): automated merge master into $TARGET_BRANCH"; then
+          if git merge "$MASTER_SHA" -m "chore(sync): automated merge master into $TARGET_BRANCH"; then
             echo "Merge succeeded cleanly."
           else
             CONFLICTS=$(git diff --name-only --diff-filter=U)
@@ -160,10 +166,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TARGET_BRANCH="${{ matrix.branch }}"
+          MASTER_SHA="${{ github.sha }}"
           SYNC_BRANCH="sync/master-to-${TARGET_BRANCH#ver/}"
           
           git checkout -b "$SYNC_BRANCH" "origin/$TARGET_BRANCH"
-          git merge origin/master || true
+          git merge "$MASTER_SHA" || true
           
           git push origin "$SYNC_BRANCH" --force
           
