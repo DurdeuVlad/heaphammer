@@ -158,6 +158,15 @@ if (project.minecraft_version == '1.21.1') {
 	}
 
 	buildTestmods.dependsOn(jarPlayerSession, jarPersistentEntity)
+	tasks.named('test') {
+		dependsOn(buildTestmods)
+	}
+} else {
+	// Advanced fixture packaging belongs only to the canonical 1.21.1 build.
+	// Keep synchronized historical branches free of a false packaging failure.
+	tasks.withType(Test).configureEach {
+		exclude '**/AdvancedLeakFixtureBuildTest.class'
+	}
 }
 
 

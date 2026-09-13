@@ -108,7 +108,7 @@ $MatrixScenarios = @(
     @{
         Name = "10_PlayerSession_Leak";
         PreCommand = "playersessionleak mode leak";
-        Command = "hh run players --iterations=3 --logins-per-cycle=1 --actions=join,quit --diagnostics=retention,histogram,event-metrics";
+        Command = "hh run players --iterations=6 --logins-per-cycle=1 --actions=join,quit --explicit-gc=true --diagnostics=retention,histogram,event-metrics";
         Mods = @("testmod-leak-playersession-1.0.0.jar");
         ExpectedVerdict = "SUSPICIOUS";
         Description = "Player login/logout retention leak with per-session histogram payloads";
@@ -116,7 +116,7 @@ $MatrixScenarios = @(
     @{
         Name = "11_PlayerSession_Control";
         PreCommand = "playersessionleak mode clean";
-        Command = "hh run players --iterations=3 --logins-per-cycle=1 --actions=join,quit --diagnostics=retention,histogram,event-metrics";
+        Command = "hh run players --iterations=6 --logins-per-cycle=1 --actions=join,quit --explicit-gc=true --diagnostics=retention,histogram,event-metrics";
         Mods = @("testmod-leak-playersession-1.0.0.jar");
         ExpectedVerdict = "PASS";
         Description = "Player lifecycle control with the intentional retention path disabled";
@@ -292,21 +292,32 @@ Function Run-ServerScenario {
 }
 
 if (-not $CanonicalAdvancedFixtureBuild) {
+    if ($SpecificScenario -match '^(10|11|12|13)_') {
+        Write-Error "Scenario $SpecificScenario requires the canonical Minecraft 1.21.1 build"
+        exit 1
+    }
     $MatrixScenarios = @($MatrixScenarios | Where-Object { $_.Name -notmatch '^(10|11|12|13)_' })
 }
 
 # Main execution loop
 $results = @{}
+$executedScenario = $false
 foreach ($scenario in $MatrixScenarios) {
     if ($SpecificScenario -ne "" -and $scenario.Name -ne $SpecificScenario) {
         continue
     }
+    $executedScenario = $true
     $success = Run-ServerScenario -Scenario $scenario
     $results[$scenario.Name] = $success
     if (-not $success) {
         Write-Error "Matrix test aborted due to scenario failure: $($scenario.Name)"
         exit 1
     }
+}
+
+if ($SpecificScenario -ne "" -and -not $executedScenario) {
+    Write-Error "Unknown matrix scenario: $SpecificScenario"
+    exit 1
 }
 
 Write-Host "`n=================================================================" -ForegroundColor Cyan

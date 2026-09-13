@@ -22,6 +22,12 @@ VERSION_RE = re.compile(r'HeapHammer v([^ ]+)')
 PLAYER_RETENTION_RE = re.compile(
     r"\[TestMod-OmniTrack\] Status: enabled=true, chunks=\d+, entities=\d+, ticks=\d+, players=(\d+)"
 )
+PLAYER_FIXTURE_STATUS_RE = re.compile(
+    r"\[TestMod-PlayerSessionLeak\] mode=(\w+), retained_sessions=(\d+), joins=(\d+), disconnects=(\d+)"
+)
+PERSISTENT_FIXTURE_STATUS_RE = re.compile(
+    r"\[TestMod-PersistentEntityLeak\] mode=(\w+), retained_entities=(\d+), loads=(\d+), unloads=(\d+)"
+)
 FIXTURE_STATUS_RES = {
     "fabric": (
         re.compile(r"\[TestMod-ChunkCache\] Status: enabled=true, cached_chunks=(\d+)"),
@@ -189,6 +195,7 @@ def main() -> int:
     root = Path.cwd()
     evidence = root / "build" / "live-server"
     evidence.mkdir(parents=True, exist_ok=True)
+    disposable_world = f"../build/live-server/world-{os.getpid()}"
     (root / "run").mkdir(parents=True, exist_ok=True)
     (root / "run" / "eula.txt").write_text(
         "# Disposable CI server only; this file is never committed.\neula=true\n",
@@ -197,13 +204,15 @@ def main() -> int:
     (root / "run" / "server.properties").write_text(
         "# Disposable CI server only; this file is never committed.\n"
         "online-mode=false\n"
+        f"level-name={disposable_world}\n"
         "pause-when-empty-seconds=0\n",
         encoding="utf-8",
     )
     stage_mods(root, args.loader, args.leak_fixture)
 
+    advanced_fixtures = False
     if args.loader == "fabric":
-        advanced_fixtures = all(
+        advanced_fixtures = is_canonical_fabric_build(root, args.leak_fixture) and all(
             (root / "build" / "testmods" / name).is_file()
             for name in (
                 "testmod-leak-playersession-1.0.0.jar",
@@ -231,7 +240,7 @@ def main() -> int:
                 "persistententityleak status",
                 "playersessionleak mode leak",
                 "persistententityleak mode leak",
-                "hh run players --iterations=3 --logins-per-cycle=1 --actions=join,quit --diagnostics=retention,histogram,event-metrics",
+                "hh run players --iterations=3 --logins-per-cycle=1 --actions=join,quit --explicit-gc=true --diagnostics=retention,histogram,event-metrics",
                 "hh run entities --profile=persistent --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true --diagnostics=retention,histogram,event-metrics,world-store",
             ]
             commands.extend([
@@ -380,18 +389,54 @@ def main() -> int:
     incomplete_reports = []
     fixture_status_lines = []
     player_retention_counts = []
+    player_fixture_status = []
+    persistent_fixture_status = []
+    advanced_player_reports = []
+    advanced_persistent_reports = []
     for line in command_output:
         if any(pattern.search(line) for pattern in FIXTURE_STATUS_RES[args.leak_fixture]):
             fixture_status_lines.append(line.strip())
         player_match = PLAYER_RETENTION_RE.search(line)
         if player_match:
             player_retention_counts.append(int(player_match.group(1)))
+        player_fixture_match = PLAYER_FIXTURE_STATUS_RE.search(line)
+        if player_fixture_match:
+            player_fixture_status.append(
+                {
+                    "mode": player_fixture_match.group(1),
+                    "retainedSessions": int(player_fixture_match.group(2)),
+                    "joins": int(player_fixture_match.group(3)),
+                    "disconnects": int(player_fixture_match.group(4)),
+                }
+            )
+        persistent_fixture_match = PERSISTENT_FIXTURE_STATUS_RE.search(line)
+        if persistent_fixture_match:
+            persistent_fixture_status.append(
+                {
+                    "mode": persistent_fixture_match.group(1),
+                    "retainedEntities": int(persistent_fixture_match.group(2)),
+                    "loads": int(persistent_fixture_match.group(3)),
+                    "unloads": int(persistent_fixture_match.group(4)),
+                }
+            )
     fixture_status_observed = bool(fixture_status_lines)
     for item in new_reports:
         report = item["report"]
         detection = report.get("detection", {})
         classification = str(detection.get("classification", ""))
         status = str(report.get("status", ""))
+        spec = report.get("spec", {})
+        collectors = {
+            str(collector).upper() for collector in spec.get("diagnosticCollectors", [])
+        }
+        if spec.get("scenarioId") == "players" and "RETENTION" in collectors:
+            advanced_player_reports.append(item)
+        if (
+            spec.get("scenarioId") == "entities"
+            and str(spec.get("entityProfile", "")).upper() == "PERSISTENT"
+            and "RETENTION" in collectors
+        ):
+            advanced_persistent_reports.append(item)
         suspicious = suspicious or classification in {"SUSPICIOUS", "FAIL"}
         cleanup_values = [
             checkpoint.get("cleanupValid")
@@ -419,6 +464,18 @@ def main() -> int:
         )
     summary["fixtureStatusObserved"] = fixture_status_observed
     summary["fixtureStatusLines"] = fixture_status_lines
+    summary["advancedFixtureStatus"] = {
+        "playerSession": player_fixture_status,
+        "persistentEntity": persistent_fixture_status,
+    }
+    summary["advancedReports"] = [
+        {
+            "runId": item["report"].get("runId"),
+            "scenario": item["report"].get("spec", {}).get("scenarioId"),
+            "classification": item["report"].get("detection", {}).get("classification"),
+        }
+        for item in advanced_player_reports + advanced_persistent_reports
+    ]
     summary["playerScenarioRun"] = player_scenario_run
     summary["playerRetentionCounts"] = player_retention_counts
     summary["leakDetectedBySlope"] = suspicious
@@ -430,6 +487,38 @@ def main() -> int:
         raise RuntimeError("Player scenario ran but the player-retention fixture did not report a count")
     if player_scenario_run and max(player_retention_counts) <= 0:
         raise RuntimeError("Player scenario ran but the player-retention fixture retained no players")
+    if advanced_fixtures:
+        if not player_fixture_status:
+            raise RuntimeError("Canonical run did not report player-session fixture state")
+        if not persistent_fixture_status:
+            raise RuntimeError("Canonical run did not report persistent-entity fixture state")
+        if not any(
+            state["mode"] == "LEAK" and state["retainedSessions"] > 0
+            for state in player_fixture_status
+        ):
+            raise RuntimeError("Player-session fixture reported no retained leak records")
+        if not any(
+            state["mode"] == "LEAK"
+            and state["retainedEntities"] > 0
+            and state["loads"] > 0
+            and state["unloads"] > 0
+            for state in persistent_fixture_status
+        ):
+            raise RuntimeError("Persistent-entity fixture reported no retained leak records")
+        if not advanced_player_reports:
+            raise RuntimeError("Canonical run did not produce an advanced player diagnostic report")
+        if not advanced_persistent_reports:
+            raise RuntimeError("Canonical run did not produce an advanced persistent-entity report")
+        if not any(
+            item["report"].get("detection", {}).get("classification") in {"SUSPICIOUS", "FAIL"}
+            for item in advanced_player_reports
+        ):
+            raise RuntimeError("Player-session fixture report did not detect a retained leak")
+        if not any(
+            item["report"].get("detection", {}).get("classification") in {"SUSPICIOUS", "FAIL"}
+            for item in advanced_persistent_reports
+        ):
+            raise RuntimeError("Persistent-entity fixture report did not detect a retained leak")
     if incomplete_reports:
         raise RuntimeError("Incomplete or uncleared report(s): " + "; ".join(incomplete_reports))
     print(json.dumps(summary, indent=2), flush=True)

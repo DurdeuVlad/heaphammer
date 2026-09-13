@@ -28,7 +28,7 @@ Recommended verification commands:
 
 ```text
 playersessionleak mode leak
-hh run players --iterations=6 --logins-per-cycle=2 --actions=join,quit --diagnostics=retention,histogram,event-metrics
+hh run players --iterations=6 --logins-per-cycle=2 --actions=join,quit --explicit-gc=true --diagnostics=retention,histogram,event-metrics
 
 persistententityleak mode leak
 hh run entities --profile=persistent --iterations=6 --batch=15 --hold=5 --settle=10 --explicit-gc=true --diagnostics=retention,histogram,world-store,event-metrics
