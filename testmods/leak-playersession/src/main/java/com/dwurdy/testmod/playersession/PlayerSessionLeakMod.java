@@ -4,6 +4,7 @@ import com.dwurdy.heaphammer.platform.PlayerLifecycleObservers;
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.commands.CommandSourceStack;
@@ -47,6 +48,14 @@ public final class PlayerSessionLeakMod implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             if (handler != null) {
                 observeJoinedPlayer(handler.getPlayer());
+            }
+        });
+        // Direct synthetic placement on some historical modern runtimes does
+        // not dispatch the networking join event. Entity load is the other
+        // stable Fabric lifecycle boundary that observes that player object.
+        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
+            if (entity instanceof ServerPlayer player) {
+                observeJoinedPlayer(player);
             }
         });
         // Synthetic connections do not always emit Fabric join/disconnect
