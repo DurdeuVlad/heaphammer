@@ -3,6 +3,7 @@ package com.dwurdy.heaphammer.scenario.entities;
 import com.dwurdy.heaphammer.domain.ExperimentId;
 import com.dwurdy.heaphammer.domain.ExperimentPlan;
 import com.dwurdy.heaphammer.domain.ExperimentSpec;
+import com.dwurdy.heaphammer.domain.EntityWorkloadProfile;
 import com.dwurdy.heaphammer.domain.ScenarioId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -114,5 +115,24 @@ class EntityScenarioPlannerTest {
                 assertTrue(dist <= radius + 0.001, "Spawn coord distance must be within radius");
             }
         }
+    }
+
+    @Test
+    @DisplayName("persistent profile emits a chunk cycle between spawn and cleanup")
+    void persistentProfileAddsReloadCycle() {
+        ExperimentSpec spec = ExperimentSpec.builder()
+                .scenarioId(ScenarioId.ENTITIES)
+                .entityProfile(EntityWorkloadProfile.PERSISTENT)
+                .iterations(1)
+                .batchSize(2)
+                .build();
+
+        ExperimentPlan plan = new EntityScenarioPlanner().plan(spec, TEST_ENTITY_TYPES);
+
+        assertEquals(2, plan.entityOperations().stream()
+                .filter(operation -> ResolvedEntityOperation.ACTION_CYCLE_CHUNK.equals(operation.action()))
+                .count());
+        assertTrue(plan.entityOperations().stream().allMatch(operation ->
+                operation.profile() == EntityWorkloadProfile.PERSISTENT));
     }
 }

@@ -114,6 +114,12 @@ $TestCommands = @(
         Timeout = $CommandTimeoutSeconds
     },
     @{
+        Cmd = "hh scenario describe players";
+        Pattern = "Scenario: players";
+        Description = "Player lifecycle scenario documentation";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
         Cmd = "hh plan chunks --radius=4 --iterations=2";
         Pattern = "Plan Created:";
         Description = "Dry-run chunk scenario planner";
@@ -129,6 +135,12 @@ $TestCommands = @(
         Cmd = "hh plan blockentities --iterations=2 --batch=5";
         Pattern = "Block Entity Plan Created:";
         Description = "Dry-run block entity planner";
+        Timeout = $CommandTimeoutSeconds
+    },
+    @{
+        Cmd = "hh plan players --iterations=2 --logins-per-cycle=2 --actions=join,respawn,quit";
+        Pattern = "Player Plan Created:";
+        Description = "Dry-run player lifecycle planner";
         Timeout = $CommandTimeoutSeconds
     },
     @{
@@ -159,6 +171,12 @@ $TestCommands = @(
         Cmd = "hh run entities --iterations=2 --batch=5 --hold=2 --settle=2 --explicit-gc=true";
         Pattern = "Report saved successfully";
         Description = "Live entity churn workload and cleanup";
+        Timeout = $RunTimeoutSeconds
+    },
+    @{
+        Cmd = "hh run players --iterations=2 --logins-per-cycle=1 --actions=join,quit --diagnostics=event-metrics";
+        Pattern = "Report saved successfully|unsupported by this platform";
+        Description = "Live player lifecycle capability and cleanup";
         Timeout = $RunTimeoutSeconds
     },
     @{
