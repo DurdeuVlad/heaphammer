@@ -70,6 +70,26 @@ cd loaders/neoforge
 
 > Note on `master`'s `platform/neoforge` package: it is a pure-Java, reflection-decoupled **simulation** used by the unit suite. The production NeoForge wiring (`HeapHammerNeoForge` entrypoint, `DirectNeoForgePlatformAdapter`, `DirectNeoForgeTicketBridge`) lives in `loaders/neoforge/src` and is the only code path a NeoForge server ever executes.
 
+### Advanced diagnostic fixture coverage for 1.1.0
+
+The advanced player-session and persistent-entity fixtures are covered by the modern Fabric live-server matrix on these targets:
+
+| MC | Branch | Loader | Advanced fixtures |
+|---|---|---|---|
+| 1.21.1 | `master` | Fabric | ✅ player-session + persistent-entity |
+| 1.21.4 | `ver/1.21.4` | Fabric | ✅ player-session + persistent-entity |
+| 1.20.6 | `ver/1.20.6` | Fabric | ✅ player-session + persistent-entity |
+| 1.20.4 | `ver/1.20.4` | Fabric | ✅ player-session + persistent-entity |
+| 1.20.1 | `ver/1.20.1` | Fabric | ✅ player-session + persistent-entity |
+
+For these five rows, CI requires both fixture source trees and both `build/testmods` jars before the live harness runs. The fixtures remain opt-in diagnostic mods; they are not part of the shipped runtime jar.
+
+Explicit non-goals for this wave:
+
+- Older Fabric targets (`1.19.4` and below) do not claim advanced-fixture coverage.
+- NeoForge and Forge targets do not claim these Fabric fixture adaptations.
+- No loader-specific fixture API is being standardized across Fabric, NeoForge, and Forge by this expansion.
+
 ---
 
 ## 4. How a Release Flows (no manual steps)

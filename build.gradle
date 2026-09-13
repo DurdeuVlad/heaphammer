@@ -125,17 +125,77 @@ task buildTestmods(dependsOn: [jarChunkcache, jarOmnitrack, jarCrossmodCore, jar
 	description = "Compiles and packages all synthetic testmod jars for empirical verification"
 }
 
+// These advanced fixtures use the stable modern Fabric API surface shared by
+// the 1.20.1+ Fabric targets. Keep them out of older Fabric and Forge builds
+// until loader-specific adaptations exist.
+def advancedFabricMinecraftVersions = ['1.21.4', '1.21.1', '1.20.6', '1.20.4', '1.20.1']
+if (advancedFabricMinecraftVersions.contains(project.minecraft_version)) {
+	sourceSets {
+		testmodPlayerSession {
+			java.srcDirs = ['testmods/leak-playersession/src/main/java']
+			resources.srcDirs = ['testmods/leak-playersession/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		}
+		testmodPersistentEntity {
+			java.srcDirs = ['testmods/leak-persistententity/src/main/java']
+			resources.srcDirs = ['testmods/leak-persistententity/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		}
+	}
 
-processResources {
-	def currentVersion = project.version
-	inputs.property "version", currentVersion
+	task jarPlayerSession(type: Jar) {
+		archiveBaseName = 'testmod-leak-playersession'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodPlayerSession.output
+	}
 
-	filesMatching("fabric.mod.json") {
-		expand "version": currentVersion
+	task jarPersistentEntity(type: Jar) {
+		archiveBaseName = 'testmod-leak-persistententity'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodPersistentEntity.output
+	}
+
+	buildTestmods.dependsOn(jarPlayerSession, jarPersistentEntity)
+	tasks.named('test') {
+		dependsOn(buildTestmods)
+	}
+} else {
+	// Keep unsupported historical branches free of a false packaging failure.
+	tasks.withType(Test).configureEach {
+		exclude '**/AdvancedLeakFixtureBuildTest.class'
 	}
 }
 
 def targetJavaVersion = project.hasProperty('java_version') ? Integer.parseInt(project.property('java_version').toString()) : 21
+
+// Keep every Fabric testmod manifest aligned with the branch that built it.
+// Custom source sets have their own ProcessResources tasks, so configure the
+// whole task type instead of only the main source set's task.
+tasks.withType(org.gradle.language.jvm.tasks.ProcessResources).configureEach {
+	def currentVersion = project.version
+	def currentMinecraftVersion = project.minecraft_version
+	def currentLoaderVersion = project.loader_version
+	def currentJavaVersion = project.hasProperty('java_version') ? project.property('java_version').toString() : '21'
+	inputs.properties(
+		version: currentVersion,
+		minecraft_version: currentMinecraftVersion,
+		fabric_loader_version: currentLoaderVersion,
+		java_version: currentJavaVersion
+	)
+
+	filesMatching("fabric.mod.json") {
+		expand(
+			version: currentVersion,
+			minecraft_version: currentMinecraftVersion,
+			fabric_loader_version: currentLoaderVersion,
+			java_version: currentJavaVersion
+		)
+	}
+}
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = targetJavaVersion
