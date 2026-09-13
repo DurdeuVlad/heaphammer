@@ -64,22 +64,39 @@ def find_primary_jar(root: Path) -> Path:
 
 def fixture_jars(root: Path, fixture: str) -> list[Path]:
     if fixture == "fabric":
-        names = (
+        required_names = (
             "testmod-leak-chunkcache-1.0.0.jar",
             "testmod-leak-omnitrack-1.0.0.jar",
         )
+        advanced_names = (
+            "testmod-leak-playersession-1.0.0.jar",
+            "testmod-leak-persistententity-1.0.0.jar",
+        )
     elif fixture == "forge1122":
-        names = ("testmod-leak-forge1122-1.0.0.jar",)
+        required_names = ("testmod-leak-forge1122-1.0.0.jar",)
+        advanced_names = ()
     else:
-        names = ("testmod-leak-forge1710-1.0.0.jar",)
+        required_names = ("testmod-leak-forge1710-1.0.0.jar",)
+        advanced_names = ()
 
     result = []
-    for name in names:
+    for name in required_names:
         path = root / "build" / "testmods" / name
         if not path.is_file():
             raise RuntimeError(f"Required live leak fixture was not built: {path}")
         result.append(path)
+    for name in advanced_names:
+        path = root / "build" / "testmods" / name
+        if path.is_file():
+            result.append(path)
+        elif args_are_canonical_fabric(root, fixture):
+            raise RuntimeError(f"Required canonical advanced fixture was not built: {path}")
     return result
+
+
+def args_are_canonical_fabric(root: Path, fixture: str) -> bool:
+    """Advanced fixtures are intentionally required only by the 1.21.1 root build."""
+    return fixture == "fabric" and (root / "gradle.properties").is_file() and "minecraft_version=1.21.1" in (root / "gradle.properties").read_text(encoding="utf-8")
 
 
 def stage_mods(root: Path, loader: str, fixture: str) -> None:
@@ -179,6 +196,13 @@ def main() -> int:
     stage_mods(root, args.loader, args.leak_fixture)
 
     if args.loader == "fabric":
+        advanced_fixtures = all(
+            (root / "build" / "testmods" / name).is_file()
+            for name in (
+                "testmod-leak-playersession-1.0.0.jar",
+                "testmod-leak-persistententity-1.0.0.jar",
+            )
+        )
         commands = [
             "hh version",
             "hh capabilities",
@@ -194,6 +218,21 @@ def main() -> int:
             "chunkcacheleak status",
             "omnitrack status",
         ]
+        if advanced_fixtures:
+            commands[8:8] = [
+                "playersessionleak status",
+                "persistententityleak status",
+                "playersessionleak mode leak",
+                "persistententityleak mode leak",
+                "hh run players --iterations=3 --logins-per-cycle=1 --actions=join,quit --diagnostics=retention,histogram,event-metrics",
+                "hh run entities --profile=persistent --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true --diagnostics=retention,histogram,event-metrics,world-store",
+            ]
+            commands.extend([
+                "playersessionleak status",
+                "persistententityleak status",
+                "playersessionleak reset",
+                "persistententityleak reset",
+            ])
     elif args.leak_fixture == "forge1122":
         commands = [
             "hh version",
@@ -220,9 +259,10 @@ def main() -> int:
     observed_mod_version = None
     player_scenario_run = False
     reports_before = {str(p) for p in (root / "run").rglob("*.json")}
+    gradle_wrapper = "gradlew.bat" if os.name == "nt" else "./gradlew"
     process = subprocess.Popen(
         [
-            "./gradlew",
+            gradle_wrapper,
             "runServer",
             f"-Pmod_version={args.expected_mod_version}",
             "--no-daemon",
@@ -344,6 +384,7 @@ def main() -> int:
         report = item["report"]
         detection = report.get("detection", {})
         classification = str(detection.get("classification", ""))
+        status = str(report.get("status", ""))
         suspicious = suspicious or classification in {"SUSPICIOUS", "FAIL"}
         cleanup_values = [
             checkpoint.get("cleanupValid")

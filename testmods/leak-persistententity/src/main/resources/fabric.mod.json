@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "testmod-leak-persistententity",
+  "version": "1.0.0",
+  "name": "TestMod Leak PersistentEntity",
+  "description": "Synthetic persistent-entity retention leak fixture for HeapHammer",
+  "authors": [
+    "dwurdy"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.dwurdy.testmod.persistententity.PersistentEntityLeakMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}

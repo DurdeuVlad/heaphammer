@@ -90,6 +90,15 @@ Does active stress testing actually find bugs faster than letting a server run i
 
 *Conclusion: On an idle staging server, leaking mods remain invisible. HeapHammer forces dormant retention bugs to reveal themselves in under 20 seconds.*
 
+### Case 5: Targeted Player and Persistent-Entity Retention Fixtures
+
+The 1.1.0 diagnostic paths also include two narrowly scoped Fabric fixtures:
+
+- `testmod-leak-playersession` retains only HeapHammer-created `hh_test_` players after disconnect and attaches a uniquely named `PlayerSessionRecord` payload. This exercises authentic join/quit churn, weak-reference retention, class histogram attribution, and event counters.
+- `testmod-leak-persistententity` retains only HeapHammer-tagged persistent mobs after unload and attaches a `PersistentEntityRecord` payload. This exercises the persistent entity profile and can be paired with the world-store scanner on platforms that implement real entity unload/reload cycles.
+
+Both fixtures default to `OFF` and expose `clean`, `leak`, and `reset` modes. The clean mode is an essential control: it verifies that the diagnostic path does not report a leak merely because the workload created legitimate player or persistent-entity state. The fixture leak mode is intentionally allowed to hold Minecraft objects; that exception applies only to synthetic test mods, never to HeapHammer core.
+
 ---
 
 ## 4. Modpack Leak Triage Playbook

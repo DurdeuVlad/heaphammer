@@ -125,6 +125,41 @@ task buildTestmods(dependsOn: [jarChunkcache, jarOmnitrack, jarCrossmodCore, jar
 	description = "Compiles and packages all synthetic testmod jars for empirical verification"
 }
 
+// These advanced fixtures use the canonical 1.21.1 Fabric API surface. Keep
+// them out of historical branch builds until loader-specific adaptations exist.
+if (project.minecraft_version == '1.21.1') {
+	sourceSets {
+		testmodPlayerSession {
+			java.srcDirs = ['testmods/leak-playersession/src/main/java']
+			resources.srcDirs = ['testmods/leak-playersession/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath
+			runtimeClasspath += sourceSets.main.runtimeClasspath
+		}
+		testmodPersistentEntity {
+			java.srcDirs = ['testmods/leak-persistententity/src/main/java']
+			resources.srcDirs = ['testmods/leak-persistententity/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		}
+	}
+
+	task jarPlayerSession(type: Jar) {
+		archiveBaseName = 'testmod-leak-playersession'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodPlayerSession.output
+	}
+
+	task jarPersistentEntity(type: Jar) {
+		archiveBaseName = 'testmod-leak-persistententity'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodPersistentEntity.output
+	}
+
+	buildTestmods.dependsOn(jarPlayerSession, jarPersistentEntity)
+}
+
 
 processResources {
 	def currentVersion = project.version

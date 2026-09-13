@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "testmod-leak-playersession",
+  "version": "1.0.0",
+  "name": "TestMod Leak PlayerSession",
+  "description": "Synthetic player-session retention leak fixture for HeapHammer",
+  "authors": [
+    "dwurdy"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.dwurdy.testmod.playersession.PlayerSessionLeakMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}

@@ -91,6 +91,38 @@ $MatrixScenarios = @(
         Mods = @();
         ExpectedVerdict = "PASS";
         Description = "Vanilla server baseline with Block Entity Stress scenario";
+    },
+    @{
+        Name = "10_PlayerSession_Leak";
+        PreCommand = "playersessionleak mode leak";
+        Command = "hh run players --iterations=3 --logins-per-cycle=1 --actions=join,quit --diagnostics=retention,histogram,event-metrics";
+        Mods = @("testmod-leak-playersession-1.0.0.jar");
+        ExpectedVerdict = "SUSPICIOUS";
+        Description = "Player login/logout retention leak with per-session histogram payloads";
+    },
+    @{
+        Name = "11_PlayerSession_Control";
+        PreCommand = "playersessionleak mode clean";
+        Command = "hh run players --iterations=3 --logins-per-cycle=1 --actions=join,quit --diagnostics=retention,histogram,event-metrics";
+        Mods = @("testmod-leak-playersession-1.0.0.jar");
+        ExpectedVerdict = "PASS";
+        Description = "Player lifecycle control with the intentional retention path disabled";
+    },
+    @{
+        Name = "12_PersistentEntity_Leak";
+        PreCommand = "persistententityleak mode leak";
+        Command = "hh run entities --profile=persistent --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true --diagnostics=retention,histogram,event-metrics,world-store";
+        Mods = @("testmod-leak-persistententity-1.0.0.jar");
+        ExpectedVerdict = "SUSPICIOUS";
+        Description = "Persistent HeapHammer-tagged entity retention leak";
+    },
+    @{
+        Name = "13_PersistentEntity_Control";
+        PreCommand = "persistententityleak mode clean";
+        Command = "hh run entities --profile=persistent --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true --diagnostics=retention,histogram,event-metrics,world-store";
+        Mods = @("testmod-leak-persistententity-1.0.0.jar");
+        ExpectedVerdict = "PASS";
+        Description = "Persistent entity control with the intentional retention path disabled";
     }
 )
 
