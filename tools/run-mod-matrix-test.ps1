@@ -33,6 +33,23 @@ if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
+$AdvancedFabricMinecraftVersions = @("1.21.4", "1.21.1", "1.20.6", "1.20.4", "1.20.1")
+$MinecraftVersion = (Get-Content -Path "$WorkspaceRoot/gradle.properties" |
+    Where-Object { $_ -match '^minecraft_version=' } |
+    Select-Object -First 1) -replace '^minecraft_version=', ''
+$AdvancedFixtureBuild = $AdvancedFabricMinecraftVersions -contains $MinecraftVersion.Trim()
+if ($AdvancedFixtureBuild) {
+    foreach ($advancedFixture in @(
+        "testmod-leak-playersession-1.0.0.jar",
+        "testmod-leak-persistententity-1.0.0.jar"
+    )) {
+        if (-not (Test-Path "$TestModsDir/$advancedFixture")) {
+            Write-Error "Canonical advanced fixture jar not found: $TestModsDir/$advancedFixture"
+            exit 1
+        }
+    }
+}
+
 $MatrixScenarios = @(
     @{
         Name = "01_Baseline_Clean";
@@ -91,6 +108,38 @@ $MatrixScenarios = @(
         Mods = @();
         ExpectedVerdict = "PASS";
         Description = "Vanilla server baseline with Block Entity Stress scenario";
+    },
+    @{
+        Name = "10_PlayerSession_Leak";
+        PreCommand = "playersessionleak mode leak";
+        Command = "hh run players --iterations=6 --logins-per-cycle=1 --actions=join,quit --explicit-gc=true --diagnostics=retention,histogram,event-metrics";
+        Mods = @("testmod-leak-playersession-1.0.0.jar");
+        ExpectedVerdict = "SUSPICIOUS";
+        Description = "Player login/logout retention leak with per-session histogram payloads";
+    },
+    @{
+        Name = "11_PlayerSession_Control";
+        PreCommand = "playersessionleak mode clean";
+        Command = "hh run players --iterations=6 --logins-per-cycle=1 --actions=join,quit --explicit-gc=true --diagnostics=retention,histogram,event-metrics";
+        Mods = @("testmod-leak-playersession-1.0.0.jar");
+        ExpectedVerdict = "PASS";
+        Description = "Player lifecycle control with the intentional retention path disabled";
+    },
+    @{
+        Name = "12_PersistentEntity_Leak";
+        PreCommand = "persistententityleak mode leak";
+        Command = "hh run entities --profile=persistent --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true --diagnostics=retention,histogram,event-metrics,world-store";
+        Mods = @("testmod-leak-persistententity-1.0.0.jar");
+        ExpectedVerdict = "SUSPICIOUS";
+        Description = "Persistent HeapHammer-tagged entity retention leak";
+    },
+    @{
+        Name = "13_PersistentEntity_Control";
+        PreCommand = "persistententityleak mode clean";
+        Command = "hh run entities --profile=persistent --iterations=5 --batch=15 --hold=5 --settle=10 --explicit-gc=true --diagnostics=retention,histogram,event-metrics,world-store";
+        Mods = @("testmod-leak-persistententity-1.0.0.jar");
+        ExpectedVerdict = "PASS";
+        Description = "Persistent entity control with the intentional retention path disabled";
     }
 )
 
@@ -221,6 +270,15 @@ Function Run-ServerScenario {
 
     # Read and inspect JSON
     $json = Get-Content -Path $destReport -Raw | ConvertFrom-Json
+    if ($json.status -ne "COMPLETED") {
+        Write-Error "Scenario $name did not complete: status=$($json.status)"
+        return $false
+    }
+    $invalidCleanup = @($json.checkpoints | Where-Object { $_.cleanupValid -ne $true })
+    if ($invalidCleanup.Count -gt 0) {
+        Write-Error "Scenario $name has invalid cleanup checkpoints"
+        return $false
+    }
     $verdict = $json.detection.classification
     $slope = $json.detection.slopeBytesPerCycle
     $slopeMb = [math]::Round($slope / (1024.0 * 1024.0), 2)
@@ -237,18 +295,33 @@ Function Run-ServerScenario {
     return $true
 }
 
+if (-not $AdvancedFixtureBuild) {
+    if ($SpecificScenario -match '^(10|11|12|13)_') {
+        Write-Error "Scenario $SpecificScenario requires a modern Fabric build (1.20.1+ target wave)"
+        exit 1
+    }
+    $MatrixScenarios = @($MatrixScenarios | Where-Object { $_.Name -notmatch '^(10|11|12|13)_' })
+}
+
 # Main execution loop
 $results = @{}
+$executedScenario = $false
 foreach ($scenario in $MatrixScenarios) {
     if ($SpecificScenario -ne "" -and $scenario.Name -ne $SpecificScenario) {
         continue
     }
+    $executedScenario = $true
     $success = Run-ServerScenario -Scenario $scenario
     $results[$scenario.Name] = $success
     if (-not $success) {
         Write-Error "Matrix test aborted due to scenario failure: $($scenario.Name)"
         exit 1
     }
+}
+
+if ($SpecificScenario -ne "" -and -not $executedScenario) {
+    Write-Error "Unknown matrix scenario: $SpecificScenario"
+    exit 1
 }
 
 Write-Host "`n=================================================================" -ForegroundColor Cyan

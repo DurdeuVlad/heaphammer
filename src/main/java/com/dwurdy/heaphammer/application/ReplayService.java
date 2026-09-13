@@ -62,6 +62,7 @@ public class ReplayService {
                 plan.operations(),
                 plan.entityOperations(),
                 plan.blockEntityOperations(),
+                plan.playerOperations(),
                 plan.estimatedDurationTicks(),
                 plan.uniqueChunksCount()
         );
