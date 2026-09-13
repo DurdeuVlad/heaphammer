@@ -137,7 +137,10 @@ public class OmniTrackLeakMod implements ModInitializer {
     }
 
     private static void retainJoinedPlayer(Object player) {
-        if (!LEAK_ENABLED.get() || player == null || !player.getClass().getName().contains("ServerPlayer")) {
+        // The lifecycle port only invokes this callback for successfully joined
+        // test players. Do not inspect the runtime class name: production Fabric
+        // servers use intermediary/obfuscated names rather than ServerPlayer.
+        if (!LEAK_ENABLED.get() || player == null) {
             return;
         }
         Object uuid = invokeNoArgs(player, "getUUID");
