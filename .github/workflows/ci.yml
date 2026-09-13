@@ -64,7 +64,15 @@ jobs:
           for d in loaders/*/; do
             if [ -f "${d}settings.gradle" ]; then
               echo "=== Nested loader build: ${d} ==="
-              (cd "$d" && ../../gradlew build --no-daemon)
+              # ForgeGradle 1.16.5 requires Gradle 8.x while the repo-root
+              # wrapper is Gradle 9.x; use a loader-local wrapper when one is
+              # supplied and fall back to the root wrapper for no-op/modern
+              # nested builds.
+              if [ -f "${d}gradlew" ]; then
+                (cd "$d" && chmod +x gradlew && ./gradlew build --no-daemon)
+              else
+                (cd "$d" && ../../gradlew build --no-daemon)
+              fi
             fi
           done
 
