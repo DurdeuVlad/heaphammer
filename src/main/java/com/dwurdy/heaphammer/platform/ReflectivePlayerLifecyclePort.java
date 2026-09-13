@@ -62,6 +62,7 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         Invocation placed = invoke(playerList, "placeNewPlayer", connection, player, cookie);
         if (!placed.found || value(invoke(playerList, "getPlayer", playerId)) == null) return null;
 
+        PlayerLifecycleObservers.notifyJoined(player);
         RetentionTracker tracker = retentionTracker;
         if (tracker != null) tracker.observe(player.getClass().getName(), player);
         return playerId;
