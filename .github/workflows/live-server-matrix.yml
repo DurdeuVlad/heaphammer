@@ -67,7 +67,11 @@ jobs:
             java-version: '21'
             leak-mod: fabric
             advanced-fixtures: false
-            server-java-opts: '-Xmx4G'
+            # 1.18.2's historical chunk/entity fixtures retain substantially
+            # more heap before the player probe than later Fabric versions.
+            # Keep the normal 64 MB safety breaker, but give this CI probe
+            # enough headroom to complete its bounded workload.
+            server-java-opts: '-Xmx6G'
           - branch: ver/1.17.1
             mc-version: '1.17.1'
             loader: fabric
