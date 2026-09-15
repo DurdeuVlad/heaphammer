@@ -25,68 +25,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Every supported Minecraft version line. primary-loader is the loader
-          # produced by the ROOT build; nested loaders/ builds add more jars.
+          # Canonical LTS Targets (starting from v1.1.1):
+          # Prunes transitional/intermediate versions to focus distribution strictly
+          # on the 6 major LTS lines where >98% of modpack and server traffic resides.
           - branch: master
             mc-version: '1.21.1'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.21.1
-          - branch: ver/1.21.4
-            mc-version: '1.21.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.21.4
-          - branch: ver/1.20.6
-            mc-version: '1.20.6'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.20.6
-          - branch: ver/1.20.4
-            mc-version: '1.20.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.20.4
           - branch: ver/1.20.1
             mc-version: '1.20.1'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.20.1
-          - branch: ver/1.19.4
-            mc-version: '1.19.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.19.4
-          - branch: ver/1.19.2
-            mc-version: '1.19.2'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.19.2
           - branch: ver/1.18.2
             mc-version: '1.18.2'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.18.2
-          - branch: ver/1.17.1
-            mc-version: '1.17.1'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.17.1
           - branch: ver/1.16.5
             mc-version: '1.16.5'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.16.5
-          - branch: ver/1.15.2
-            mc-version: '1.15.2'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.15.2
-          - branch: ver/1.14.4
-            mc-version: '1.14.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.14.4
           - branch: ver/1.12.2-forge
             mc-version: '1.12.2'
             java-version: '17'
@@ -273,6 +234,26 @@ jobs:
           } > RELEASE_NOTES.md
           echo "Changelog generated ($(wc -l < RELEASE_NOTES.md) lines)"
 
+          # Generate clean, scannable changelog for CurseForge and Modrinth (no checksum dumps or sync noise)
+          {
+            echo "### HeapHammer ${TAG}"
+            echo ""
+            echo "**Deterministic Minecraft server stress testing and retained-memory regression detection.**"
+            echo ""
+            echo "#### Highlights & Changes"
+            # Filter out merge commits, branch merges, and automated sync noise for a clean player/admin changelog
+            CLEAN_LOG=$(grep -v -E -- '^-\s*(Merge pull request|Merge branch|Merge HeapHammer|merge\(release\)|chore\(sync\)|chore\(release\))' CHANGELOG.md | head -n 35 || true)
+            if [ -n "$CLEAN_LOG" ]; then
+              echo "$CLEAN_LOG"
+            else
+              cat CHANGELOG.md | head -n 35
+            fi
+            echo ""
+            echo "---"
+            echo "**Full Release Notes & Checksums**: https://github.com/DurdeuVlad/heaphammer/releases/tag/${TAG}"
+          } > PLATFORM_CHANGELOG.md
+          echo "Platform changelog generated ($(wc -l < PLATFORM_CHANGELOG.md) lines)"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -295,7 +276,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-notes
-          path: RELEASE_NOTES.md
+          path: |
+            RELEASE_NOTES.md
+            PLATFORM_CHANGELOG.md
           retention-days: 1
 
       - name: Summary
@@ -334,15 +317,66 @@ jobs:
             mc_loader="${rest%-*}"
             loader="${mc_loader##*-}"
             mc="${mc_loader%-*}"
+            ver="${base##*-}"
+
+            case "$loader" in
+              fabric)
+                loader_title="Fabric"
+                loaders_str=$'fabric\nquilt'
+                ;;
+              neoforge)
+                loader_title="NeoForge"
+                loaders_str="neoforge"
+                ;;
+              forge)
+                loader_title="Forge"
+                loaders_str="forge"
+                ;;
+              *)
+                loader_title="$loader"
+                loaders_str="$loader"
+                ;;
+            esac
+
+            display_name="HeapHammer ${ver} (${loader_title} ${mc})"
+
+            case "$mc" in
+              1.21.1) gv_str=$'1.21\n1.21.1' ;;
+              1.20.6) gv_str=$'1.20.5\n1.20.6' ;;
+              1.20.4) gv_str=$'1.20.3\n1.20.4' ;;
+              1.20.1) gv_str=$'1.20\n1.20.1' ;;
+              1.19.4) gv_str="1.19.4" ;;
+              1.19.2) gv_str=$'1.19\n1.19.1\n1.19.2' ;;
+              1.18.2) gv_str=$'1.18\n1.18.1\n1.18.2' ;;
+              1.16.5) gv_str=$'1.16\n1.16.1\n1.16.2\n1.16.3\n1.16.4\n1.16.5' ;;
+              1.12.2) gv_str=$'1.12\n1.12.1\n1.12.2' ;;
+              *) gv_str="$mc" ;;
+            esac
+
+            if [[ "$ver" == *"alpha"* ]]; then
+              vtype="alpha"
+            elif [[ "$ver" == *"beta"* || "$ver" == *"-rc"* ]]; then
+              vtype="beta"
+            else
+              vtype="release"
+            fi
+
             entries=$(echo "$entries" | jq -c \
-              --arg f "${base}.jar" --arg mc "$mc" --arg l "$loader" \
-              '. + [{file:$f, mc:$mc, loader:$l}]')
+              --arg f "${base}.jar" \
+              --arg mc "$mc" \
+              --arg l "$loader" \
+              --arg lt "$loader_title" \
+              --arg dn "$display_name" \
+              --arg ls "$loaders_str" \
+              --arg gv "$gv_str" \
+              --arg vt "$vtype" \
+              '. + [{file:$f, mc:$mc, loader:$l, loader_title:$lt, display_name:$dn, loaders:$ls, game_versions:$gv, version_type:$vt}]')
           done
           echo "matrix={\"include\":$entries}" >> $GITHUB_OUTPUT
           echo "$entries" | jq .
 
   publish-platforms:
-    name: Publish ${{ matrix.loader }} ${{ matrix.mc }} to Modrinth & CurseForge
+    name: Publish ${{ matrix.loader_title }} ${{ matrix.mc }} to Modrinth & CurseForge
     needs: [publish, publish-matrix]
     runs-on: ubuntu-latest
     strategy:
@@ -382,17 +416,19 @@ jobs:
           modrinth-fail-mode: warn
           modrinth-version: ${{ steps.release.outputs.version }}+${{ matrix.loader }}.${{ matrix.mc }}
 
+          # CurseForge: standardized display name convention
           curseforge-id: '1687734'
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           curseforge-fail-mode: warn
-          curseforge-version: HeapHammer ${{ steps.release.outputs.version }} (${{ matrix.loader }} ${{ matrix.mc }})
+          curseforge-version: ${{ matrix.display_name }}
 
-          name: HeapHammer ${{ steps.release.outputs.version }} (${{ matrix.loader }} ${{ matrix.mc }})
-          version-type: release
-          changelog-file: RELEASE_NOTES.md
+          # Shared Metadata
+          name: ${{ matrix.display_name }}
+          version-type: ${{ matrix.version_type }}
+          changelog-file: PLATFORM_CHANGELOG.md
           environment: server
 
           files: dist/production/${{ matrix.file }}
-          loaders: ${{ matrix.loader }}
-          game-versions: ${{ matrix.mc }}
+          loaders: ${{ matrix.loaders }}
+          game-versions: ${{ matrix.game_versions }}
           game-version-filter: none
