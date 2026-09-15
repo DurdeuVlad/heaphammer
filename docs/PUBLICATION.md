@@ -55,28 +55,20 @@ HeapHammer adheres to a strict, production-oriented Semantic Versioning standard
 
 ---
 
-## 2. Multi-Version Artifact Matrix
+## 2. Multi-Version Artifact Matrix (LTS Policy from v1.1.1)
 
-When a release is tagged and deployed, artifacts are built across **every** supported version branch. Each branch produces one jar per loader it supports: the root build produces the branch's *primary* loader jar, and each `loaders/<loader>/` nested Gradle build produces an additional loader jar. Artifacts are named `heaphammer-<mc>-<loader>-<modver>.jar`.
+Starting from **v1.1.1**, HeapHammer focuses active release distribution exclusively on the **6 canonical LTS Minecraft versions**, producing dedicated binaries for the dominant mod loaders on each line:
 
 | Minecraft Version | Git Branch | Root Build (Primary Loader) | Nested Loader Builds | Build JDK |
 |---|---|---|---|---|
-| **1.21.4** | `ver/1.21.4` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
 | **1.21.1** *(Primary)* | `master` / `release/v*` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
-| **1.20.6** | `ver/1.20.6` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
-| **1.20.4** | `ver/1.20.4` | Fabric (Loom) | `loaders/neoforge` (ModDevGradle) | 21 |
 | **1.20.1** | `ver/1.20.1` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
-| **1.19.4** | `ver/1.19.4` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
-| **1.19.2** | `ver/1.19.2` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
 | **1.18.2** | `ver/1.18.2` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
-| **1.17.1** | `ver/1.17.1` | Fabric (Loom) | `loaders/forge` (MDG legacyforge) | 21 |
 | **1.16.5** | `ver/1.16.5` | Fabric (Loom) | `loaders/forge` (ForgeGradle) | 21 |
-| **1.15.2** | `ver/1.15.2` | Fabric (Loom) | — | 21 |
-| **1.14.4** | `ver/1.14.4` | Fabric (Loom) | — | 21 |
 | **1.12.2** | `ver/1.12.2-forge` | Forge (RetroFuturaGradle) | — | 17 |
 | **1.7.10** | `ver/1.7.10-forge` | Forge (RetroFuturaGradle) | — | 17 |
 
-> The authoritative, always-current target matrix lives in [BUILD_TARGETS.md](BUILD_TARGETS.md). The release workflow derives the published loader list from the artifacts actually produced — the release notes table is generated from staged filenames, never hardcoded.
+> Intermediate/transitional versions (`1.21.4`, `1.20.6`, `1.20.4`, `1.19.4`, `1.19.2`, `1.17.1`, `1.15.2`, `1.14.4`) are retired from automated release pipelines to eliminate repository clutter and notification spam. The authoritative reference lives in [BUILD_TARGETS.md](BUILD_TARGETS.md).
 
 ---
 

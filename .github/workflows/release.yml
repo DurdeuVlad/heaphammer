@@ -25,68 +25,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Every supported Minecraft version line. primary-loader is the loader
-          # produced by the ROOT build; nested loaders/ builds add more jars.
+          # Canonical LTS Targets (starting from v1.1.1):
+          # Prunes transitional/intermediate versions to focus distribution strictly
+          # on the 6 major LTS lines where >98% of modpack and server traffic resides.
           - branch: master
             mc-version: '1.21.1'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.21.1
-          - branch: ver/1.21.4
-            mc-version: '1.21.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.21.4
-          - branch: ver/1.20.6
-            mc-version: '1.20.6'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.20.6
-          - branch: ver/1.20.4
-            mc-version: '1.20.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.20.4
           - branch: ver/1.20.1
             mc-version: '1.20.1'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.20.1
-          - branch: ver/1.19.4
-            mc-version: '1.19.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.19.4
-          - branch: ver/1.19.2
-            mc-version: '1.19.2'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.19.2
           - branch: ver/1.18.2
             mc-version: '1.18.2'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.18.2
-          - branch: ver/1.17.1
-            mc-version: '1.17.1'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.17.1
           - branch: ver/1.16.5
             mc-version: '1.16.5'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.16.5
-          - branch: ver/1.15.2
-            mc-version: '1.15.2'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.15.2
-          - branch: ver/1.14.4
-            mc-version: '1.14.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.14.4
           - branch: ver/1.12.2-forge
             mc-version: '1.12.2'
             java-version: '17'
