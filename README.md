@@ -45,7 +45,7 @@ In modpacks with 100+ mods, memory leaks rarely show up on idle servers. They ta
 
 Traditional profilers (like Spark or JFR) show what is occupying memory **right now**, but they cannot tell you **which workload caused it** or **whether the memory will ever be reclaimed**.
 
-**HeapHammer is designed to compress long-running player-like workloads into a short, repeatable test.**  
+**HeapHammer is designed to compress long-running player-like workloads into a short, repeatable test.**
 It injects native Minecraft chunk tickets, entity spawns, and block entity cycles under a strict tick budget, forces cleanup, and uses statistical regression to prove whether memory resets or keeps climbing.
 
 > [!NOTE]
