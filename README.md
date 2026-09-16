@@ -118,9 +118,9 @@ enables replay          bounded work per tick      for native chunk unload   Ord
 
 HeapHammer is **designed primarily for staging and development servers** to validate modpacks before publishing updates. However, it is built with strict **zero-destruction safety invariants** so server admins can run diagnostics on live worlds:
 
-- 🛡️ **Zero Chunk Corruption**: Only uses dedicated test tickets (`TicketType heaphammer`). Player chunks, world spawn, and player builds are never touched or modified.
-- ⏱️ **Watchdog Protection**: Operations are tick-budgeted (max 15 ms/tick). It will never trigger a server watchdog crash or TPS freeze.
-- 🧹 **Instant Clean Abort**: Running `/hh stop` or `/hh cleanup` immediately frees 100% of test tickets and entities. No leftover tickets, no server restart needed.
+- 🛡️ **Zero Chunk Corruption**: Uses dedicated test tickets (`TicketType heaphammer`) and is designed to avoid player chunks, world spawn, and player builds; verify behavior against the target version and configuration.
+- ⏱️ **Watchdog Protection**: Operations are tick-budgeted (max 15 ms/tick) to reduce impact; monitor the target server and workload when running diagnostics.
+- 🧹 **Clean Abort**: Running `/hh stop` or `/hh cleanup` invokes the cleanup path for test tickets and entities; verify the result after aborting a run in the target environment.
 
 ---
 
@@ -305,7 +305,7 @@ HeapHammer is specifically engineered for safe execution on live staging and pro
 
 ## Multi-Version Architecture
 
-HeapHammer uses **Hexagonal Architecture (Ports & Adapters)**. The core domain, math engine, and scenario planning are pure Java with **zero Minecraft dependencies**, guaranteeing binary compatibility across all supported versions:
+HeapHammer uses **Hexagonal Architecture (Ports & Adapters)**. The core domain, math engine, and scenario planning are pure Java with **zero Minecraft dependencies**, aiming to preserve compatibility across supported versions:
 
 - **1.21.4 / 1.21.1** (Fabric & NeoForge, Java 21) — Active modern trunk and cutting-edge releases
 - **1.20.6 / 1.20.4 / 1.20.1** (Fabric & Forge, Java 21/17) — Modern Gold Standard modpacks
