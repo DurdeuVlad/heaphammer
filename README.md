@@ -45,7 +45,7 @@ In modpacks with 100+ mods, memory leaks rarely show up on idle servers. They ta
 
 Traditional profilers (like Spark or JFR) show what is occupying memory **right now**, but they cannot tell you **which workload caused it** or **whether the memory will ever be reclaimed**.
 
-**HeapHammer compresses 24 hours of player activity into a 2-minute repeatable test.**  
+**HeapHammer is designed to compress long-running player-like workloads into a short, repeatable test.**  
 It injects native Minecraft chunk tickets, entity spawns, and block entity cycles under a strict tick budget, forces cleanup, and uses statistical regression to prove whether memory resets or keeps climbing.
 
 > [!NOTE]
@@ -81,17 +81,17 @@ Rather than running generic stress loops, HeapHammer exercises real Minecraft me
 
 ## Does It Work With Any Mod?
 
-**Yes. HeapHammer works automatically out of the box with any mod**—no mod-specific plugins, custom configs, or patches required.
+HeapHammer is designed to exercise native Minecraft server behavior without requiring a mod-specific adapter for the common workload paths. Coverage still depends on the Minecraft version, loader, server configuration, and the behavior a mod exposes to those workloads.
 
 Because HeapHammer stresses the **native Minecraft server engine** and queries the **JVM runtime directly**, any mod running on your server is automatically included in tests:
 
 | Mod Category | Examples | Automatic Behavior | What HeapHammer Catches |
 |---|---|---|---|
-| 🗺️ **World-Gen & Biomes** | Terralith, BYG, Biomes O' Plenty | **100% Automatic** | Chunk loading triggers native feature generation, population, and lighting passes. Catches listeners that leak chunk data. |
-| 📍 **Maps & Claims** | Dynmap, JourneyMap, FTB Chunks | **100% Automatic** | Exercises whether map rendering and claiming listeners cleanly evict terrain cache data when chunks unload. |
-| 👾 **Custom Mobs & Bosses** | Alex's Mobs, Lycanites, Cataclysm | **100% Automatic** | Spawns, ticks, and discards registered entity types, verifying that entity tracking and combat listeners don't pin dead mobs in static lists. |
-| ⚙️ **Machines & Tech** | Create, Mekanism, Applied Energistics 2 | **100% Automatic** | Placing and breaking blocks tests tile entity tick queue deregistration (`BlockEntity.setRemoved()`) and inventory buffer cleanup. |
-| 📦 **Full Modpacks** | ATM, Better MC, Custom Packs (200+ mods) | **100% Automatic** | `/hh report diff` isolates which mod update introduced a regression by comparing memory slopes before and after adding a mod. |
+| 🗺️ **World-Gen & Biomes** | Terralith, BYG, Biomes O' Plenty | **Native workload path** | Chunk loading exercises native feature generation, population, and lighting passes. |
+| 📍 **Maps & Claims** | Dynmap, JourneyMap, FTB Chunks | **Native workload path** | Exercises whether listeners evict terrain-related state when chunks unload. |
+| 👾 **Custom Mobs & Bosses** | Alex's Mobs, Lycanites, Cataclysm | **Native workload path** | Spawns, ticks, and removes configured entities for lifecycle testing. |
+| ⚙️ **Machines & Tech** | Create, Mekanism, Applied Energistics 2 | **Native workload path** | Places and removes configured block-entity workloads for cleanup testing. |
+| 📦 **Full Modpacks** | ATM, Better MC, custom packs | **Scenario-dependent** | Differential reports can help compare memory behavior across controlled modpack changes. |
 
 > [!TIP]
 > **What about the `/hh adapters` command?**  
@@ -104,11 +104,11 @@ Because HeapHammer stresses the **native Minecraft server engine** and queries t
 ```text
 1. PLAN (Seed)          2. EXECUTE (Tick Budget)    3. SETTLE (Eviction)      4. VERDICT (Slope)
 Deterministic seed  ──> Max 10 ops/tick         ──> Drop tickets, wait    ──> Measure post-settle
-guarantees replay       TPS stays smooth            for native chunk unload   Ordinary Least Squares
+enables replay          bounded work per tick      for native chunk unload   Ordinary Least Squares
 ```
 
 1. **Deterministic Planning**: Every workload is generated from a fixed seed. When a leak is discovered, the exact coordinate sequence can be replayed across server restarts.
-2. **Strict Tick Budgeting**: Operations run incrementally during server tick ends (`maxOperationsPerTick=10`, `maxMsPerTick=15`). The server thread is never starved, and TPS remains smooth.
+2. **Strict Tick Budgeting**: Operations run incrementally during server tick ends (`maxOperationsPerTick=10`, `maxMsPerTick=15`) so operators can bound the workload's impact and observe server health.
 3. **Native Eviction & Settle**: After each batch, HeapHammer drops all tickets and allows vanilla `ServerChunkCache` to evict chunks naturally over configurable settle ticks.
 4. **Statistical OLS Regression vs. GC Noise**: Rather than guessing from volatile instantaneous heap spikes ($\Delta\text{Heap}$), HeapHammer measures the slope ($y = mx + b$) and goodness of fit ($R^2$) across post-settle checkpoints.
 
@@ -126,7 +126,7 @@ HeapHammer is **designed primarily for staging and development servers** to vali
 
 ## Quickstart
 
-HeapHammer is **100% server-side only**. Connecting players do **not** need it installed.
+HeapHammer is intended to run server-side; connecting players do not need the mod installed for the server diagnostics path.
 
 ### 1. Install
 Download the compiled JAR from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer) or [GitHub Releases](https://github.com/DurdeuVlad/heaphammer/releases) and place it into your server's `mods/` directory:
@@ -197,7 +197,7 @@ Classification: PASS -> SUSPICIOUS (CHANGED)
 
 ## Empirical Proof
 
-HeapHammer is not theoretical. Every algorithm, regression slope, and ticket lifecycle has been empirically benchmarked and proven on **real Minecraft 1.21.1 Fabric dedicated servers** using standalone companion test mods:
+The repository includes documented experiments for the regression engine, ticket lifecycle, and live-server command paths. Treat those results as environment-specific evidence, not a guarantee for every modpack or supported version:
 
 ### 1. Dedicated Server Benchmark Matrix (5 Cycles, Explicit GC)
 | Test Condition | Retained Slope | Net Delta | Verdict | Real-World Outcome |
