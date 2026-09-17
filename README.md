@@ -83,7 +83,7 @@ Rather than running generic stress loops, HeapHammer exercises real Minecraft me
 
 HeapHammer is designed to exercise native Minecraft server behavior without requiring a mod-specific adapter for the common workload paths. Coverage still depends on the Minecraft version, loader, server configuration, and the behavior a mod exposes to those workloads.
 
-Because HeapHammer stresses the **native Minecraft server engine** and queries the **JVM runtime directly**, any mod running on your server is automatically included in tests:
+Because HeapHammer stresses the **native Minecraft server engine** and queries the **JVM runtime directly**, a workload can exercise interactions across the running server environment; coverage and detection still depend on the mod, loader, version, and scenario selected:
 
 | Mod Category | Examples | Automatic Behavior | What HeapHammer Catches |
 |---|---|---|---|
