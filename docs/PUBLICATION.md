@@ -142,15 +142,18 @@ git push origin release/v1.1.0
 
 Production releases are deployed automatically via `.github/workflows/release.yml`:
 
-- **Trigger**: Pushing a `v*.*.*` tag (e.g. `git tag v1.0.2 && git push origin v1.0.2`), or manual `workflow_dispatch`.
-- **Build**: Parallel matrix builds across all 14 supported Minecraft version branches (`master` + every `ver/*`). Each job runs the full unit suite — `build` implies `test` — and then builds every nested `loaders/*/` project present on that branch. A failing test on any version blocks the release.
+- **Trigger**: Pushing a `v*.*.*` tag (e.g. `git tag v1.1.1 && git push origin v1.1.1`), or manual `workflow_dispatch`.
+- **Build**: Parallel matrix builds across the 6 canonical LTS Minecraft version branches (`master`, `ver/1.20.1`, `ver/1.18.2`, `ver/1.16.5`, `ver/1.12.2-forge`, `ver/1.7.10-forge`). Each job runs the full unit suite — `build` implies `test` — and then builds every nested `loaders/*/` project present on that branch. A failing test on any version blocks the release.
 - **Naming**: Every artifact is staged as `heaphammer-<mc>-<loader>-<modver>.jar`. The mod version is forced uniform via `-Pmod_version=<tag>` so branch `gradle.properties` drift can never leak into a release.
-- **Publish**: GitHub Releases receives every JAR plus `SHA256SUMS.txt` via `gh release`. A `publish-matrix` job then derives one matrix entry per staged jar from its `heaphammer-<mc>-<loader>-<modver>.jar` filename, and a `publish-platforms` job runs `Kir-Antipov/mc-publish@v3.3` once per file with the exact `loaders` and `game-versions` for that jar:
-  - **CurseForge Display Names**: Follow the canonical convention: `HeapHammer <modver> (<Loader> <mc>)` with capitalized loaders (e.g. `HeapHammer 1.1.0 (Fabric 1.21.1)`, `HeapHammer 1.1.0 (NeoForge 1.21.1)`).
-  - **Clean Platform Changelog**: Instead of dumping the full 24-file SHA-256 table and commit logs into every file, a concise `PLATFORM_CHANGELOG.md` is generated with user-facing highlights and a direct link to the canonical GitHub Release.
+- **Publish Architecture (2-Phase Deterministic Deployment)**:
+  GitHub Releases receives every JAR plus `SHA256SUMS.txt` via `gh release`. Platform publishing is split into two deterministic phases to solve the CurseForge "Download Button" precedence problem:
+  - **Phase 1 (`publish-platforms-secondary`)**: Uploads all historical LTS targets (`1.7.10 Forge`, `1.12.2 Forge`, `1.16.5`, `1.18.2`, `1.20.1`) and secondary loaders (`1.21.1 NeoForge`) in parallel.
+  - **Phase 2 (`publish-platforms-primary`)**: Uploads the primary modern target (`1.21.1 Fabric`) in a dedicated final step after Phase 1 settles. Because CurseForge's main overview page **"Download"** button serves whichever `Release` file has the most recent upload timestamp, uploading the modern standard last **guarantees that clicking "Download" on CurseForge always serves 1.21.1 Fabric** instead of a legacy 1.7.10 or 1.16.5 Forge JAR.
+  - **Standardized Bracketed Display Names**: Files use high-visibility prefixes: `[<Loader> <MC>] HeapHammer <ModVer>` (e.g. `[Fabric 1.21.1] HeapHammer 1.1.1`, `[NeoForge 1.21.1] HeapHammer 1.1.1`, `[Forge 1.20.1] HeapHammer 1.1.1`). This prevents loader truncation in narrow launcher tables and mobile views.
+  - **Clean Platform Changelog**: Instead of dumping the full SHA-256 table and commit logs into every file, a concise `PLATFORM_CHANGELOG.md` is generated with user-facing highlights and a direct link to the canonical GitHub Release.
   - **Dual Quilt Tagging**: All Fabric builds automatically tag both `Fabric` and `Quilt`.
   - **Point-Release Coverage**: Major minor lines map point releases (e.g. `1.21.1` tags `1.21` and `1.21.1`; `1.20.1` tags `1.20` and `1.20.1`; `1.16.5` tags `1.16` through `1.16.5`) so launcher users on sub-releases find the file.
-  - **Modrinth Scoping**: Modrinth versions are uniquely identified as `<modver>+<loader>.<mc>` (e.g. `1.1.0+neoforge.1.21.4`) with that single binary as the primary file.
+  - **Modrinth Scoping**: Modrinth versions are uniquely identified as `<modver>+<loader>.<mc>` (e.g. `1.1.1+neoforge.1.21.1`), with the primary 1.21.1 Fabric release designated as `featured: true`.
   - **Platform Failure Isolation**: Platform uploads use `warn-mode` so third-party API hiccups do not fail the overall pipeline.
 - **Secrets required** (configured in repo Settings → Secrets and variables → Actions):
   - `CURSEFORGE_TOKEN` — CurseForge API token (upload scope on project `1687734`)
@@ -163,21 +166,30 @@ Production releases are deployed automatically via `.github/workflows/release.ym
 
 ## 7. CurseForge & Modrinth Project Maintenance & Anti-Spam Guidelines
 
-To prevent file browser clutter and notification fatigue on public mod repositories:
+To prevent file browser clutter, notification fatigue, and ensure **ease of installation is #1 priority**:
 
-### 1. Active LTS vs Transitional Versions
-CurseForge and Modrinth displays are file-centric. When publishing across all 14 Minecraft versions:
-- **Active Canonical Releases**: Keep only the primary LTS Minecraft versions featured / unarchived on the main files list:
-  - `1.21.1` (Fabric & NeoForge)
-  - `1.20.1` (Fabric & Forge)
-  - `1.18.2` (Fabric & Forge)
-  - `1.16.5` (Fabric & Forge)
-  - `1.12.2` (Forge)
-  - `1.7.10` (Forge)
-- **Archiving Intermediate Releases**: For low-traffic transitional versions (`1.14.4`, `1.15.2`, `1.17.1`, `1.19.2`, `1.19.4`, `1.20.4`, `1.20.6`), use the CurseForge Dashboard (`curseforge.com/manage/projects/1687734/files`) $\to$ click `⋮` $\to$ **Archive File**.
-  *Archiving removes them from the main front-page file list and launcher auto-recommenders while keeping them downloadable for users who specifically search for older versions.*
+### 1. One Active Release Per Version Policy (Eliminating the "100 Entries" Clutter)
+CurseForge and Modrinth displays are file-centric. When publishing across multiple Minecraft versions:
+- **The Core Rule**: For each supported Minecraft version, there must be **strictly ONE active release** (the latest mod version).
+- **Why Historical Clutter Occurs**:
+  - Across releases `v1.0.0`, `v1.0.1`, `v1.0.2`, and `v1.1.0`, files for all 14 branches accumulated unarchived on CurseForge, totaling ~100 entries on the public Files tab.
+  - Older patch versions (`1.0.0`, `1.0.1`, `1.0.2`) and retired transitional branches (`1.14.4` through `1.20.6`) were left active, creating an overwhelming, unnavigable file list.
+- **CurseForge Author Dashboard Cleanup Procedure**:
+  1. Open the CurseForge Author Dashboard: [`curseforge.com/manage/projects/1687734/files`](https://curseforge.com/manage/projects/1687734/files).
+  2. For all files belonging to prior mod releases (`v1.0.0`, `v1.0.1`, `v1.0.2`, `v1.1.0`), click `⋮` $\to$ **Archive File**.
+  3. For all files targeting retired transitional versions (`1.14.4`, `1.15.2`, `1.17.1`, `1.19.2`, `1.19.4`, `1.20.4`, `1.20.6`), click `⋮` $\to$ **Archive File**.
+  4. *Effect of Archiving*: The files immediately disappear from the public Files tab and launcher search/auto-recommenders, reducing the file list from 100 entries to strictly the 10 canonical LTS targets. The files remain downloadable for anyone with direct legacy links.
 
-### 2. Remediation for Uploaded Metadata
+### 2. Active Canonical LTS Targets
+Only the 6 canonical LTS Minecraft lines remain unarchived and active on CurseForge and Modrinth:
+- `1.21.1` (`[Fabric 1.21.1]` and `[NeoForge 1.21.1]`)
+- `1.20.1` (`[Fabric 1.20.1]` and `[Forge 1.20.1]`)
+- `1.18.2` (`[Fabric 1.18.2]` and `[Forge 1.18.2]`)
+- `1.16.5` (`[Fabric 1.16.5]` and `[Forge 1.16.5]`)
+- `1.12.2` (`[Forge 1.12.2]`)
+- `1.7.10` (`[Forge 1.7.10]`)
+
+### 3. Remediation for Uploaded Metadata
 If an upload ever occurs with unformatted titles or changelog dumps:
-- On CurseForge: Click **Edit** on the file in the author dashboard to adjust the **Display Name**, update the **Changelog** to the concise summary, and toggle the `Quilt` checkbox.
-- On Modrinth: Unfeature intermediate version cards so that only the canonical LTS versions are highlighted.
+- On CurseForge: Click **Edit** on the file in the author dashboard to adjust the **Display Name** to `[<Loader> <MC>] HeapHammer <ModVer>`, update the **Changelog** to the concise summary, and toggle the `Quilt` checkbox.
+- On Modrinth: Unfeature intermediate or legacy version cards so that only the canonical LTS versions are highlighted.
