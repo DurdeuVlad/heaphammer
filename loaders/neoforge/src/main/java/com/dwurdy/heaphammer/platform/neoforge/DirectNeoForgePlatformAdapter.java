@@ -107,7 +107,7 @@ public class DirectNeoForgePlatformAdapter extends NeoForgePlatformAdapter {
 
     @Override
     public EnvironmentFingerprint captureFingerprint() {
-        String heapHammerVersion = modVersion("heaphammer", "1.1.0");
+        String heapHammerVersion = modVersion("heaphammer", "1.1.1");
         String mcVersion = modVersion("minecraft", "1.21.1");
         String loaderVersion = "neoforge-" + modVersion("neoforge", "21.1.248");
         String javaVersion = System.getProperty("java.version", "21");
