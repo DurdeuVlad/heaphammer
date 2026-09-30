@@ -45,6 +45,8 @@ if (-not (Test-Path $primaryJar)) {
 $prodDir = "$WorkspaceRoot/dist/production"
 if (-not (Test-Path $prodDir)) {
     New-Item -ItemType Directory -Path $prodDir -Force | Out-Null
+} else {
+    Get-ChildItem -Path $prodDir -Include "*.jar", "SHA256SUMS.txt" -Recurse | Remove-Item -Force
 }
 
 Write-Host "`nStaging production release bundle in dist/production..." -ForegroundColor Cyan
@@ -188,12 +190,23 @@ if (-not $ghInstalled) {
 # never overstate loader coverage.
 $jarRows = Get-ChildItem "$prodDir/heaphammer-*.jar" | ForEach-Object {
     if ($_.Name -match '^heaphammer-(.+)-(fabric|neoforge|forge)-[^-]+\.jar$') {
-        [PSCustomObject]@{ MC = $Matches[1]; Loader = $Matches[2]; File = $_.Name }
+        $lName = switch ($Matches[2]) {
+            "fabric" { "Fabric" }
+            "neoforge" { "NeoForge" }
+            "forge" { "Forge" }
+            default { $Matches[2] }
+        }
+        [PSCustomObject]@{
+            MC = $Matches[1]
+            Loader = $lName
+            File = $_.Name
+            DisplayName = "[$lName $($Matches[1])] HeapHammer $modVersion"
+        }
     }
-} | Sort-Object { [version]$_.MC } -Descending, Loader
+} | Sort-Object -Property @{Expression={ [version]$_.MC }; Descending=$true}, @{Expression='Loader'}
 
 $tableLines = $jarRows | ForEach-Object {
-    "| **$($_.MC)** | $($_.Loader) | ``$($_.File)`` |"
+    "| **$($_.MC)** | $($_.Loader) | ``$($_.File)`` | ``$($_.DisplayName)`` |"
 }
 
 $notesLines = @(
@@ -204,8 +217,8 @@ $notesLines = @(
     "### Supported Minecraft Versions",
     "HeapHammer v$modVersion provides dedicated, precompiled binaries for $($jarRows.Count) version/loader targets:",
     "",
-    "| Minecraft Version | Mod Loader | Release Binary |",
-    "|---|---|---|"
+    "| Minecraft Version | Mod Loader | Release Binary | Platform Display Name |",
+    "|---|---|---|---|"
 ) + $tableLines + @(
     "",
     "### Release Highlights",
