@@ -143,6 +143,36 @@ if (advancedFabricMinecraftVersions.contains(project.minecraft_version)) {
 			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
 			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
 		}
+		testmodCloneCache {
+			java.srcDirs = ['testmods/leak-clonecache/src/main/java']
+			resources.srcDirs = ['testmods/leak-clonecache/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		}
+		testmodFakePlayerFactory {
+			java.srcDirs = ['testmods/leak-fakeplayerfactory/src/main/java']
+			resources.srcDirs = ['testmods/leak-fakeplayerfactory/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		}
+		testmodGazeTrack {
+			java.srcDirs = ['testmods/leak-gazetrack/src/main/java']
+			resources.srcDirs = ['testmods/leak-gazetrack/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		}
+		testmodCacheList {
+			java.srcDirs = ['testmods/leak-cachelist/src/main/java']
+			resources.srcDirs = ['testmods/leak-cachelist/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+		}
+		testmodAntagOptimizer {
+			java.srcDirs = ['testmods/antag-optimizer/src/main/java']
+			resources.srcDirs = ['testmods/antag-optimizer/src/main/resources']
+			compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output + sourceSets.testmodCacheList.output
+			runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output + sourceSets.testmodCacheList.output
+		}
 	}
 
 	task jarPlayerSession(type: Jar) {
@@ -159,7 +189,43 @@ if (advancedFabricMinecraftVersions.contains(project.minecraft_version)) {
 		from sourceSets.testmodPersistentEntity.output
 	}
 
-	buildTestmods.dependsOn(jarPlayerSession, jarPersistentEntity)
+	task jarCloneCache(type: Jar) {
+		archiveBaseName = 'testmod-leak-clonecache'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodCloneCache.output
+	}
+
+	task jarFakePlayerFactory(type: Jar) {
+		archiveBaseName = 'testmod-leak-fakeplayerfactory'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodFakePlayerFactory.output
+	}
+
+	task jarGazeTrack(type: Jar) {
+		archiveBaseName = 'testmod-leak-gazetrack'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodGazeTrack.output
+	}
+
+	task jarCacheList(type: Jar) {
+		archiveBaseName = 'testmod-leak-cachelist'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodCacheList.output
+	}
+
+	task jarAntagOptimizer(type: Jar) {
+		archiveBaseName = 'testmod-antag-optimizer'
+		archiveVersion = '1.0.0'
+		destinationDirectory = file("build/testmods")
+		from sourceSets.testmodAntagOptimizer.output
+	}
+
+	buildTestmods.dependsOn(jarPlayerSession, jarPersistentEntity, jarCloneCache,
+			jarFakePlayerFactory, jarGazeTrack, jarCacheList, jarAntagOptimizer)
 	tasks.named('test') {
 		dependsOn(buildTestmods)
 	}
