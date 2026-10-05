@@ -39,6 +39,7 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             "net.minecraft.network.protocol.PacketFlow",
             "net.minecraft.network.packet.PacketFlow"
     };
+    private static final int MAX_OUTBOUND_DRAIN_PER_CALL = 8192;
     private final Supplier<?> serverSupplier;
     private volatile RetentionTracker retentionTracker;
 
@@ -75,11 +76,22 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
 
         invoke(player, "setPos", x, y, z);
         Invocation placed = invoke(playerList, "placeNewPlayer", connection, player, cookie);
-        if (!placed.found) {
-            placed = invoke(playerList, "placeNewPlayer", connection, player);
-        }
-        if (!placed.found || value(invoke(playerList, "getPlayer", playerId)) == null) return null;
+        if (!placed.found && placed.failure == null) placed = invoke(playerList, "placeNewPlayer", connection, player);
+        // placeNewPlayer is the authoritative join boundary. On some
+        // historical runtimes the player-list lookup becomes visible only
+        // after this call returns, so immediate list visibility is only a
+        // fallback for runtimes that do not report the invocation cleanly.
+        if (!placed.found && !isPlayerTracked(playerList, player, playerId)) return null;
 
+        // placeNewPlayer relocates fresh players to the world spawn point,
+        // overriding the earlier setPos. Re-apply the planned position so
+        // cohort ring geometry survives the authoritative join boundary.
+        invoke(player, "setPos", x, y, z);
+
+        // The EmbeddedChannel backing this synthetic connection has no client
+        // draining its outbound queue. Consume it so login packets do not
+        // accumulate for the lifetime of the session.
+        drainOutbound(connection);
         PlayerLifecycleObservers.notifyJoined(player);
         RetentionTracker tracker = retentionTracker;
         if (tracker != null) tracker.observe(player.getClass().getName(), player);
@@ -94,17 +106,33 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         Object player = value(invoke(playerList, "getPlayer", playerId));
         if (server == null || playerList == null || player == null) return false;
 
-        if (action == PlayerAction.TELEPORT) return invoke(player, "teleportTo", x, y, z).found;
+        if (action == PlayerAction.LOOKAT) {
+            boolean looked = lookAt(player, x, y, z);
+            drainPlayerConnection(player);
+            return looked;
+        }
+        if (action == PlayerAction.TELEPORT) {
+            boolean moved = invoke(player, "teleportTo", x, y, z).found;
+            drainPlayerConnection(player);
+            return moved;
+        }
         if (action == PlayerAction.DIMCHANGE) {
             Object target = findLevel(server, targetDimension);
             if (target == null) return false;
             Object yaw = value(invoke(player, "getYRot"));
             Object pitch = value(invoke(player, "getXRot"));
-            return invoke(player, "teleportTo", target, x, y, z, Collections.emptySet(),
+            boolean moved = invoke(player, "teleportTo", target, x, y, z, Collections.emptySet(),
                     yaw == null ? Float.valueOf(0.0F) : yaw,
                     pitch == null ? Float.valueOf(0.0F) : pitch).found;
+            drainPlayerConnection(player);
+            return moved;
         }
-        if (action == PlayerAction.RESPAWN) return respawn(playerList, player);
+        if (action == PlayerAction.RESPAWN) {
+            boolean respawned = respawn(playerList, player);
+            drainPlayerConnection(player);
+            return respawned;
+        }
+        drainPlayerConnection(player);
         return true;
     }
 
@@ -140,6 +168,81 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         return count;
     }
 
+    /**
+     * Server-side packets written to a synthetic connection have nowhere to
+     * go: the EmbeddedChannel queues them as outbound messages forever. Drain
+     * every online test player's connection once per tick so held-online
+     * cohort workloads do not turn HeapHammer into the leak it is measuring.
+     */
+    @Override
+    public void housekeepingTick() {
+        Object server = serverSupplier.get();
+        Object playerList = value(invoke(server, "getPlayerList"));
+        for (Object player : iterable(value(invoke(playerList, "getPlayers")))) {
+            if (isTestPlayer(player)) {
+                drainPlayerConnection(player);
+            }
+        }
+    }
+
+    /**
+     * Rotates the player so its view vector points at the given position.
+     * Raycast- and observation-style mods read the rotation fields on the
+     * server side; no client acknowledgement is required.
+     */
+    private static boolean lookAt(Object player, double x, double y, double z) {
+        Double eyeX = asDouble(value(invoke(player, "getX")));
+        Double eyeY = asDouble(value(invoke(player, "getEyeY")));
+        Double eyeZ = asDouble(value(invoke(player, "getZ")));
+        if (eyeX == null || eyeZ == null) return false;
+        if (eyeY == null) {
+            Double feetY = asDouble(value(invoke(player, "getY")));
+            Double eyeHeight = asDouble(value(invoke(player, "getEyeHeight")));
+            if (feetY == null || eyeHeight == null) return false;
+            eyeY = feetY + eyeHeight;
+        }
+        double dx = x - eyeX;
+        double dy = y - eyeY;
+        double dz = z - eyeZ;
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float pitch = (float) Math.toDegrees(Math.atan2(-dy, Math.sqrt(dx * dx + dz * dz)));
+        boolean applied = invoke(player, "setRot", yaw, pitch).found;
+        if (!applied) {
+            applied = invoke(player, "setYRot", yaw).found & invoke(player, "setXRot", pitch).found;
+        }
+        invoke(player, "setYHeadRot", yaw);
+        invoke(player, "setYBodyRot", yaw);
+        setFieldValue(player, "yRotO", yaw);
+        setFieldValue(player, "xRotO", pitch);
+        setFieldValue(player, "yHeadRotO", yaw);
+        setFieldValue(player, "yBodyRotO", yaw);
+        return applied;
+    }
+
+    private static void drainPlayerConnection(Object player) {
+        Object listener = fieldValue(player, "connection");
+        drainOutbound(fieldValue(listener, "connection"));
+    }
+
+    /**
+     * Consumes outbound messages queued on the connection's channel and
+     * releases any reference-counted payloads. Bounded per call so the drain
+     * itself stays inside the tick budget.
+     */
+    private static void drainOutbound(Object connection) {
+        Object channel = fieldValue(connection, "channel");
+        if (channel == null) return;
+        for (int i = 0; i < MAX_OUTBOUND_DRAIN_PER_CALL; i++) {
+            Object message = value(invoke(channel, "readOutbound"));
+            if (message == null) return;
+            invokeStatic("io.netty.util.ReferenceCountUtil", "release", message);
+        }
+    }
+
+    private static Double asDouble(Object value) {
+        return value instanceof Number ? ((Number) value).doubleValue() : null;
+    }
+
     private static boolean respawn(Object playerList, Object player) {
         if (playerList == null || player == null) return false;
         for (Method method : methods(playerList.getClass(), "respawn")) {
@@ -160,22 +263,65 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
     }
 
     private static boolean disconnect(Object player, String message) {
-        Object connection = fieldValue(player, "connection");
-        if (connection == null) return false;
-        for (Method method : methods(connection.getClass(), "onDisconnect")) {
+        Object listener = fieldValue(player, "connection");
+        if (listener == null) return false;
+        for (Method method : methods(listener.getClass(), "onDisconnect")) {
             if (method.getParameterTypes().length != 1) continue;
             Class<?> parameter = method.getParameterTypes()[0];
             Object reason = disconnectReason(parameter, message);
             if (reason == null && parameter.isPrimitive()) continue;
             try {
                 method.setAccessible(true);
-                method.invoke(connection, reason);
+                method.invoke(listener, reason);
+                closeNetworkConnection(listener, message);
+                releaseDisconnectedReferences(listener);
                 return true;
             } catch (Exception ignored) {
                 // Try another overload, if present.
             }
         }
         return false;
+    }
+
+    /**
+     * The synthetic player path invokes the server listener directly because
+     * there is no real client event loop. Close the underlying transport too;
+     * otherwise the listener/connection pair can keep a disconnected player
+     * reachable after PlayerList removes it.
+     */
+    private static void closeNetworkConnection(Object listener, String message) {
+        Object networkConnection = fieldValue(listener, "connection");
+        if (networkConnection == null) return;
+        for (Method method : methods(networkConnection.getClass(), "disconnect")) {
+            if (method.getParameterTypes().length != 1) continue;
+            Object reason = disconnectReason(method.getParameterTypes()[0], message);
+            if (reason == null && method.getParameterTypes()[0].isPrimitive()) continue;
+            try {
+                method.setAccessible(true);
+                method.invoke(networkConnection, reason);
+                drainOutbound(networkConnection);
+                return;
+            } catch (Exception ignored) {
+                // Older runtimes may not expose a compatible transport close.
+            }
+        }
+    }
+
+    /**
+     * Break the synthetic listener graph after the authoritative disconnect
+     * callback. Only the transport-side references are severed: entity
+     * trackers retain Connection records whose player() dereferences
+     * listener.player, so nulling it corrupts every later entity removal
+     * (ServerEntity.removePairing NPE). Vanilla keeps the player reference
+     * until the tracker drops the record — matching that keeps GC honest and
+     * exposes tracker retention to measurement instead of masking it.
+     */
+    private static void releaseDisconnectedReferences(Object listener) {
+        Object networkConnection = fieldValue(listener, "connection");
+        if (networkConnection != null) {
+            setFieldValue(networkConnection, "packetListener", null);
+            setFieldValue(networkConnection, "disconnectListener", null);
+        }
     }
 
     private static Object disconnectReason(Class<?> parameter, String message) {
@@ -194,10 +340,13 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         if (profile == null) return null;
         Class<?> cookieClass = load("net.minecraft.server.network.CommonListenerCookie");
         if (cookieClass == null) return null;
-        for (Method method : cookieClass.getMethods()) {
-            if (!Modifier.isStatic(method.getModifiers()) || !"createInitial".equals(method.getName())) continue;
+        for (Method method : cookieClass.getDeclaredMethods()) {
+            if (!Modifier.isStatic(method.getModifiers()) || !cookieClass.isAssignableFrom(method.getReturnType())) continue;
             Class<?>[] types = method.getParameterTypes();
-            if ((types.length != 1 && types.length != 2) || !types[0].isAssignableFrom(profile.getClass())) continue;
+            if ((types.length != 1 && types.length != 2) || !types[0].isAssignableFrom(profile.getClass())) {
+                continue;
+            }
+            if (types.length == 2 && !isBoolean(types[1])) continue;
             try {
                 method.setAccessible(true);
                 return types.length == 1 ? method.invoke(null, profile) : method.invoke(null, profile, Boolean.FALSE);
@@ -216,6 +365,23 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             if (dimension.equals(String.valueOf(location))) return level;
         }
         return null;
+    }
+
+    /**
+     * Confirms that PlayerList accepted the player. Some historical runtimes
+     * populate the iterable player list before their UUID lookup is visible,
+     * so the direct getPlayer(UUID) result cannot be the only confirmation.
+     */
+    static boolean isPlayerTracked(Object playerList, Object player, UUID playerId) {
+        if (playerList == null || player == null) return false;
+        if (value(invoke(playerList, "getPlayer", playerId)) != null) return true;
+        for (Object listedPlayer : iterable(value(invoke(playerList, "getPlayers")))) {
+            if (listedPlayer == player) return true;
+            Object profile = value(invoke(listedPlayer, "getGameProfile"));
+            Object listedId = value(invoke(profile, "getId"));
+            if (playerId.equals(listedId)) return true;
+        }
+        return false;
     }
 
     private static boolean isTestPlayer(Object player) {
@@ -253,10 +419,82 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             if (packetFlow == null) continue;
             for (String connectionClassName : CONNECTION_CLASS_NAMES) {
                 Object connection = construct(connectionClassName, packetFlow);
-                if (connection != null) return connection;
+                Object channel = construct("io.netty.channel.embedded.EmbeddedChannel");
+                if (connection != null && channel != null && configureConnectionChannel(connection, channel)) {
+                    return connection;
+                }
             }
         }
         return null;
+    }
+
+    /**
+     * Installs the synthetic channel and initializes the protocol attributes
+     * expected by the server's authoritative player-placement path. Older
+     * runtimes may not expose the protocol helpers, so the channel field and
+     * initializer remain compatibility fallbacks where those helpers exist.
+     */
+    static boolean configureConnectionChannel(Object connection, Object channel) {
+        if (connection == null || channel == null) return false;
+        if (!setFieldValue(connection, "channel", channel)) return false;
+
+        Invocation initializer = invoke(connection, "setInitialProtocolAttributes", channel);
+        if (!initializer.found && initializer.failure == null) {
+            initializer = invoke(connection, "setHandlers", channel);
+        }
+        if (initializer.failure != null) return false;
+
+        Class<?> protocolType = load("net.minecraft.network.ConnectionProtocol");
+        Object play = enumConstant(protocolType, "PLAY");
+        if (play != null && !configurePlayProtocol(connection, channel, play)) return false;
+        return true;
+    }
+
+    private static boolean configurePlayProtocol(Object connection, Object channel, Object play) {
+        Class<?> connectionType = connection.getClass();
+        boolean metadataAvailableOnAnyCandidate = false;
+        for (String packetFlowClassName : PACKET_FLOW_CLASS_NAMES) {
+            Class<?> packetFlowType = load(packetFlowClassName);
+            if (packetFlowType == null || !packetFlowType.isEnum()) continue;
+
+            boolean configured = true;
+            boolean metadataAvailable = false;
+            for (String flowName : new String[]{"SERVERBOUND", "CLIENTBOUND"}) {
+                Object flow = enumConstant(packetFlowType, flowName);
+                Object key = value(invokeStatic(connectionType, "getProtocolKey", flow));
+                if (key == null) {
+                    Object networkSide = enumConstant("net.minecraft.network.NetworkSide", flowName);
+                    if (networkSide == null) {
+                        networkSide = enumConstant("net.minecraft.network.protocol.NetworkSide", flowName);
+                    }
+                    key = value(invokeStatic(connectionType, "getProtocolAttributeKey", networkSide));
+                }
+                if (key == null) {
+                    String primaryField = "SERVERBOUND".equals(flowName)
+                            ? "ATTRIBUTE_SERVERBOUND_PROTOCOL" : "ATTRIBUTE_CLIENTBOUND_PROTOCOL";
+                    String legacyField = "SERVERBOUND".equals(flowName)
+                            ? "SERVERBOUND_PROTOCOL_KEY" : "CLIENTBOUND_PROTOCOL_KEY";
+                    key = staticFieldValue(connectionType, primaryField, legacyField);
+                }
+                Object codec = value(invoke(play, "codec", flow));
+                if (codec == null) codec = value(invoke(play, "getHandler", flow));
+                if (key == null || codec == null) {
+                    configured = false;
+                    break;
+                }
+                metadataAvailable = true;
+                metadataAvailableOnAnyCandidate = true;
+                Object attribute = value(invoke(channel, "attr", key));
+                if (attribute == null
+                        || !invoke(attribute, "set", codec).found) {
+                    configured = false;
+                    break;
+                }
+            }
+            if (configured) return true;
+            if (metadataAvailable) metadataAvailableOnAnyCandidate = true;
+        }
+        return !metadataAvailableOnAnyCandidate;
     }
 
     private static List<Object> iterable(Object value) {
@@ -280,32 +518,68 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         return null;
     }
 
+    private static Object staticFieldValue(Class<?> type, String... names) {
+        if (type == null) return null;
+        for (Class<?> cursor = type; cursor != null; cursor = cursor.getSuperclass()) {
+            for (String name : names) {
+                try {
+                    Field field = cursor.getDeclaredField(name);
+                    if (!Modifier.isStatic(field.getModifiers())) continue;
+                    field.setAccessible(true);
+                    return field.get(null);
+                } catch (Exception ignored) {
+                    // Try the next mapped field name or superclass.
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean setFieldValue(Object target, String name, Object value) {
+        if (target == null) return false;
+        for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
+            try {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                field.set(target, value);
+                return true;
+            } catch (Exception ignored) {
+                // Search the superclass hierarchy.
+            }
+        }
+        return false;
+    }
+
     private static Invocation invoke(Object target, String name, Object... args) {
         if (target == null) return Invocation.ABSENT;
+        Throwable failure = null;
         for (Method method : methods(target.getClass(), name)) {
             if (!compatible(method.getParameterTypes(), args)) continue;
             try {
                 method.setAccessible(true);
                 return new Invocation(true, method.invoke(target, args));
-            } catch (Exception ignored) {
+            } catch (Exception exception) {
+                failure = rootCause(exception);
                 // Try another overload, if present.
             }
         }
-        return Invocation.ABSENT;
+        return failure == null ? Invocation.ABSENT : new Invocation(false, null, failure);
     }
 
     private static Invocation invokeStatic(Class<?> type, String name, Object... args) {
         if (type == null) return Invocation.ABSENT;
+        Throwable failure = null;
         for (Method method : methods(type, name)) {
             if (!Modifier.isStatic(method.getModifiers()) || !compatible(method.getParameterTypes(), args)) continue;
             try {
                 method.setAccessible(true);
                 return new Invocation(true, method.invoke(null, args));
-            } catch (Exception ignored) {
+            } catch (Exception exception) {
+                failure = rootCause(exception);
                 // Try another overload, if present.
             }
         }
-        return Invocation.ABSENT;
+        return failure == null ? Invocation.ABSENT : new Invocation(false, null, failure);
     }
 
     private static Invocation invokeStatic(String className, String name, Object... args) {
@@ -406,14 +680,26 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         return invocation == null ? null : invocation.value;
     }
 
+    private static Throwable rootCause(Exception exception) {
+        Throwable cause = exception;
+        while (cause.getCause() != null) cause = cause.getCause();
+        return cause;
+    }
+
     private static final class Invocation {
         private static final Invocation ABSENT = new Invocation(false, null);
         private final boolean found;
         private final Object value;
+        private final Throwable failure;
 
         private Invocation(boolean found, Object value) {
+            this(found, value, null);
+        }
+
+        private Invocation(boolean found, Object value, Throwable failure) {
             this.found = found;
             this.value = value;
+            this.failure = failure;
         }
     }
 }

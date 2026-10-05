@@ -28,6 +28,8 @@ Welcome to the HeapHammer documentation center. Here you will find architectural
 ### 3. Release & Operations
 - **[PUBLICATION.md](PUBLICATION.md)**: Canonical release lifecycle, milestone-batched release branching model (`release/v*`), strict Semantic Versioning (Zero Alpha policy), verification checklists, and Modrinth/CurseForge packaging.
 - **[BUILD_TARGETS.md](BUILD_TARGETS.md)**: Canonical version × loader target matrix, nested `loaders/` build layout, per-loader toolchain map, and how to add a new loader target.
+- **[RELEASE_1_1_1.md](RELEASE_1_1_1.md)**: Release notes for 1.1.1 (CurseForge release streamlining and 2-phase distribution architecture).
+- **[RELEASE_1_1_0.md](RELEASE_1_1_0.md)**: Release notes for 1.1.0 (player-session and persistent-entity diagnostic fixtures).
 
 ### 4. Governance & Community
 - **[OSS.md](OSS.md)**: Open-source governance, licensing policy (LGPL-3.0), dual-axis branch strategy, and historical LTS version maintenance roadmap.

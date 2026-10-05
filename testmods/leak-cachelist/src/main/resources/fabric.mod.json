@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "testmod-leak-cachelist",
+  "version": "1.0.0",
+  "name": "TestMod Leak CacheList",
+  "description": "Victim fixture whose rebuild path leaks when an intrusive optimizer deletes its cache",
+  "authors": [
+    "dwurdy"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.dwurdy.testmod.cachelist.CacheListLeakMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=${java_version}"
+  }
+}
