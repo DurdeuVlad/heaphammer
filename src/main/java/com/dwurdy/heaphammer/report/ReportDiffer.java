@@ -175,7 +175,7 @@ public class ReportDiffer {
         WorldStoreSnapshot baseline = evidence.baselineWorldStore();
         WorldStoreSnapshot current = evidence.finalWorldStore();
         if (baseline == null || current == null) return 0L;
-        return current.totalRegionBytes() - baseline.totalRegionBytes();
+        return current.totalPersistedBytes() - baseline.totalPersistedBytes();
     }
 
     private static long worldGrowthEntities(RunDiagnostics evidence) {

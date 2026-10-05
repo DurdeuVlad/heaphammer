@@ -52,6 +52,39 @@ class AdvancedLeakFixtureBuildTest {
         }
     }
 
+    @Test
+    @DisplayName("Verify clone-boundary, fake-player-factory, gaze, and antagonist fixture jars package cleanly")
+    void testNewFixtureJarPackaging() throws IOException {
+        assumeAdvancedFixtureBuild();
+        assertJarWithClasses("testmod-leak-clonecache",
+                "com/dwurdy/testmod/clonecache/CloneCacheLeakMod.class",
+                "com/dwurdy/testmod/clonecache/CloneSessionRecord.class");
+        assertJarWithClasses("testmod-leak-fakeplayerfactory",
+                "com/dwurdy/testmod/fakeplayerfactory/FakePlayerFactoryLeakMod.class",
+                "com/dwurdy/testmod/fakeplayerfactory/FactoryPlayerRecord.class");
+        assertJarWithClasses("testmod-leak-gazetrack",
+                "com/dwurdy/testmod/gazetrack/GazeTrackLeakMod.class",
+                "com/dwurdy/testmod/gazetrack/GazeTargetRecord.class");
+        assertJarWithClasses("testmod-leak-cachelist",
+                "com/dwurdy/testmod/cachelist/CacheListLeakMod.class",
+                "com/dwurdy/testmod/cachelist/RebuildAuditRecord.class");
+        assertJarWithClasses("testmod-antag-optimizer",
+                "com/dwurdy/testmod/antag/optimizer/AntagonistOptimizerMod.class");
+    }
+
+    private static void assertJarWithClasses(String baseName, String... classes) throws IOException {
+        Path jarPath = Paths.get("build/testmods/" + baseName + "-1.0.0.jar");
+        File jarFile = jarPath.toFile();
+        assertTrue(jarFile.exists(), "Run buildTestmods before packaging assertions");
+
+        try (JarFile jar = new JarFile(jarFile)) {
+            assertNotNull(jar.getJarEntry("fabric.mod.json"));
+            for (String clazz : classes) {
+                assertNotNull(jar.getJarEntry(clazz), baseName + " missing " + clazz);
+            }
+        }
+    }
+
     private static void assumeAdvancedFixtureBuild() throws IOException {
         Path properties = Paths.get("gradle.properties");
         String minecraftVersion = Files.isRegularFile(properties)

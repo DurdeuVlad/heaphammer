@@ -43,4 +43,9 @@ public final class FabricPlayerLifecyclePort implements PlayerLifecyclePort {
     public int cleanupTestPlayers() {
         return delegate.cleanupTestPlayers();
     }
+
+    @Override
+    public void housekeepingTick() {
+        delegate.housekeepingTick();
+    }
 }
