@@ -10,7 +10,7 @@
 
 **Deterministic Minecraft server stress testing and retained-memory regression detection.**
 
-[![Release](https://img.shields.io/badge/release-v1.0.0-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
+[![Release](https://img.shields.io/badge/release-v1.2.0-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
 [![CurseForge](https://img.shields.io/badge/CurseForge-HeapHammer-F16436?style=flat-square&logo=curseforge&logoColor=white)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CurseForge Downloads](https://img.shields.io/curseforge/dt/1687734?style=flat-square&logo=curseforge&logoColor=white&color=F16436&label=downloads)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CI](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml/badge.svg)](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml)
@@ -45,7 +45,7 @@ In modpacks with 100+ mods, memory leaks rarely show up on idle servers. They ta
 
 Traditional profilers (like Spark or JFR) show what is occupying memory **right now**, but they cannot tell you **which workload caused it** or **whether the memory will ever be reclaimed**.
 
-**HeapHammer compresses 24 hours of player activity into a 2-minute repeatable test.**  
+**HeapHammer is designed to compress long-running player-like workloads into a short, repeatable test.**
 It injects native Minecraft chunk tickets, entity spawns, and block entity cycles under a strict tick budget, forces cleanup, and uses statistical regression to prove whether memory resets or keeps climbing.
 
 > [!NOTE]
@@ -81,17 +81,17 @@ Rather than running generic stress loops, HeapHammer exercises real Minecraft me
 
 ## Does It Work With Any Mod?
 
-**Yes. HeapHammer works automatically out of the box with any mod**—no mod-specific plugins, custom configs, or patches required.
+HeapHammer is designed to exercise native Minecraft server behavior without requiring a mod-specific adapter for the common workload paths. Coverage still depends on the Minecraft version, loader, server configuration, and the behavior a mod exposes to those workloads.
 
-Because HeapHammer stresses the **native Minecraft server engine** and queries the **JVM runtime directly**, any mod running on your server is automatically included in tests:
+Because HeapHammer stresses the **native Minecraft server engine** and queries the **JVM runtime directly**, a workload can exercise interactions across the running server environment; coverage and detection still depend on the mod, loader, version, and scenario selected:
 
 | Mod Category | Examples | Automatic Behavior | What HeapHammer Catches |
 |---|---|---|---|
-| 🗺️ **World-Gen & Biomes** | Terralith, BYG, Biomes O' Plenty | **100% Automatic** | Chunk loading triggers native feature generation, population, and lighting passes. Catches listeners that leak chunk data. |
-| 📍 **Maps & Claims** | Dynmap, JourneyMap, FTB Chunks | **100% Automatic** | Exercises whether map rendering and claiming listeners cleanly evict terrain cache data when chunks unload. |
-| 👾 **Custom Mobs & Bosses** | Alex's Mobs, Lycanites, Cataclysm | **100% Automatic** | Spawns, ticks, and discards registered entity types, verifying that entity tracking and combat listeners don't pin dead mobs in static lists. |
-| ⚙️ **Machines & Tech** | Create, Mekanism, Applied Energistics 2 | **100% Automatic** | Placing and breaking blocks tests tile entity tick queue deregistration (`BlockEntity.setRemoved()`) and inventory buffer cleanup. |
-| 📦 **Full Modpacks** | ATM, Better MC, Custom Packs (200+ mods) | **100% Automatic** | `/hh report diff` isolates which mod update introduced a regression by comparing memory slopes before and after adding a mod. |
+| 🗺️ **World-Gen & Biomes** | Terralith, BYG, Biomes O' Plenty | **Native workload path** | Chunk loading exercises native feature generation, population, and lighting passes. |
+| 📍 **Maps & Claims** | Dynmap, JourneyMap, FTB Chunks | **Native workload path** | Exercises whether listeners evict terrain-related state when chunks unload. |
+| 👾 **Custom Mobs & Bosses** | Alex's Mobs, Lycanites, Cataclysm | **Native workload path** | Spawns, ticks, and removes configured entities for lifecycle testing. |
+| ⚙️ **Machines & Tech** | Create, Mekanism, Applied Energistics 2 | **Native workload path** | Places and removes configured block-entity workloads for cleanup testing. |
+| 📦 **Full Modpacks** | ATM, Better MC, custom packs | **Scenario-dependent** | Differential reports can help compare memory behavior across controlled modpack changes. |
 
 > [!TIP]
 > **What about the `/hh adapters` command?**  
@@ -104,11 +104,11 @@ Because HeapHammer stresses the **native Minecraft server engine** and queries t
 ```text
 1. PLAN (Seed)          2. EXECUTE (Tick Budget)    3. SETTLE (Eviction)      4. VERDICT (Slope)
 Deterministic seed  ──> Max 10 ops/tick         ──> Drop tickets, wait    ──> Measure post-settle
-guarantees replay       TPS stays smooth            for native chunk unload   Ordinary Least Squares
+enables replay          bounded work per tick      for native chunk unload   Ordinary Least Squares
 ```
 
 1. **Deterministic Planning**: Every workload is generated from a fixed seed. When a leak is discovered, the exact coordinate sequence can be replayed across server restarts.
-2. **Strict Tick Budgeting**: Operations run incrementally during server tick ends (`maxOperationsPerTick=10`, `maxMsPerTick=15`). The server thread is never starved, and TPS remains smooth.
+2. **Strict Tick Budgeting**: Operations run incrementally during server tick ends (`maxOperationsPerTick=10`, `maxMsPerTick=15`) so operators can bound the workload's impact and observe server health.
 3. **Native Eviction & Settle**: After each batch, HeapHammer drops all tickets and allows vanilla `ServerChunkCache` to evict chunks naturally over configurable settle ticks.
 4. **Statistical OLS Regression vs. GC Noise**: Rather than guessing from volatile instantaneous heap spikes ($\Delta\text{Heap}$), HeapHammer measures the slope ($y = mx + b$) and goodness of fit ($R^2$) across post-settle checkpoints.
 
@@ -118,20 +118,20 @@ guarantees replay       TPS stays smooth            for native chunk unload   Or
 
 HeapHammer is **designed primarily for staging and development servers** to validate modpacks before publishing updates. However, it is built with strict **zero-destruction safety invariants** so server admins can run diagnostics on live worlds:
 
-- 🛡️ **Zero Chunk Corruption**: Only uses dedicated test tickets (`TicketType heaphammer`). Player chunks, world spawn, and player builds are never touched or modified.
-- ⏱️ **Watchdog Protection**: Operations are tick-budgeted (max 15 ms/tick). It will never trigger a server watchdog crash or TPS freeze.
-- 🧹 **Instant Clean Abort**: Running `/hh stop` or `/hh cleanup` immediately frees 100% of test tickets and entities. No leftover tickets, no server restart needed.
+- 🛡️ **Zero Chunk Corruption**: Uses dedicated test tickets (`TicketType heaphammer`) and is designed to avoid player chunks, world spawn, and player builds; verify behavior against the target version and configuration.
+- ⏱️ **Watchdog Protection**: Operations are tick-budgeted (max 15 ms/tick) to reduce impact; monitor the target server and workload when running diagnostics.
+- 🧹 **Clean Abort**: Running `/hh stop` or `/hh cleanup` invokes the cleanup path for test tickets and entities; verify the result after aborting a run in the target environment.
 
 ---
 
 ## Quickstart
 
-HeapHammer is **100% server-side only**. Connecting players do **not** need it installed.
+HeapHammer is intended to run server-side; connecting players do not need the mod installed for the server diagnostics path.
 
 ### 1. Install
 Download the compiled JAR from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer) or [GitHub Releases](https://github.com/DurdeuVlad/heaphammer/releases) and place it into your server's `mods/` directory:
 ```bash
-cp heaphammer-1.0.0.jar /path/to/server/mods/
+cp heaphammer-1.2.0.jar /path/to/server/mods/
 ```
 
 ### 2. Run Stress Test
@@ -197,7 +197,7 @@ Classification: PASS -> SUSPICIOUS (CHANGED)
 
 ## Empirical Proof
 
-HeapHammer is not theoretical. Every algorithm, regression slope, and ticket lifecycle has been empirically benchmarked and proven on **real Minecraft 1.21.1 Fabric dedicated servers** using standalone companion test mods:
+The repository includes documented experiments for the regression engine, ticket lifecycle, and live-server command paths. Treat those results as environment-specific evidence, not a guarantee for every modpack or supported version:
 
 ### 1. Dedicated Server Benchmark Matrix (5 Cycles, Explicit GC)
 | Test Condition | Retained Slope | Net Delta | Verdict | Real-World Outcome |
@@ -257,7 +257,10 @@ Execute via `/hh` in-game or `hh` directly from the dedicated server console:
 | `hh doctor` | Checks server readiness, loaded chunks, and ticket health. | `hh doctor` |
 | `hh run chunks [flags]` | Executes deterministic chunk churn workload. | `hh run chunks --iterations=5 --batch=10 --radius=8 --strategy=spiral` |
 | `hh run entities [flags]` | Executes entity lifecycle stress workload. | `hh run entities --iterations=5 --batch=50 --hold=20` |
+| `hh run entities --profile=...` | Runs persistent or capability-gated unticked-ring entity profiles. | `hh run entities --profile=persistent --diagnostics=world-store` |
 | `hh run blockentities [flags]` | Executes block entity placement and destruction stress. | `hh run blockentities --iterations=5 --batch=20` |
+| `hh run players [flags]` | Exercises real test-player login/logout lifecycle actions where supported. | `hh run players --logins-per-cycle=5 --actions=join,respawn,quit` |
+| `hh run ... --duration=... --interval=...` | Repeats bounded workload bursts for a finite soak schedule. | `hh run chunks --duration=10m --interval=30s` |
 | `hh status` | Displays active test progress, current cycle, and tickets. | `hh status` |
 | `hh stop` | Immediately halts test and releases all tickets. | `hh stop` |
 | `hh cleanup` | Forcibly purges all active HeapHammer tickets and entities across all dimensions. | `hh cleanup` |
@@ -265,6 +268,7 @@ Execute via `/hh` in-game or `hh` directly from the dedicated server console:
 | `hh config reload` | Hot-reloads safety configuration from `config/heaphammer.json`. | `hh config reload` |
 | `hh report show <id\|last>` | Displays memory retention slope, $R^2$, and verdict. | `hh report show last` |
 | `hh report diff <runA> <runB>` | Compares two runs to detect regressions between modpack updates. | `hh report diff run-01 run-02` |
+| `hh compare <runA> <runB>` | Alias for evidence-backed report comparison, including R² and diagnostic deltas. | `hh compare run-01 run-02` |
 | `hh replay <run-id>` | Replays the exact resolved operation sequence. | `hh replay run-01` |
 | `hh diagnostics histogram` | Samples top 10 JVM class instances and memory size. | `hh diagnostics histogram` |
 | `hh diagnostics heapdump` | Dumps a standard HotSpot `.hprof` snapshot for MAT/JProfiler. | `hh diagnostics heapdump` |
@@ -301,7 +305,7 @@ HeapHammer is specifically engineered for safe execution on live staging and pro
 
 ## Multi-Version Architecture
 
-HeapHammer uses **Hexagonal Architecture (Ports & Adapters)**. The core domain, math engine, and scenario planning are pure Java with **zero Minecraft dependencies**, guaranteeing binary compatibility across all supported versions:
+HeapHammer uses **Hexagonal Architecture (Ports & Adapters)**. The core domain, math engine, and scenario planning are pure Java with **zero Minecraft dependencies**, aiming to preserve compatibility across supported versions:
 
 - **1.21.4 / 1.21.1** (Fabric & NeoForge, Java 21) — Active modern trunk and cutting-edge releases
 - **1.20.6 / 1.20.4 / 1.20.1** (Fabric & Forge, Java 21/17) — Modern Gold Standard modpacks

@@ -6,7 +6,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
-/** Read-only entity-region metrics for one dimension. */
+/** Read-only entity-region, SavedData, and chunk-region metrics for one dimension. */
 @Desugar
 public record WorldStoreDimensionSnapshot(
         String dimension,
@@ -17,12 +17,18 @@ public record WorldStoreDimensionSnapshot(
         long itemEntityCount,
         long testEntityCount,
         long testItemEntityCount,
-        Map<String, Long> itemAgeBuckets
+        Map<String, Long> itemAgeBuckets,
+        long savedDataFileCount,
+        long savedDataBytes,
+        long chunkFileCount,
+        long chunkBytes
 ) {
     public WorldStoreDimensionSnapshot {
         Objects.requireNonNull(dimension, "dimension must not be null");
         if (regionFileCount < 0L || regionBytes < 0L || entityCount < 0L || persistentEntityCount < 0L
-                || itemEntityCount < 0L || testEntityCount < 0L || testItemEntityCount < 0L) {
+                || itemEntityCount < 0L || testEntityCount < 0L || testItemEntityCount < 0L
+                || savedDataFileCount < 0L || savedDataBytes < 0L
+                || chunkFileCount < 0L || chunkBytes < 0L) {
             throw new IllegalArgumentException("world-store counts must not be negative");
         }
         itemAgeBuckets = itemAgeBuckets == null

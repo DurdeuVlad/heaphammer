@@ -14,6 +14,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Persistent journal tracking active experiment assets (placed block entities, entities, tickets)
@@ -46,6 +49,12 @@ public class CrashRecoveryJournal {
     }
 
     private final Path journalPath;
+    private final ExecutorService persistenceExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "heaphammer-recovery-journal");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final AtomicLong persistenceGeneration = new AtomicLong();
     private volatile JournalState currentState = null;
 
     public CrashRecoveryJournal() {
@@ -64,7 +73,14 @@ public class CrashRecoveryJournal {
                 System.currentTimeMillis()
         );
         this.currentState = state;
-        persist();
+        if (plan.playerOperations() != null) {
+            plan.playerOperations().forEach(operation -> {
+                if (operation.action() == com.dwurdy.heaphammer.domain.PlayerAction.JOIN) {
+                    state.activePlayerUuids.add(operation.playerId().toString());
+                }
+            });
+        }
+        persistInitial();
     }
 
     public synchronized void recordEntitySpawned(UUID uuid) {
@@ -111,6 +127,7 @@ public class CrashRecoveryJournal {
 
     public synchronized void recordFinish() {
         this.currentState = null;
+        persistenceGeneration.incrementAndGet();
         try {
             Files.deleteIfExists(journalPath);
         } catch (IOException e) {
@@ -157,8 +174,7 @@ public class CrashRecoveryJournal {
                     for (String uuidStr : state.activePlayerUuids) {
                         try {
                             UUID uuid = UUID.fromString(uuidStr);
-                            if (platform.getPlayerLifecyclePort().isPresent()
-                                    && platform.getPlayerLifecyclePort().get().quit(state.dimension, uuid)) {
+                            if (platform.getPlayerLifecyclePort().map(port -> port.quit(state.dimension, uuid)).orElse(false)) {
                                 cleanedCount++;
                             }
                         } catch (Exception ignored) {}
@@ -178,14 +194,47 @@ public class CrashRecoveryJournal {
         return cleanedCount;
     }
 
-    private void persist() {
+    private synchronized void persist() {
         if (currentState == null) return;
+        long generation = persistenceGeneration.incrementAndGet();
+        JournalState snapshot = copyState(currentState);
+        persistenceExecutor.execute(() -> {
+            try {
+                String json = GsonCodec.toJson(snapshot);
+                synchronized (CrashRecoveryJournal.this) {
+                    // Serialize the final generation check with recordFinish().
+                    // Otherwise a write that passed the check before finish could
+                    // recreate the journal after recordFinish() deleted it.
+                    if (generation == persistenceGeneration.get()) {
+                        writeJournal(json);
+                    }
+                }
+            } catch (IOException e) {
+                LOGGER.warn("Failed to persist crash recovery journal: {}", e.getMessage());
+            }
+        });
+    }
+
+    protected void writeJournal(String json) throws IOException {
+        FileStorage.writeStringAtomic(journalPath, json);
+    }
+
+    private synchronized void persistInitial() {
+        if (currentState == null) return;
+        persistenceGeneration.incrementAndGet();
         try {
-            String json = GsonCodec.toJson(currentState);
-            FileStorage.writeStringAtomic(journalPath, json);
+            FileStorage.writeStringAtomic(journalPath, GsonCodec.toJson(copyState(currentState)));
         } catch (IOException e) {
             LOGGER.warn("Failed to persist crash recovery journal: {}", e.getMessage());
         }
+    }
+
+    private static JournalState copyState(JournalState source) {
+        JournalState copy = new JournalState(source.runId, source.scenarioId, source.dimension, source.startedTimestamp);
+        if (source.activeEntityUuids != null) copy.activeEntityUuids.addAll(source.activeEntityUuids);
+        if (source.activePlayerUuids != null) copy.activePlayerUuids.addAll(source.activePlayerUuids);
+        if (source.activeBlockPositions != null) copy.activeBlockPositions.addAll(source.activeBlockPositions);
+        return copy;
     }
 
     public JournalState getCurrentState() {

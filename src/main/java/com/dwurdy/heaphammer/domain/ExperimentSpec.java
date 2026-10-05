@@ -37,6 +37,7 @@ public record ExperimentSpec(
         EntityWorkloadProfile entityProfile,
         int loginsPerCycle,
         List<PlayerAction> playerActions,
+        boolean playerCohort,
         long durationSeconds,
         long intervalSeconds,
         List<DiagnosticCollector> diagnosticCollectors,
@@ -126,11 +127,41 @@ public record ExperimentSpec(
                 maxMillisPerTick, explicitGc, 1.0, Collections.emptyList(), Collections.emptyList(),
                 EntityWorkloadProfile.TRANSIENT, batchSize,
                 com.dwurdy.heaphammer.infrastructure.LegacyCollections.list(PlayerAction.JOIN, PlayerAction.QUIT),
-                0L, 0L, Collections.emptyList(), Collections.emptyList());
+                false, 0L, 0L, Collections.emptyList(), Collections.emptyList());
     }
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    /** Builder pre-populated with every field of this spec. */
+    public Builder toBuilder() {
+        return builder()
+                .scenarioId(scenarioId)
+                .seed(seed)
+                .dimension(dimension)
+                .center(centerX, centerZ)
+                .radius(radius)
+                .iterations(iterations)
+                .batchSize(batchSize)
+                .strategy(strategy)
+                .warmupIterations(warmupIterations)
+                .holdTicks(holdTicks)
+                .settleTicks(settleTicks)
+                .maxOperationsPerTick(maxOperationsPerTick)
+                .maxMillisPerTick(maxMillisPerTick)
+                .explicitGc(explicitGc)
+                .coverage(coverage)
+                .includeMods(includeMods)
+                .excludeMods(excludeMods)
+                .entityProfile(entityProfile)
+                .loginsPerCycle(loginsPerCycle)
+                .playerActions(playerActions)
+                .playerCohort(playerCohort)
+                .durationSeconds(durationSeconds)
+                .intervalSeconds(intervalSeconds)
+                .diagnosticCollectors(diagnosticCollectors)
+                .trackedClasses(trackedClasses);
     }
 
     public static class Builder {
@@ -155,6 +186,7 @@ public record ExperimentSpec(
         private EntityWorkloadProfile entityProfile = EntityWorkloadProfile.TRANSIENT;
         private int loginsPerCycle = 1;
         private List<PlayerAction> playerActions = new ArrayList<>(com.dwurdy.heaphammer.infrastructure.LegacyCollections.list(PlayerAction.JOIN, PlayerAction.QUIT));
+        private boolean playerCohort = false;
         private long durationSeconds = 0L;
         private long intervalSeconds = 0L;
         private List<DiagnosticCollector> diagnosticCollectors = new ArrayList<>();
@@ -182,6 +214,7 @@ public record ExperimentSpec(
         public Builder entityProfile(EntityWorkloadProfile profile) { this.entityProfile = profile; return this; }
         public Builder loginsPerCycle(int loginsPerCycle) { this.loginsPerCycle = loginsPerCycle; return this; }
         public Builder playerActions(List<PlayerAction> actions) { this.playerActions = (actions == null) ? new ArrayList<>() : new ArrayList<>(actions); return this; }
+        public Builder playerCohort(boolean playerCohort) { this.playerCohort = playerCohort; return this; }
         public Builder durationSeconds(long durationSeconds) { this.durationSeconds = durationSeconds; return this; }
         public Builder intervalSeconds(long intervalSeconds) { this.intervalSeconds = intervalSeconds; return this; }
         public Builder diagnosticCollectors(List<DiagnosticCollector> collectors) { this.diagnosticCollectors = (collectors == null) ? new ArrayList<>() : new ArrayList<>(collectors); return this; }
@@ -192,7 +225,7 @@ public record ExperimentSpec(
                     scenarioId, seed, dimension, centerX, centerZ, radius, iterations, batchSize,
                     strategy, warmupIterations, holdTicks, settleTicks, maxOperationsPerTick,
                     maxMillisPerTick, explicitGc, coverage, includeMods, excludeMods,
-                    entityProfile, loginsPerCycle, playerActions, durationSeconds, intervalSeconds,
+                    entityProfile, loginsPerCycle, playerActions, playerCohort, durationSeconds, intervalSeconds,
                     diagnosticCollectors, trackedClasses
             );
         }

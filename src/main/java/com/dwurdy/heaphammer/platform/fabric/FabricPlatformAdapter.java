@@ -83,7 +83,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         String heapHammerVersion = FabricLoader.getInstance()
                 .getModContainer("heaphammer")
                 .map(m -> m.getMetadata().getVersion().getFriendlyString())
-                .orElse("1.0.0");
+                .orElse("1.2.0");
 
         String mcVersion = FabricLoader.getInstance()
                 .getModContainer("minecraft")
@@ -159,6 +159,52 @@ public class FabricPlatformAdapter implements PlatformAdapter {
     public boolean isServerReady() {
         MinecraftServer server = serverSupplier.get();
         return server != null && server.isRunning();
+    }
+
+    @Override
+    public PlatformCapabilities getCapabilities() {
+        return PlatformCapabilities.builder()
+                .supported(PlatformCapability.PLAYER_LIFECYCLE)
+                .supported(PlatformCapability.PERSISTENT_ENTITIES)
+                .unsupported(PlatformCapability.UNTICKED_CHUNKS, "Fabric 1.21.1 has no stable public per-entity unticked-chunk contract")
+                .supported(PlatformCapability.HISTOGRAM)
+                .supported(PlatformCapability.RETENTION)
+                .supported(PlatformCapability.WORLD_STORE)
+                .supported(PlatformCapability.EVENT_METRICS)
+                .supported(PlatformCapability.SOAK)
+                .build();
+    }
+
+    @Override
+    public java.util.Optional<PlayerLifecyclePort> getPlayerLifecyclePort() {
+        return java.util.Optional.of(playerLifecyclePort);
+    }
+
+    @Override
+    public java.util.Optional<EntityLifecyclePort> getEntityLifecyclePort() {
+        return java.util.Optional.of(entityLifecyclePort);
+    }
+
+    @Override
+    public java.util.Optional<WorldStoreMetricsPort> getWorldStoreMetricsPort() {
+        return java.util.Optional.of(() -> {
+            MinecraftServer server = serverSupplier.get();
+            return server == null ? com.dwurdy.heaphammer.diagnostics.WorldStoreSnapshot.empty()
+                    : new AnvilWorldStoreScanner(server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)).capture();
+        });
+    }
+
+    @Override
+    public java.util.Optional<EventMetricsPort> getEventMetricsPort() {
+        return java.util.Optional.of(eventMetrics);
+    }
+
+    @Override
+    public java.util.Optional<RetentionObservationPort> getRetentionObservationPort() {
+        return java.util.Optional.of(tracker -> {
+            playerLifecyclePort.attach(tracker);
+            entityLifecyclePort.attach(tracker);
+        });
     }
 
     public static final String TEST_ENTITY_TAG = "heaphammer:test";
@@ -351,6 +397,9 @@ public class FabricPlatformAdapter implements PlatformAdapter {
                 }
             }
         }
+
+        // 5. Remove any test players that survived an interrupted lifecycle run.
+        cleaned += playerLifecyclePort.cleanupTestPlayers();
 
         return cleaned;
     }

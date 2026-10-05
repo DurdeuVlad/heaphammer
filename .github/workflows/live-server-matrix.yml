@@ -24,71 +24,90 @@ jobs:
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.21.4
             mc-version: '1.21.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.20.6
             mc-version: '1.20.6'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.20.4
             mc-version: '1.20.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.20.1
             mc-version: '1.20.1'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: true
           - branch: ver/1.19.4
             mc-version: '1.19.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.19.2
             mc-version: '1.19.2'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.18.2
             mc-version: '1.18.2'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
+            # 1.18.2's historical chunk/entity fixtures retain substantially
+            # more heap before the player probe than later Fabric versions.
+            # Keep the normal 64 MB safety breaker, but give this CI probe
+            # enough headroom to complete its bounded workload.
+            server-java-opts: '-Xmx6G'
           - branch: ver/1.17.1
             mc-version: '1.17.1'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.16.5
             mc-version: '1.16.5'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.15.2
             mc-version: '1.15.2'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.14.4
             mc-version: '1.14.4'
             loader: fabric
             java-version: '21'
             leak-mod: fabric
+            advanced-fixtures: false
           - branch: ver/1.12.2-forge
             mc-version: '1.12.2'
             loader: forge
             java-version: '17'
             leak-mod: forge1122
+            advanced-fixtures: false
           - branch: ver/1.7.10-forge
             mc-version: '1.7.10'
             loader: forge
             java-version: '17'
             leak-mod: forge1710
+            advanced-fixtures: false
 
     steps:
       - name: Checkout version branch
@@ -103,6 +122,20 @@ jobs:
           # while the harness itself is maintained on master.
           git fetch origin master --depth=1
           git show origin/master:tools/live_server_matrix.py > tools/live_server_matrix.py
+
+      - name: Require modern Fabric advanced fixture adapters
+        if: matrix.advanced-fixtures == true
+        run: |
+          # Each selected modern Fabric branch carries version-adapted source
+          # for all seven advanced fixtures. Do not copy 1.21.1 sources across
+          # mappings; this gate makes missing branch adaptations explicit.
+          test -d testmods/leak-playersession
+          test -d testmods/leak-persistententity
+          test -d testmods/leak-clonecache
+          test -d testmods/leak-fakeplayerfactory
+          test -d testmods/leak-gazetrack
+          test -d testmods/leak-cachelist
+          test -d testmods/antag-optimizer
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
@@ -134,19 +167,32 @@ jobs:
         env:
           LOADER: ${{ matrix.loader }}
         run: |
-          ./gradlew build buildTestmods -Pmod_version=1.1.0 --no-daemon
+          ./gradlew build buildTestmods -Pmod_version=1.2.0 --no-daemon
+
+      - name: Require modern Fabric advanced fixture jars
+        if: matrix.advanced-fixtures == true
+        run: |
+          # The live harness stages and exercises both jars for these rows.
+          test -f build/testmods/testmod-leak-playersession-1.0.0.jar
+          test -f build/testmods/testmod-leak-persistententity-1.0.0.jar
+          test -f build/testmods/testmod-leak-clonecache-1.0.0.jar
+          test -f build/testmods/testmod-leak-fakeplayerfactory-1.0.0.jar
+          test -f build/testmods/testmod-leak-gazetrack-1.0.0.jar
+          test -f build/testmods/testmod-leak-cachelist-1.0.0.jar
+          test -f build/testmods/testmod-antag-optimizer-1.0.0.jar
 
       - name: Boot server and execute live matrix
         env:
           MC_VERSION: ${{ matrix.mc-version }}
           LOADER: ${{ matrix.loader }}
           LEAK_FIXTURE: ${{ matrix.leak-mod }}
+          JAVA_TOOL_OPTIONS: ${{ matrix.server-java-opts }}
         run: |
           python3 tools/live_server_matrix.py \
             --mc-version "$MC_VERSION" \
             --loader "$LOADER" \
             --leak-fixture "$LEAK_FIXTURE" \
-            --expected-mod-version 1.1.0
+            --expected-mod-version 1.2.0
 
       - name: Upload live-server evidence
         if: always()
