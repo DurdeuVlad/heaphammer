@@ -19,7 +19,8 @@ class RunDiagnosticsSerializationTest {
                 10L,
                 Map.of("example.Player", new RetentionClassEntry("example.Player", 3L, 2L)));
         WorldStoreDimensionSnapshot world = new WorldStoreDimensionSnapshot(
-                "minecraft:overworld", 2L, 4096L, 9L, 7L, 4L, 3L, 1L, Map.of("0-99", 4L));
+                "minecraft:overworld", 2L, 4096L, 9L, 7L, 4L, 3L, 1L, Map.of("0-99", 4L),
+                3L, 8192L, 5L, 16384L);
         WorldStoreSnapshot worldSnapshot = new WorldStoreSnapshot(10L, Map.of("minecraft:overworld", world));
         EventMetricsSnapshot events = new EventMetricsSnapshot(10L, Map.of("PlayerLoggedOutEvent", 3L), Map.of());
 
@@ -41,6 +42,8 @@ class RunDiagnosticsSerializationTest {
 
         assertEquals(2L, restored.finalRetention().entries().get("example.Player").liveCount());
         assertEquals(4096L, restored.finalWorldStore().dimensions().get("minecraft:overworld").regionBytes());
+        assertEquals(8192L, restored.finalWorldStore().dimensions().get("minecraft:overworld").savedDataBytes());
+        assertEquals(16384L, restored.finalWorldStore().dimensions().get("minecraft:overworld").chunkBytes());
         assertEquals(3L, restored.finalEvents().dispatchCounts().get("PlayerLoggedOutEvent"));
         assertEquals(List.of("optional collector warning"), restored.warnings());
     }

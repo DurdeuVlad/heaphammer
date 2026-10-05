@@ -39,6 +39,7 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             "net.minecraft.network.protocol.PacketFlow",
             "net.minecraft.network.packet.PacketFlow"
     };
+    private static final int MAX_OUTBOUND_DRAIN_PER_CALL = 8192;
     private final Supplier<?> serverSupplier;
     private volatile RetentionTracker retentionTracker;
 
@@ -82,6 +83,15 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         // fallback for runtimes that do not report the invocation cleanly.
         if (!placed.found && !isPlayerTracked(playerList, player, playerId)) return null;
 
+        // placeNewPlayer relocates fresh players to the world spawn point,
+        // overriding the earlier setPos. Re-apply the planned position so
+        // cohort ring geometry survives the authoritative join boundary.
+        invoke(player, "setPos", x, y, z);
+
+        // The EmbeddedChannel backing this synthetic connection has no client
+        // draining its outbound queue. Consume it so login packets do not
+        // accumulate for the lifetime of the session.
+        drainOutbound(connection);
         PlayerLifecycleObservers.notifyJoined(player);
         RetentionTracker tracker = retentionTracker;
         if (tracker != null) tracker.observe(player.getClass().getName(), player);
@@ -96,17 +106,33 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         Object player = value(invoke(playerList, "getPlayer", playerId));
         if (server == null || playerList == null || player == null) return false;
 
-        if (action == PlayerAction.TELEPORT) return invoke(player, "teleportTo", x, y, z).found;
+        if (action == PlayerAction.LOOKAT) {
+            boolean looked = lookAt(player, x, y, z);
+            drainPlayerConnection(player);
+            return looked;
+        }
+        if (action == PlayerAction.TELEPORT) {
+            boolean moved = invoke(player, "teleportTo", x, y, z).found;
+            drainPlayerConnection(player);
+            return moved;
+        }
         if (action == PlayerAction.DIMCHANGE) {
             Object target = findLevel(server, targetDimension);
             if (target == null) return false;
             Object yaw = value(invoke(player, "getYRot"));
             Object pitch = value(invoke(player, "getXRot"));
-            return invoke(player, "teleportTo", target, x, y, z, Collections.emptySet(),
+            boolean moved = invoke(player, "teleportTo", target, x, y, z, Collections.emptySet(),
                     yaw == null ? Float.valueOf(0.0F) : yaw,
                     pitch == null ? Float.valueOf(0.0F) : pitch).found;
+            drainPlayerConnection(player);
+            return moved;
         }
-        if (action == PlayerAction.RESPAWN) return respawn(playerList, player);
+        if (action == PlayerAction.RESPAWN) {
+            boolean respawned = respawn(playerList, player);
+            drainPlayerConnection(player);
+            return respawned;
+        }
+        drainPlayerConnection(player);
         return true;
     }
 
@@ -140,6 +166,81 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             if (disconnect(player, "HeapHammer cleanup")) count++;
         }
         return count;
+    }
+
+    /**
+     * Server-side packets written to a synthetic connection have nowhere to
+     * go: the EmbeddedChannel queues them as outbound messages forever. Drain
+     * every online test player's connection once per tick so held-online
+     * cohort workloads do not turn HeapHammer into the leak it is measuring.
+     */
+    @Override
+    public void housekeepingTick() {
+        Object server = serverSupplier.get();
+        Object playerList = value(invoke(server, "getPlayerList"));
+        for (Object player : iterable(value(invoke(playerList, "getPlayers")))) {
+            if (isTestPlayer(player)) {
+                drainPlayerConnection(player);
+            }
+        }
+    }
+
+    /**
+     * Rotates the player so its view vector points at the given position.
+     * Raycast- and observation-style mods read the rotation fields on the
+     * server side; no client acknowledgement is required.
+     */
+    private static boolean lookAt(Object player, double x, double y, double z) {
+        Double eyeX = asDouble(value(invoke(player, "getX")));
+        Double eyeY = asDouble(value(invoke(player, "getEyeY")));
+        Double eyeZ = asDouble(value(invoke(player, "getZ")));
+        if (eyeX == null || eyeZ == null) return false;
+        if (eyeY == null) {
+            Double feetY = asDouble(value(invoke(player, "getY")));
+            Double eyeHeight = asDouble(value(invoke(player, "getEyeHeight")));
+            if (feetY == null || eyeHeight == null) return false;
+            eyeY = feetY + eyeHeight;
+        }
+        double dx = x - eyeX;
+        double dy = y - eyeY;
+        double dz = z - eyeZ;
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float pitch = (float) Math.toDegrees(Math.atan2(-dy, Math.sqrt(dx * dx + dz * dz)));
+        boolean applied = invoke(player, "setRot", yaw, pitch).found;
+        if (!applied) {
+            applied = invoke(player, "setYRot", yaw).found & invoke(player, "setXRot", pitch).found;
+        }
+        invoke(player, "setYHeadRot", yaw);
+        invoke(player, "setYBodyRot", yaw);
+        setFieldValue(player, "yRotO", yaw);
+        setFieldValue(player, "xRotO", pitch);
+        setFieldValue(player, "yHeadRotO", yaw);
+        setFieldValue(player, "yBodyRotO", yaw);
+        return applied;
+    }
+
+    private static void drainPlayerConnection(Object player) {
+        Object listener = fieldValue(player, "connection");
+        drainOutbound(fieldValue(listener, "connection"));
+    }
+
+    /**
+     * Consumes outbound messages queued on the connection's channel and
+     * releases any reference-counted payloads. Bounded per call so the drain
+     * itself stays inside the tick budget.
+     */
+    private static void drainOutbound(Object connection) {
+        Object channel = fieldValue(connection, "channel");
+        if (channel == null) return;
+        for (int i = 0; i < MAX_OUTBOUND_DRAIN_PER_CALL; i++) {
+            Object message = value(invoke(channel, "readOutbound"));
+            if (message == null) return;
+            invokeStatic("io.netty.util.ReferenceCountUtil", "release", message);
+        }
+    }
+
+    private static Double asDouble(Object value) {
+        return value instanceof Number ? ((Number) value).doubleValue() : null;
     }
 
     private static boolean respawn(Object playerList, Object player) {
@@ -198,6 +299,7 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
             try {
                 method.setAccessible(true);
                 method.invoke(networkConnection, reason);
+                drainOutbound(networkConnection);
                 return;
             } catch (Exception ignored) {
                 // Older runtimes may not expose a compatible transport close.
@@ -205,14 +307,21 @@ public final class ReflectivePlayerLifecyclePort implements PlayerLifecyclePort 
         }
     }
 
-    /** Break the synthetic listener graph after the authoritative disconnect callback. */
+    /**
+     * Break the synthetic listener graph after the authoritative disconnect
+     * callback. Only the transport-side references are severed: entity
+     * trackers retain Connection records whose player() dereferences
+     * listener.player, so nulling it corrupts every later entity removal
+     * (ServerEntity.removePairing NPE). Vanilla keeps the player reference
+     * until the tracker drops the record — matching that keeps GC honest and
+     * exposes tracker retention to measurement instead of masking it.
+     */
     private static void releaseDisconnectedReferences(Object listener) {
         Object networkConnection = fieldValue(listener, "connection");
         if (networkConnection != null) {
             setFieldValue(networkConnection, "packetListener", null);
             setFieldValue(networkConnection, "disconnectListener", null);
         }
-        setFieldValue(listener, "player", null);
     }
 
     private static Object disconnectReason(Class<?> parameter, String message) {
