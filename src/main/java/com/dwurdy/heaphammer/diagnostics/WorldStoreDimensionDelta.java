@@ -14,7 +14,9 @@ public record WorldStoreDimensionDelta(
         long deltaPersistentEntities,
         long deltaItems,
         long deltaTestEntities,
-        long deltaTestItems
+        long deltaTestItems,
+        long deltaSavedDataBytes,
+        long deltaChunkBytes
 ) {
     public WorldStoreDimensionDelta {
         Objects.requireNonNull(dimension, "dimension must not be null");
@@ -28,6 +30,8 @@ public record WorldStoreDimensionDelta(
         long previousItems = previous == null ? 0L : previous.itemEntityCount();
         long previousTestEntities = previous == null ? 0L : previous.testEntityCount();
         long previousTestItems = previous == null ? 0L : previous.testItemEntityCount();
+        long previousSavedData = previous == null ? 0L : previous.savedDataBytes();
+        long previousChunks = previous == null ? 0L : previous.chunkBytes();
         return new WorldStoreDimensionDelta(
                 current.dimension(),
                 current.regionFileCount() - previousRegions,
@@ -36,7 +40,9 @@ public record WorldStoreDimensionDelta(
                 current.persistentEntityCount() - previousPersistent,
                 current.itemEntityCount() - previousItems,
                 current.testEntityCount() - previousTestEntities,
-                current.testItemEntityCount() - previousTestItems
+                current.testItemEntityCount() - previousTestItems,
+                current.savedDataBytes() - previousSavedData,
+                current.chunkBytes() - previousChunks
         );
     }
 }

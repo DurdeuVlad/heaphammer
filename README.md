@@ -10,7 +10,7 @@
 
 **Deterministic Minecraft server stress testing and retained-memory regression detection.**
 
-[![Release](https://img.shields.io/badge/release-v1.1.0-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.1-orange.svg?style=flat-square)](https://github.com/DurdeuVlad/heaphammer/releases)
 [![CurseForge](https://img.shields.io/badge/CurseForge-HeapHammer-F16436?style=flat-square&logo=curseforge&logoColor=white)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CurseForge Downloads](https://img.shields.io/curseforge/dt/1687734?style=flat-square&logo=curseforge&logoColor=white&color=F16436&label=downloads)](https://www.curseforge.com/minecraft/mc-mods/heaphammer)
 [![CI](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml/badge.svg)](https://github.com/DurdeuVlad/heaphammer/actions/workflows/ci.yml)
@@ -131,7 +131,7 @@ HeapHammer is intended to run server-side; connecting players do not need the mo
 ### 1. Install
 Download the compiled JAR from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/heaphammer) or [GitHub Releases](https://github.com/DurdeuVlad/heaphammer/releases) and place it into your server's `mods/` directory:
 ```bash
-cp heaphammer-1.1.0.jar /path/to/server/mods/
+cp heaphammer-1.1.1.jar /path/to/server/mods/
 ```
 
 ### 2. Run Stress Test

@@ -192,13 +192,26 @@ jobs:
         id: changelog
         run: |
           TAG="${{ steps.release.outputs.tag }}"
-          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
-          if [ -n "$PREV_TAG" ]; then
-            echo "Generating changelog from ${PREV_TAG} to ${TAG}..."
-            git log --pretty=format:"- %s" "${PREV_TAG}..${TAG}" > CHANGELOG.md
+          VERSION="${{ steps.release.outputs.version }}"
+          # Curated per-release docs follow the docs/RELEASE_X_Y_Z.md naming
+          # convention (dots in the version become underscores), e.g. tag
+          # v1.2.0 -> docs/RELEASE_1_2_0.md.
+          RELEASE_DOC="docs/RELEASE_${VERSION//./_}.md"
+          if [ -f "$RELEASE_DOC" ]; then
+            # A curated per-release document takes precedence over raw git-log
+            # bullets. Drop the doc's own H1 — RELEASE_NOTES renders its own
+            # title above this section.
+            echo "Using curated release notes: $RELEASE_DOC"
+            tail -n +2 "$RELEASE_DOC" > CHANGELOG.md
           else
-            echo "No previous tag found. Generating full changelog..."
-            git log --pretty=format:"- %s" HEAD > CHANGELOG.md
+            PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              echo "Generating changelog from ${PREV_TAG} to ${TAG}..."
+              git log --pretty=format:"- %s" "${PREV_TAG}..${TAG}" > CHANGELOG.md
+            else
+              echo "No previous tag found. Generating full changelog..."
+              git log --pretty=format:"- %s" HEAD > CHANGELOG.md
+            fi
           fi
           # The supported-targets table is generated from the actual staged
           # artifacts (heaphammer-<mc>-<loader>-<ver>.jar) so it can never
@@ -299,7 +312,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
+      secondary_matrix: ${{ steps.plan.outputs.secondary_matrix }}
+      primary_matrix: ${{ steps.plan.outputs.primary_matrix }}
     steps:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -310,7 +324,8 @@ jobs:
       - name: Build publish matrix from artifact names
         id: plan
         run: |
-          entries='[]'
+          secondary_entries='[]'
+          primary_entries='[]'
           for jar in dist/production/heaphammer-*.jar; do
             base=$(basename "$jar" .jar)              # heaphammer-<mc>-<loader>-<ver>
             rest="${base#heaphammer-}"
@@ -338,7 +353,9 @@ jobs:
                 ;;
             esac
 
-            display_name="HeapHammer ${ver} (${loader_title} ${mc})"
+            # Canonical high-visibility format: [<Loader> <MC>] HeapHammer <Ver>
+            # Prevents loader truncation in narrow CurseForge/launcher UI views
+            display_name="[${loader_title} ${mc}] HeapHammer ${ver}"
 
             case "$mc" in
               1.21.1) gv_str=$'1.21\n1.21.1' ;;
@@ -361,7 +378,7 @@ jobs:
               vtype="release"
             fi
 
-            entries=$(echo "$entries" | jq -c \
+            entry=$(jq -c -n \
               --arg f "${base}.jar" \
               --arg mc "$mc" \
               --arg l "$loader" \
@@ -370,18 +387,40 @@ jobs:
               --arg ls "$loaders_str" \
               --arg gv "$gv_str" \
               --arg vt "$vtype" \
-              '. + [{file:$f, mc:$mc, loader:$l, loader_title:$lt, display_name:$dn, loaders:$ls, game_versions:$gv, version_type:$vt}]')
-          done
-          echo "matrix={\"include\":$entries}" >> $GITHUB_OUTPUT
-          echo "$entries" | jq .
+              '{file:$f, mc:$mc, loader:$l, loader_title:$lt, display_name:$dn, loaders:$ls, game_versions:$gv, version_type:$vt}')
 
-  publish-platforms:
-    name: Publish ${{ matrix.loader_title }} ${{ matrix.mc }} to Modrinth & CurseForge
+            # Modern trunk standard (1.21.1 Fabric) is segregated into primary_entries
+            # to be published in a final stage, guaranteeing its CurseForge upload timestamp
+            # is the absolute newest so the main "Download" button serves the modern standard.
+            if [ "$mc" = "1.21.1" ] && [ "$loader" = "fabric" ]; then
+              primary_entries=$(echo "$primary_entries" | jq -c --argjson e "$entry" '. + [$e]')
+            else
+              secondary_entries=$(echo "$secondary_entries" | jq -c --argjson e "$entry" '. + [$e]')
+            fi
+          done
+
+          # Fallback: if no 1.21.1 fabric target is found, pick the first entry as primary
+          if [ "$primary_entries" = '[]' ] && [ "$secondary_entries" != '[]' ]; then
+            primary_entries=$(echo "$secondary_entries" | jq -c '.[0:1]')
+            secondary_entries=$(echo "$secondary_entries" | jq -c '.[1:]')
+          fi
+
+          echo "secondary_matrix={\"include\":$secondary_entries}" >> $GITHUB_OUTPUT
+          echo "primary_matrix={\"include\":$primary_entries}" >> $GITHUB_OUTPUT
+          echo "=== Secondary Matrix ==="
+          echo "$secondary_entries" | jq .
+          echo "=== Primary Matrix ==="
+          echo "$primary_entries" | jq .
+
+  # Phase 1: Upload historical LTS and secondary loader targets in parallel.
+  publish-platforms-secondary:
+    name: Publish [${{ matrix.loader_title }} ${{ matrix.mc }}] to Platforms
     needs: [publish, publish-matrix]
     runs-on: ubuntu-latest
+    if: ${{ fromJSON(needs.publish-matrix.outputs.secondary_matrix).include[0] != null }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.publish-matrix.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.publish-matrix.outputs.secondary_matrix) }}
     steps:
       - name: Resolve release tag
         id: release
@@ -408,15 +447,80 @@ jobs:
       - name: Publish ${{ matrix.file }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          # Modrinth requires a unique version_number per project, so each
-          # loader/MC file gets its own version: 1.0.2+fabric.1.20.1 etc.
+          # Modrinth
           modrinth-id: heaphammer
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-featured: false
           modrinth-fail-mode: warn
           modrinth-version: ${{ steps.release.outputs.version }}+${{ matrix.loader }}.${{ matrix.mc }}
 
-          # CurseForge: standardized display name convention
+          # CurseForge: standardized bracketed display name convention
+          curseforge-id: '1687734'
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-fail-mode: warn
+          curseforge-version: ${{ matrix.display_name }}
+
+          # Shared Metadata
+          name: ${{ matrix.display_name }}
+          version-type: ${{ matrix.version_type }}
+          changelog-file: PLATFORM_CHANGELOG.md
+          environment: server
+
+          files: dist/production/${{ matrix.file }}
+          loaders: ${{ matrix.loaders }}
+          game-versions: ${{ matrix.game_versions }}
+          game-version-filter: none
+
+  # Phase 2: Upload primary standard target (1.21.1 Fabric) in a dedicated final step.
+  # This guarantees its upload timestamp is newest on CurseForge, locking the primary
+  # "Download" button to the modern LTS release and avoiding legacy file download errors.
+  publish-platforms-primary:
+    name: Publish Primary [${{ matrix.loader_title }} ${{ matrix.mc }}] (Latest Download Target)
+    needs: [publish, publish-matrix, publish-platforms-secondary]
+    if: always() && needs.publish.result == 'success' && needs.publish-matrix.result == 'success' && fromJSON(needs.publish-matrix.outputs.primary_matrix).include[0] != null
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.publish-matrix.outputs.primary_matrix) }}
+    steps:
+      - name: Resolve release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/production
+          merge-multiple: true
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      # Buffer pause to guarantee sequential CurseForge timestamp separation
+      - name: Timestamp buffer
+        run: sleep 5
+
+      - name: Publish Primary Target ${{ matrix.file }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          # Modrinth (marked featured for primary version)
+          modrinth-id: heaphammer
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: true
+          modrinth-unfeature-mode: subset
+          modrinth-fail-mode: warn
+          modrinth-version: ${{ steps.release.outputs.version }}+${{ matrix.loader }}.${{ matrix.mc }}
+
+          # CurseForge: standardized bracketed display name convention
           curseforge-id: '1687734'
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           curseforge-fail-mode: warn

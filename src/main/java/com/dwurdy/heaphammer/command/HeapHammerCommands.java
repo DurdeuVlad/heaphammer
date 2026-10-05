@@ -285,7 +285,7 @@ public class HeapHammerCommands {
                 "/hh plan chunks [flags]   - Compute deterministic workload plan\n" +
                 "/hh run chunks [flags]    - Execute chunk churn experiment\n" +
                 "/hh plan|run entities [flags] - Entity churn; --profile=persistent|unticked_ring\n" +
-                "/hh plan|run players [flags] - Real player lifecycle; --logins-per-cycle=N\n" +
+                "/hh plan|run players [flags] - Real player lifecycle; --logins-per-cycle=N --cohort=true --actions=join,lookat,quit\n" +
                 "/hh compare <run-a> <run-b> - Compare two evidence-backed reports\n" +
                 "/hh capabilities          - Show supported and unsupported platform features\n" +
                 "/hh status                - Show active experiment progress\n" +
@@ -437,7 +437,8 @@ public class HeapHammerCommands {
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "Scenario: players\n" +
                 "Runs deterministic test-player lifecycle actions through the server's real login/logout path. " +
-                "Use --logins-per-cycle and --actions=join,respawn,teleport,dimchange,quit; the platform must report PLAYER_LIFECYCLE support."
+                "Use --logins-per-cycle, --cohort=true, and --actions=join,respawn,teleport,dimchange,lookat,quit; " +
+                "the platform must report PLAYER_LIFECYCLE support."
         ).withStyle(ChatFormatting.YELLOW), false);
         return 1;
     }
@@ -503,31 +504,10 @@ public class HeapHammerCommands {
     }
 
     private ExperimentSpec scenarioSpec(ExperimentSpec baseSpec, ScenarioId scenarioId, int centerX, int centerZ, int radius) {
-        return ExperimentSpec.builder()
+        return baseSpec.toBuilder()
                 .scenarioId(scenarioId)
-                .seed(baseSpec.seed())
-                .dimension(baseSpec.dimension())
                 .center(centerX, centerZ)
                 .radius(radius)
-                .iterations(baseSpec.iterations())
-                .batchSize(baseSpec.batchSize())
-                .strategy(baseSpec.strategy())
-                .warmupIterations(baseSpec.warmupIterations())
-                .holdTicks(baseSpec.holdTicks())
-                .settleTicks(baseSpec.settleTicks())
-                .maxOperationsPerTick(baseSpec.maxOperationsPerTick())
-                .maxMillisPerTick(baseSpec.maxMillisPerTick())
-                .explicitGc(baseSpec.explicitGc())
-                .coverage(baseSpec.coverage())
-                .includeMods(baseSpec.includeMods())
-                .excludeMods(baseSpec.excludeMods())
-                .entityProfile(baseSpec.entityProfile())
-                .loginsPerCycle(baseSpec.loginsPerCycle())
-                .playerActions(baseSpec.playerActions())
-                .durationSeconds(baseSpec.durationSeconds())
-                .intervalSeconds(baseSpec.intervalSeconds())
-                .diagnosticCollectors(baseSpec.diagnosticCollectors())
-                .trackedClasses(baseSpec.trackedClasses())
                 .build();
     }
 

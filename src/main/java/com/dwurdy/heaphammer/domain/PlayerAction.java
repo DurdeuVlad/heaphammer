@@ -6,5 +6,6 @@ public enum PlayerAction {
     QUIT,
     RESPAWN,
     DIMCHANGE,
-    TELEPORT
+    TELEPORT,
+    LOOKAT
 }

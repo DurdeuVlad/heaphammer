@@ -150,11 +150,14 @@ public class FlagParser {
                         actions.add(PlayerAction.valueOf(raw.trim().toUpperCase(Locale.ROOT)));
                     } catch (IllegalArgumentException e) {
                         throw new IllegalArgumentException("Invalid player action: " + raw +
-                                ". Valid values: join, quit, respawn, dimchange, teleport");
+                                ". Valid values: join, quit, respawn, dimchange, teleport, lookat");
                     }
                 }
             }
             builder.playerActions(actions);
+        }
+        if (flags.containsKey("cohort")) {
+            builder.playerCohort(Boolean.parseBoolean(flags.get("cohort")));
         }
         if (flags.containsKey("duration")) {
             builder.durationSeconds(parseDurationSeconds(flags.get("duration"), "duration"));
