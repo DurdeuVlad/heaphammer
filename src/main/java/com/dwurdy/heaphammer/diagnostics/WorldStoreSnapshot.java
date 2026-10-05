@@ -20,6 +20,19 @@ public record WorldStoreSnapshot(long timestamp, Map<String, WorldStoreDimension
         return dimensions.values().stream().mapToLong(WorldStoreDimensionSnapshot::regionBytes).sum();
     }
 
+    public long totalSavedDataBytes() {
+        return dimensions.values().stream().mapToLong(WorldStoreDimensionSnapshot::savedDataBytes).sum();
+    }
+
+    public long totalChunkBytes() {
+        return dimensions.values().stream().mapToLong(WorldStoreDimensionSnapshot::chunkBytes).sum();
+    }
+
+    /** Entity regions, SavedData .dat payloads, and chunk regions combined. */
+    public long totalPersistedBytes() {
+        return totalRegionBytes() + totalSavedDataBytes() + totalChunkBytes();
+    }
+
     public long totalEntityCount() {
         return dimensions.values().stream().mapToLong(WorldStoreDimensionSnapshot::entityCount).sum();
     }

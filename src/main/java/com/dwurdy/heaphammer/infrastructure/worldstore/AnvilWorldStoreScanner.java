@@ -38,9 +38,9 @@ public final class AnvilWorldStoreScanner implements WorldStoreMetricsPort {
     @Override
     public WorldStoreSnapshot capture() {
         Map<String, WorldStoreDimensionSnapshot> dimensions = new LinkedHashMap<>();
-        scanDimension(dimensions, "minecraft:overworld", worldRoot.resolve("entities"));
-        scanDimension(dimensions, "minecraft:the_nether", worldRoot.resolve("DIM-1").resolve("entities"));
-        scanDimension(dimensions, "minecraft:the_end", worldRoot.resolve("DIM1").resolve("entities"));
+        scanDimension(dimensions, "minecraft:overworld", worldRoot);
+        scanDimension(dimensions, "minecraft:the_nether", worldRoot.resolve("DIM-1"));
+        scanDimension(dimensions, "minecraft:the_end", worldRoot.resolve("DIM1"));
 
         Path dimensionsRoot = worldRoot.resolve("dimensions");
         if (Files.isDirectory(dimensionsRoot)) {
@@ -49,7 +49,7 @@ public final class AnvilWorldStoreScanner implements WorldStoreMetricsPort {
                     try (java.util.stream.Stream<Path> dimensionDirs = Files.list(namespace)) {
                         dimensionDirs.filter(Files::isDirectory).forEach(dimension -> {
                             String id = namespace.getFileName() + ":" + dimension.getFileName();
-                            scanDimension(dimensions, id, dimension.resolve("entities"));
+                            scanDimension(dimensions, id, dimension);
                         });
                     } catch (IOException ignored) {
                         // A dimension disappearing during a scan is reported by the next checkpoint.
@@ -62,30 +62,62 @@ public final class AnvilWorldStoreScanner implements WorldStoreMetricsPort {
         return new WorldStoreSnapshot(System.currentTimeMillis(), dimensions);
     }
 
-    private void scanDimension(Map<String, WorldStoreDimensionSnapshot> dimensions, String id, Path entitiesRoot) {
-        if (!Files.isDirectory(entitiesRoot)) return;
+    /**
+     * Measures the three persisted stores under a dimension root: entity
+     * regions (entities/r/*.mca, parsed for entity attribution), SavedData
+     * (data/*.dat, where map/raid/idcounts growth lands), and chunk regions
+     * (region/*.mca, where block-entity NBT bloat lands). Byte sizes only for
+     * the latter two — growth is the signal, not content.
+     */
+    private void scanDimension(Map<String, WorldStoreDimensionSnapshot> dimensions, String id, Path dimensionRoot) {
+        Path entitiesRoot = dimensionRoot.resolve("entities");
         long files = 0L;
         long bytes = 0L;
         Counters counters = new Counters();
         Path regionRoot = entitiesRoot.resolve("r");
-        if (!Files.isDirectory(regionRoot)) return;
-        try (java.util.stream.Stream<Path> stream = Files.list(regionRoot)) {
-            for (Path region : (Iterable<Path>) stream.filter(path -> path.getFileName().toString().endsWith(".mca"))::iterator) {
-                files++;
-                try {
-                    bytes += Files.size(region);
-                    scanRegion(region, counters);
-                } catch (IOException ignored) {
-                    // Keep file/byte evidence even when one malformed region is skipped.
+        if (Files.isDirectory(regionRoot)) {
+            try (java.util.stream.Stream<Path> stream = Files.list(regionRoot)) {
+                for (Path region : (Iterable<Path>) stream.filter(path -> path.getFileName().toString().endsWith(".mca"))::iterator) {
+                    files++;
+                    try {
+                        bytes += Files.size(region);
+                        scanRegion(region, counters);
+                    } catch (IOException ignored) {
+                        // Keep file/byte evidence even when one malformed region is skipped.
+                    }
                 }
+            } catch (IOException ignored) {
+                // Keep file/byte evidence even when the listing is truncated.
             }
-        } catch (IOException ignored) {
-            return;
         }
+        long[] savedDataStats = directoryStats(dimensionRoot.resolve("data"), ".dat");
+        long[] chunkStats = directoryStats(dimensionRoot.resolve("region"), ".mca");
+        if (files == 0L && savedDataStats[0] == 0L && chunkStats[0] == 0L) return;
         dimensions.put(id, new WorldStoreDimensionSnapshot(
                 id, files, bytes, counters.entityCount, counters.persistentEntityCount,
                 counters.itemEntityCount, counters.testEntityCount, counters.testItemEntityCount,
-                counters.itemAgeBuckets));
+                counters.itemAgeBuckets,
+                savedDataStats[0], savedDataStats[1], chunkStats[0], chunkStats[1]));
+    }
+
+    private static long[] directoryStats(Path dir, String suffix) {
+        if (!Files.isDirectory(dir)) return new long[]{0L, 0L};
+        long files = 0L;
+        long bytes = 0L;
+        try (java.util.stream.Stream<Path> stream = Files.list(dir)) {
+            for (Path path : (Iterable<Path>) stream.filter(
+                    candidate -> candidate.getFileName().toString().endsWith(suffix))::iterator) {
+                files++;
+                try {
+                    bytes += Files.size(path);
+                } catch (IOException ignored) {
+                    // Count the file even when its size cannot be read.
+                }
+            }
+        } catch (IOException ignored) {
+            // Return the partial totals gathered so far.
+        }
+        return new long[]{files, bytes};
     }
 
     private static void scanRegion(Path region, Counters counters) throws IOException {

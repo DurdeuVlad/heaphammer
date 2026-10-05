@@ -25,68 +25,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Every supported Minecraft version line. primary-loader is the loader
-          # produced by the ROOT build; nested loaders/ builds add more jars.
+          # Canonical LTS Targets (starting from v1.1.1):
+          # Prunes transitional/intermediate versions to focus distribution strictly
+          # on the 6 major LTS lines where >98% of modpack and server traffic resides.
           - branch: master
             mc-version: '1.21.1'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.21.1
-          - branch: ver/1.21.4
-            mc-version: '1.21.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.21.4
-          - branch: ver/1.20.6
-            mc-version: '1.20.6'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.20.6
-          - branch: ver/1.20.4
-            mc-version: '1.20.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.20.4
           - branch: ver/1.20.1
             mc-version: '1.20.1'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.20.1
-          - branch: ver/1.19.4
-            mc-version: '1.19.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.19.4
-          - branch: ver/1.19.2
-            mc-version: '1.19.2'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.19.2
           - branch: ver/1.18.2
             mc-version: '1.18.2'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.18.2
-          - branch: ver/1.17.1
-            mc-version: '1.17.1'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.17.1
           - branch: ver/1.16.5
             mc-version: '1.16.5'
             java-version: '21'
             primary-loader: fabric
             artifact-name: heaphammer-1.16.5
-          - branch: ver/1.15.2
-            mc-version: '1.15.2'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.15.2
-          - branch: ver/1.14.4
-            mc-version: '1.14.4'
-            java-version: '21'
-            primary-loader: fabric
-            artifact-name: heaphammer-1.14.4
           - branch: ver/1.12.2-forge
             mc-version: '1.12.2'
             java-version: '17'
@@ -190,7 +151,7 @@ jobs:
           retention-days: 7
 
   publish:
-    name: Publish to GitHub, Modrinth & CurseForge
+    name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -231,13 +192,26 @@ jobs:
         id: changelog
         run: |
           TAG="${{ steps.release.outputs.tag }}"
-          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
-          if [ -n "$PREV_TAG" ]; then
-            echo "Generating changelog from ${PREV_TAG} to ${TAG}..."
-            git log --pretty=format:"- %s" "${PREV_TAG}..${TAG}" > CHANGELOG.md
+          VERSION="${{ steps.release.outputs.version }}"
+          # Curated per-release docs follow the docs/RELEASE_X_Y_Z.md naming
+          # convention (dots in the version become underscores), e.g. tag
+          # v1.2.0 -> docs/RELEASE_1_2_0.md.
+          RELEASE_DOC="docs/RELEASE_${VERSION//./_}.md"
+          if [ -f "$RELEASE_DOC" ]; then
+            # A curated per-release document takes precedence over raw git-log
+            # bullets. Drop the doc's own H1 — RELEASE_NOTES renders its own
+            # title above this section.
+            echo "Using curated release notes: $RELEASE_DOC"
+            tail -n +2 "$RELEASE_DOC" > CHANGELOG.md
           else
-            echo "No previous tag found. Generating full changelog..."
-            git log --pretty=format:"- %s" HEAD > CHANGELOG.md
+            PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              echo "Generating changelog from ${PREV_TAG} to ${TAG}..."
+              git log --pretty=format:"- %s" "${PREV_TAG}..${TAG}" > CHANGELOG.md
+            else
+              echo "No previous tag found. Generating full changelog..."
+              git log --pretty=format:"- %s" HEAD > CHANGELOG.md
+            fi
           fi
           # The supported-targets table is generated from the actual staged
           # artifacts (heaphammer-<mc>-<loader>-<ver>.jar) so it can never
@@ -273,6 +247,26 @@ jobs:
           } > RELEASE_NOTES.md
           echo "Changelog generated ($(wc -l < RELEASE_NOTES.md) lines)"
 
+          # Generate clean, scannable changelog for CurseForge and Modrinth (no checksum dumps or sync noise)
+          {
+            echo "### HeapHammer ${TAG}"
+            echo ""
+            echo "**Deterministic Minecraft server stress testing and retained-memory regression detection.**"
+            echo ""
+            echo "#### Highlights & Changes"
+            # Filter out merge commits, branch merges, and automated sync noise for a clean player/admin changelog
+            CLEAN_LOG=$(grep -v -E -- '^-\s*(Merge pull request|Merge branch|Merge HeapHammer|merge\(release\)|chore\(sync\)|chore\(release\))' CHANGELOG.md | head -n 35 || true)
+            if [ -n "$CLEAN_LOG" ]; then
+              echo "$CLEAN_LOG"
+            else
+              cat CHANGELOG.md | head -n 35
+            fi
+            echo ""
+            echo "---"
+            echo "**Full Release Notes & Checksums**: https://github.com/DurdeuVlad/heaphammer/releases/tag/${TAG}"
+          } > PLATFORM_CHANGELOG.md
+          echo "Platform changelog generated ($(wc -l < PLATFORM_CHANGELOG.md) lines)"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -291,48 +285,254 @@ jobs:
               --verify-tag
           fi
 
-      - name: Publish all JARs to Modrinth & CurseForge
+      - name: Upload release notes for platform publish jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: |
+            RELEASE_NOTES.md
+            PLATFORM_CHANGELOG.md
+          retention-days: 1
+
+      - name: Summary
+        run: |
+          echo "## Release ${{ steps.release.outputs.tag }} Published to GitHub" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Modrinth/CurseForge uploads run in the per-file publish-platforms jobs (warn-mode)." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          ls -1 dist/production/*.jar | sed 's|.*/|`|;s|$`|' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+
+  # mc-publish resolves loaders/game-versions from the PRIMARY file only, so a
+  # single invocation cannot correctly publish a multi-loader release. Emit one
+  # matrix entry per staged jar; each publish-platforms job then publishes its
+  # file with the exact loader and game version taken from the filename.
+  publish-matrix:
+    name: Prepare platform publish matrix
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      secondary_matrix: ${{ steps.plan.outputs.secondary_matrix }}
+      primary_matrix: ${{ steps.plan.outputs.primary_matrix }}
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/production
+          merge-multiple: true
+
+      - name: Build publish matrix from artifact names
+        id: plan
+        run: |
+          secondary_entries='[]'
+          primary_entries='[]'
+          for jar in dist/production/heaphammer-*.jar; do
+            base=$(basename "$jar" .jar)              # heaphammer-<mc>-<loader>-<ver>
+            rest="${base#heaphammer-}"
+            mc_loader="${rest%-*}"
+            loader="${mc_loader##*-}"
+            mc="${mc_loader%-*}"
+            ver="${base##*-}"
+
+            case "$loader" in
+              fabric)
+                loader_title="Fabric"
+                loaders_str=$'fabric\nquilt'
+                ;;
+              neoforge)
+                loader_title="NeoForge"
+                loaders_str="neoforge"
+                ;;
+              forge)
+                loader_title="Forge"
+                loaders_str="forge"
+                ;;
+              *)
+                loader_title="$loader"
+                loaders_str="$loader"
+                ;;
+            esac
+
+            # Canonical high-visibility format: [<Loader> <MC>] HeapHammer <Ver>
+            # Prevents loader truncation in narrow CurseForge/launcher UI views
+            display_name="[${loader_title} ${mc}] HeapHammer ${ver}"
+
+            case "$mc" in
+              1.21.1) gv_str=$'1.21\n1.21.1' ;;
+              1.20.6) gv_str=$'1.20.5\n1.20.6' ;;
+              1.20.4) gv_str=$'1.20.3\n1.20.4' ;;
+              1.20.1) gv_str=$'1.20\n1.20.1' ;;
+              1.19.4) gv_str="1.19.4" ;;
+              1.19.2) gv_str=$'1.19\n1.19.1\n1.19.2' ;;
+              1.18.2) gv_str=$'1.18\n1.18.1\n1.18.2' ;;
+              1.16.5) gv_str=$'1.16\n1.16.1\n1.16.2\n1.16.3\n1.16.4\n1.16.5' ;;
+              1.12.2) gv_str=$'1.12\n1.12.1\n1.12.2' ;;
+              *) gv_str="$mc" ;;
+            esac
+
+            if [[ "$ver" == *"alpha"* ]]; then
+              vtype="alpha"
+            elif [[ "$ver" == *"beta"* || "$ver" == *"-rc"* ]]; then
+              vtype="beta"
+            else
+              vtype="release"
+            fi
+
+            entry=$(jq -c -n \
+              --arg f "${base}.jar" \
+              --arg mc "$mc" \
+              --arg l "$loader" \
+              --arg lt "$loader_title" \
+              --arg dn "$display_name" \
+              --arg ls "$loaders_str" \
+              --arg gv "$gv_str" \
+              --arg vt "$vtype" \
+              '{file:$f, mc:$mc, loader:$l, loader_title:$lt, display_name:$dn, loaders:$ls, game_versions:$gv, version_type:$vt}')
+
+            # Modern trunk standard (1.21.1 Fabric) is segregated into primary_entries
+            # to be published in a final stage, guaranteeing its CurseForge upload timestamp
+            # is the absolute newest so the main "Download" button serves the modern standard.
+            if [ "$mc" = "1.21.1" ] && [ "$loader" = "fabric" ]; then
+              primary_entries=$(echo "$primary_entries" | jq -c --argjson e "$entry" '. + [$e]')
+            else
+              secondary_entries=$(echo "$secondary_entries" | jq -c --argjson e "$entry" '. + [$e]')
+            fi
+          done
+
+          # Fallback: if no 1.21.1 fabric target is found, pick the first entry as primary
+          if [ "$primary_entries" = '[]' ] && [ "$secondary_entries" != '[]' ]; then
+            primary_entries=$(echo "$secondary_entries" | jq -c '.[0:1]')
+            secondary_entries=$(echo "$secondary_entries" | jq -c '.[1:]')
+          fi
+
+          echo "secondary_matrix={\"include\":$secondary_entries}" >> $GITHUB_OUTPUT
+          echo "primary_matrix={\"include\":$primary_entries}" >> $GITHUB_OUTPUT
+          echo "=== Secondary Matrix ==="
+          echo "$secondary_entries" | jq .
+          echo "=== Primary Matrix ==="
+          echo "$primary_entries" | jq .
+
+  # Phase 1: Upload historical LTS and secondary loader targets in parallel.
+  publish-platforms-secondary:
+    name: Publish [${{ matrix.loader_title }} ${{ matrix.mc }}] to Platforms
+    needs: [publish, publish-matrix]
+    runs-on: ubuntu-latest
+    if: ${{ fromJSON(needs.publish-matrix.outputs.secondary_matrix).include[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.publish-matrix.outputs.secondary_matrix) }}
+    steps:
+      - name: Resolve release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/production
+          merge-multiple: true
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      - name: Publish ${{ matrix.file }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           # Modrinth
           modrinth-id: heaphammer
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-featured: true
-          modrinth-unfeature-mode: subset
+          modrinth-featured: false
           modrinth-fail-mode: warn
+          modrinth-version: ${{ steps.release.outputs.version }}+${{ matrix.loader }}.${{ matrix.mc }}
 
-          # CurseForge
+          # CurseForge: standardized bracketed display name convention
           curseforge-id: '1687734'
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           curseforge-fail-mode: warn
+          curseforge-version: ${{ matrix.display_name }}
 
-          # GitHub (links the release created above)
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-fail-mode: warn
+          # Shared Metadata
+          name: ${{ matrix.display_name }}
+          version-type: ${{ matrix.version_type }}
+          changelog-file: PLATFORM_CHANGELOG.md
+          environment: server
 
-          # Release metadata
-          name: HeapHammer ${{ steps.release.outputs.version }}
-          version: ${{ steps.release.outputs.version }}
-          version-type: release
-          changelog-file: RELEASE_NOTES.md
+          files: dist/production/${{ matrix.file }}
+          loaders: ${{ matrix.loaders }}
+          game-versions: ${{ matrix.game_versions }}
+          game-version-filter: none
 
-          # All jars — loaders auto-detected per file:
-          #  - Fabric JARs: from fabric.mod.json
-          #  - NeoForge JARs: from META-INF/neoforge.mods.toml
-          #  - Forge JARs: from META-INF/mods.toml / mcmod.info
-          files: |
-            dist/production/heaphammer-*.jar
-          game-version-filter: any
-          java: |
-            21
-            17
-            8
-
-      - name: Summary
+  # Phase 2: Upload primary standard target (1.21.1 Fabric) in a dedicated final step.
+  # This guarantees its upload timestamp is newest on CurseForge, locking the primary
+  # "Download" button to the modern LTS release and avoiding legacy file download errors.
+  publish-platforms-primary:
+    name: Publish Primary [${{ matrix.loader_title }} ${{ matrix.mc }}] (Latest Download Target)
+    needs: [publish, publish-matrix, publish-platforms-secondary]
+    if: always() && needs.publish.result == 'success' && needs.publish-matrix.result == 'success' && fromJSON(needs.publish-matrix.outputs.primary_matrix).include[0] != null
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.publish-matrix.outputs.primary_matrix) }}
+    steps:
+      - name: Resolve release tag
+        id: release
         run: |
-          echo "## Release ${{ steps.release.outputs.tag }} Published" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Published to GitHub Releases, Modrinth (heaphammer), and CurseForge (1687734)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
-          ls -1 dist/production/*.jar | sed 's|.*/|`|;s|$`|' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/production
+          merge-multiple: true
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      # Buffer pause to guarantee sequential CurseForge timestamp separation
+      - name: Timestamp buffer
+        run: sleep 5
+
+      - name: Publish Primary Target ${{ matrix.file }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          # Modrinth (marked featured for primary version)
+          modrinth-id: heaphammer
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: true
+          modrinth-unfeature-mode: subset
+          modrinth-fail-mode: warn
+          modrinth-version: ${{ steps.release.outputs.version }}+${{ matrix.loader }}.${{ matrix.mc }}
+
+          # CurseForge: standardized bracketed display name convention
+          curseforge-id: '1687734'
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-fail-mode: warn
+          curseforge-version: ${{ matrix.display_name }}
+
+          # Shared Metadata
+          name: ${{ matrix.display_name }}
+          version-type: ${{ matrix.version_type }}
+          changelog-file: PLATFORM_CHANGELOG.md
+          environment: server
+
+          files: dist/production/${{ matrix.file }}
+          loaders: ${{ matrix.loaders }}
+          game-versions: ${{ matrix.game_versions }}
+          game-version-filter: none
