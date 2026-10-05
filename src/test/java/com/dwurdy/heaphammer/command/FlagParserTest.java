@@ -68,4 +68,25 @@ class FlagParserTest {
         assertEquals(java.util.List.of(DiagnosticCollector.HISTOGRAM, DiagnosticCollector.WORLD_STORE), spec.diagnosticCollectors());
         assertEquals(java.util.List.of("java.lang.String", "com.example.Test"), spec.trackedClasses());
     }
+
+    @Test
+    @DisplayName("FlagParser parses cohort mode and the lookat action")
+    void parsesCohortAndLookAt() {
+        ExperimentSpec spec = FlagParser.parseSpec(new String[]{
+                "--cohort=true", "--logins-per-cycle=4", "--actions=join,lookat,quit"
+        }, 0, 0, 0);
+
+        assertTrue(spec.playerCohort());
+        assertEquals(4, spec.loginsPerCycle());
+        assertEquals(java.util.List.of(PlayerAction.JOIN, PlayerAction.LOOKAT, PlayerAction.QUIT),
+                spec.playerActions());
+    }
+
+    @Test
+    @DisplayName("FlagParser rejects unknown player actions with the full valid-value list")
+    void rejectsUnknownPlayerAction() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> FlagParser.parseSpec(new String[]{"--actions=join,fly"}, 0, 0, 0));
+        assertTrue(ex.getMessage().contains("lookat"));
+    }
 }

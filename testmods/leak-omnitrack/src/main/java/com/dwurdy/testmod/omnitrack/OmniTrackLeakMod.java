@@ -3,13 +3,14 @@ package com.dwurdy.testmod.omnitrack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.dwurdy.heaphammer.platform.PlayerLifecycleObservers;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class OmniTrackLeakMod implements ModInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger("TestMod-OmniTrack");
+    private static final String TEST_NAME_PREFIX = "hh_test_";
 
     // Subsystem 1: Chunk Auditing
     private static final List<ChunkAuditRecord> CHUNK_AUDIT_LOG = new CopyOnWriteArrayList<>();
@@ -35,8 +37,10 @@ public class OmniTrackLeakMod implements ModInitializer {
     // Subsystem 2: Entity Tracking
     private static final Map<UUID, EntityTrackingRecord> ENTITY_TRACKER = new ConcurrentHashMap<>();
 
-    // Subsystem 2b: Player lifecycle retention for the v1.1 players workload.
-    private static final Map<UUID, Object> PLAYER_RETENTION = new ConcurrentHashMap<>();
+    // Subsystem 2b: Player lifecycle retention. Deliberately retains only
+    // server-player entities so the v1.1 players workload has an isolated
+    // fixture signal in addition to the generic entity tracker above.
+    private static final List<Object> PLAYER_RETENTION = new CopyOnWriteArrayList<>();
 
     // Subsystem 3: Tick Event Buffer
     private static final TickEventBuffer TICK_BUFFER = new TickEventBuffer();
@@ -49,12 +53,23 @@ public class OmniTrackLeakMod implements ModInitializer {
         LOGGER.info("[TestMod-OmniTrack] Initializing multi-subsystem memory leak testmod.");
 
         PlayerLifecycleObservers.registerJoinObserver(OmniTrackLeakMod::retainJoinedPlayer);
+        // The 1.20.4 synthetic login path can complete before its PlayerList
+        // becomes reflectively observable, so retain the same test players at
+        // Fabric's post-login boundary as a compatibility fallback.
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            if (handler == null || handler.getPlayer() == null) {
+                return;
+            }
+            String playerName = handler.getPlayer().getGameProfile().getName();
+            if (playerName != null && playerName.startsWith(TEST_NAME_PREFIX)) {
+                retainJoinedPlayer(handler.getPlayer());
+            }
+        });
 
         // Subsystem 1: Chunk Load hook (omits CHUNK_UNLOAD)
         ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
-            if (LEAK_ENABLED.get() && chunk instanceof LevelChunk) {
-                LevelChunk levelChunk = (LevelChunk) chunk;
-                CHUNK_AUDIT_LOG.add(new ChunkAuditRecord(levelChunk.getPos(), world.dimension(), levelChunk));
+            if (LEAK_ENABLED.get() && chunk != null) {
+                CHUNK_AUDIT_LOG.add(new ChunkAuditRecord(chunk.getPos(), world.dimension(), chunk));
             }
         });
 
@@ -73,7 +88,7 @@ public class OmniTrackLeakMod implements ModInitializer {
             }
         });
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             registerCommands(dispatcher);
         });
     }
@@ -89,19 +104,19 @@ public class OmniTrackLeakMod implements ModInitializer {
                     int players = PLAYER_RETENTION.size();
                     boolean enabled = LEAK_ENABLED.get();
 
-                    ctx.getSource().sendSuccess(new TextComponent(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-OmniTrack] Status: enabled=%b, chunks=%d, entities=%d, ticks=%d, players=%d",
                             enabled, chunks, entities, ticks, players)), false);
                     return chunks + entities + ticks + players;
                 }))
                 .then(Commands.literal("enable").executes(ctx -> {
                     LEAK_ENABLED.set(true);
-                    ctx.getSource().sendSuccess(new TextComponent("[TestMod-OmniTrack] Leak ENABLED"), false);
+                    ctx.getSource().sendSuccess(Component.literal("[TestMod-OmniTrack] Leak ENABLED"), false);
                     return 1;
                 }))
                 .then(Commands.literal("disable").executes(ctx -> {
                     LEAK_ENABLED.set(false);
-                    ctx.getSource().sendSuccess(new TextComponent("[TestMod-OmniTrack] Leak DISABLED"), false);
+                    ctx.getSource().sendSuccess(Component.literal("[TestMod-OmniTrack] Leak DISABLED"), false);
                     return 0;
                 }))
                 .then(Commands.literal("clear").executes(ctx -> {
@@ -113,28 +128,12 @@ public class OmniTrackLeakMod implements ModInitializer {
                     ENTITY_TRACKER.clear();
                     PLAYER_RETENTION.clear();
                     TICK_BUFFER.clear();
-                    ctx.getSource().sendSuccess(new TextComponent(
+                    ctx.getSource().sendSuccess(Component.literal(
                         String.format("[TestMod-OmniTrack] Cleared records (chunks=%d, entities=%d, ticks=%d, players=%d)",
                             chunks, entities, ticks, players)), false);
                     return chunks + entities + ticks + players;
                 }))
         );
-    }
-
-    private static Object invokeNoArgs(Object target, String name) {
-        if (target == null) {
-            return null;
-        }
-        for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
-            try {
-                java.lang.reflect.Method method = type.getDeclaredMethod(name);
-                method.setAccessible(true);
-                return method.invoke(target);
-            } catch (Exception ignored) {
-                // Search the superclass hierarchy for version-specific visibility.
-            }
-        }
-        return null;
     }
 
     private static void retainJoinedPlayer(Object player) {
@@ -144,14 +143,12 @@ public class OmniTrackLeakMod implements ModInitializer {
         if (!LEAK_ENABLED.get() || player == null) {
             return;
         }
-        Object uuid = invokeNoArgs(player, "getUUID");
-        if (uuid instanceof UUID) {
-            PLAYER_RETENTION.put((UUID) uuid, player);
+        // Retain the callback object directly. This fixture intentionally models
+        // a third-party registry leak, and avoiding UUID reflection keeps the
+        // signal stable across intermediary and obfuscated historical runtimes.
+        if (!PLAYER_RETENTION.contains(player)) {
+            PLAYER_RETENTION.add(player);
         }
-    }
-
-    public static int getPlayerRetentionCount() {
-        return PLAYER_RETENTION.size();
     }
 
     public static int getChunkAuditCount() {
@@ -160,6 +157,10 @@ public class OmniTrackLeakMod implements ModInitializer {
 
     public static int getEntityTrackerCount() {
         return ENTITY_TRACKER.size();
+    }
+
+    public static int getPlayerRetentionCount() {
+        return PLAYER_RETENTION.size();
     }
 
     public static int getTickBufferSize() {
