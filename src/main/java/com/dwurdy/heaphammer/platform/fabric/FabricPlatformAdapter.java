@@ -82,7 +82,7 @@ public class FabricPlatformAdapter implements PlatformAdapter {
         String heapHammerVersion = FabricLoader.getInstance()
                 .getModContainer("heaphammer")
                 .map(m -> m.getMetadata().getVersion().getFriendlyString())
-                .orElse("1.1.0");
+                .orElse("1.1.1");
 
         String mcVersion = FabricLoader.getInstance()
                 .getModContainer("minecraft")

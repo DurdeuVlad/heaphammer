@@ -45,6 +45,8 @@ if (-not (Test-Path $primaryJar)) {
 $prodDir = "$WorkspaceRoot/dist/production"
 if (-not (Test-Path $prodDir)) {
     New-Item -ItemType Directory -Path $prodDir -Force | Out-Null
+} else {
+    Get-ChildItem -Path $prodDir -Include "*.jar", "SHA256SUMS.txt" -Recurse | Remove-Item -Force
 }
 
 Write-Host "`nStaging production release bundle in dist/production..." -ForegroundColor Cyan
@@ -88,18 +90,11 @@ Invoke-NestedLoaderBuilds -Root $WorkspaceRoot -MC $mcVersion -ModVer $modVersio
 # 4. Build other supported Minecraft versions if -BuildAll requested
 if ($BuildAll) {
     Write-Host "`n[-BuildAll specified] Compiling multi-version LTS release binaries..." -ForegroundColor Cyan
+    # Canonical historical LTS branches (starting from v1.1.1):
     $versionBranches = @(
-        @{ Branch = "ver/1.21.4"; MC = "1.21.4"; Loader = "fabric" },
-        @{ Branch = "ver/1.20.6"; MC = "1.20.6"; Loader = "fabric" },
-        @{ Branch = "ver/1.20.4"; MC = "1.20.4"; Loader = "fabric" },
         @{ Branch = "ver/1.20.1"; MC = "1.20.1"; Loader = "fabric" },
-        @{ Branch = "ver/1.19.4"; MC = "1.19.4"; Loader = "fabric" },
-        @{ Branch = "ver/1.19.2"; MC = "1.19.2"; Loader = "fabric" },
         @{ Branch = "ver/1.18.2"; MC = "1.18.2"; Loader = "fabric" },
-        @{ Branch = "ver/1.17.1"; MC = "1.17.1"; Loader = "fabric" },
         @{ Branch = "ver/1.16.5"; MC = "1.16.5"; Loader = "fabric" },
-        @{ Branch = "ver/1.15.2"; MC = "1.15.2"; Loader = "fabric" },
-        @{ Branch = "ver/1.14.4"; MC = "1.14.4"; Loader = "fabric" },
         @{ Branch = "ver/1.12.2-forge"; MC = "1.12.2"; Loader = "forge" },
         @{ Branch = "ver/1.7.10-forge"; MC = "1.7.10"; Loader = "forge" }
     )
@@ -195,12 +190,23 @@ if (-not $ghInstalled) {
 # never overstate loader coverage.
 $jarRows = Get-ChildItem "$prodDir/heaphammer-*.jar" | ForEach-Object {
     if ($_.Name -match '^heaphammer-(.+)-(fabric|neoforge|forge)-[^-]+\.jar$') {
-        [PSCustomObject]@{ MC = $Matches[1]; Loader = $Matches[2]; File = $_.Name }
+        $lName = switch ($Matches[2]) {
+            "fabric" { "Fabric" }
+            "neoforge" { "NeoForge" }
+            "forge" { "Forge" }
+            default { $Matches[2] }
+        }
+        [PSCustomObject]@{
+            MC = $Matches[1]
+            Loader = $lName
+            File = $_.Name
+            DisplayName = "[$lName $($Matches[1])] HeapHammer $modVersion"
+        }
     }
-} | Sort-Object { [version]$_.MC } -Descending, Loader
+} | Sort-Object -Property @{Expression={ [version]$_.MC }; Descending=$true}, @{Expression='Loader'}
 
 $tableLines = $jarRows | ForEach-Object {
-    "| **$($_.MC)** | $($_.Loader) | ``$($_.File)`` |"
+    "| **$($_.MC)** | $($_.Loader) | ``$($_.File)`` | ``$($_.DisplayName)`` |"
 }
 
 $notesLines = @(
@@ -211,8 +217,8 @@ $notesLines = @(
     "### Supported Minecraft Versions",
     "HeapHammer v$modVersion provides dedicated, precompiled binaries for $($jarRows.Count) version/loader targets:",
     "",
-    "| Minecraft Version | Mod Loader | Release Binary |",
-    "|---|---|---|"
+    "| Minecraft Version | Mod Loader | Release Binary | Platform Display Name |",
+    "|---|---|---|---|"
 ) + $tableLines + @(
     "",
     "### Release Highlights",
