@@ -44,4 +44,9 @@ public final class NeoForgePlayerLifecyclePort implements PlayerLifecyclePort {
     public int cleanupTestPlayers() {
         return delegate.cleanupTestPlayers();
     }
+
+    @Override
+    public void housekeepingTick() {
+        delegate.housekeepingTick();
+    }
 }

@@ -192,13 +192,26 @@ jobs:
         id: changelog
         run: |
           TAG="${{ steps.release.outputs.tag }}"
-          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
-          if [ -n "$PREV_TAG" ]; then
-            echo "Generating changelog from ${PREV_TAG} to ${TAG}..."
-            git log --pretty=format:"- %s" "${PREV_TAG}..${TAG}" > CHANGELOG.md
+          VERSION="${{ steps.release.outputs.version }}"
+          # Curated per-release docs follow the docs/RELEASE_X_Y_Z.md naming
+          # convention (dots in the version become underscores), e.g. tag
+          # v1.2.0 -> docs/RELEASE_1_2_0.md.
+          RELEASE_DOC="docs/RELEASE_${VERSION//./_}.md"
+          if [ -f "$RELEASE_DOC" ]; then
+            # A curated per-release document takes precedence over raw git-log
+            # bullets. Drop the doc's own H1 — RELEASE_NOTES renders its own
+            # title above this section.
+            echo "Using curated release notes: $RELEASE_DOC"
+            tail -n +2 "$RELEASE_DOC" > CHANGELOG.md
           else
-            echo "No previous tag found. Generating full changelog..."
-            git log --pretty=format:"- %s" HEAD > CHANGELOG.md
+            PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              echo "Generating changelog from ${PREV_TAG} to ${TAG}..."
+              git log --pretty=format:"- %s" "${PREV_TAG}..${TAG}" > CHANGELOG.md
+            else
+              echo "No previous tag found. Generating full changelog..."
+              git log --pretty=format:"- %s" HEAD > CHANGELOG.md
+            fi
           fi
           # The supported-targets table is generated from the actual staged
           # artifacts (heaphammer-<mc>-<loader>-<ver>.jar) so it can never

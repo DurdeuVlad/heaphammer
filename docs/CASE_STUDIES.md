@@ -99,6 +99,36 @@ The 1.1.0 diagnostic paths also include two narrowly scoped Fabric fixtures:
 
 Both fixtures default to `OFF` and expose `clean`, `leak`, and `reset` modes. The clean mode is an essential control: it verifies that the diagnostic path does not report a leak merely because the workload created legitimate player or persistent-entity state. The fixture leak mode is intentionally allowed to hold Minecraft objects; that exception applies only to synthetic test mods, never to HeapHammer core.
 
+### Case 6: Cohort, Gaze, and Intrusive-Optimizer Archetypes
+
+The advanced fixture wave adds five targeted testmods modelled on real
+incidents catalogued in AllTheLeaks, NeoForge #1487, Fabric #3974, GTNH
+#16112, and Paper #14088:
+
+- `testmod-leak-clonecache` hooks the player clone boundary (respawn,
+  end-return). CLEAN re-keys its session record by the surviving UUID;
+  LEAK retains the pre-clone `ServerPlayer` with a 256 KB payload.
+- `testmod-leak-fakeplayerfactory` deploys a freshly constructed
+  `ServerPlayer` with a random UUID for every HeapHammer-tagged entity load —
+  the machinery-operator archetype whose advancement listeners pin the
+  operator forever in LEAK mode.
+- `testmod-leak-gazetrack` raycasts each test player's view every tick and
+  serializes any looked-at player's NBT, the MineChess/WAILA pattern. LEAK
+  keeps every observation; CLEAN keeps only the latest per observer:target.
+- `testmod-leak-cachelist` + `testmod-antag-optimizer` form the intrusive
+  pair: the victim keeps a lazily rebuilt chunk-metadata cache and logs a
+  bounded rebuild audit. Alone, even LEAK plateaus. The antagonist sweeps
+  the victim's cache every N ticks, turning each rebuild into unbounded
+  audit growth — the AllTheLeaks `ListenerList`-rebuild failure shape.
+
+Cohort mode (`--cohort=true`) keeps every login of an iteration online
+simultaneously: all JOINs run first, middle actions execute while the full
+cohort is present, then all QUITs. Members stand on a deterministic ring
+(3-block radius, auto-scaled for large cohorts so neighbor spacing stays
+above the fixtures' minimum-distance guard) and `lookat` aims each member
+at its ring-neighbor's eye position, which is what makes per-viewer
+serialization fixtures trigger at all.
+
 ---
 
 ## 4. Modpack Leak Triage Playbook

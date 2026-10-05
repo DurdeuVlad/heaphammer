@@ -21,6 +21,15 @@ class AnvilWorldStoreScannerTest {
         Path regionDir = root.resolve("entities").resolve("r");
         Files.createDirectories(regionDir);
         Files.write(regionDir.resolve("r.0.0.mca"), regionWithEntities());
+        Path dataDir = root.resolve("data");
+        Files.createDirectories(dataDir);
+        Files.write(dataDir.resolve("idcounts.dat"), new byte[1234]);
+        Files.write(dataDir.resolve("map_7.dat"), new byte[2048]);
+        Files.write(dataDir.resolve("not-saveddata.tmp"), new byte[999]);
+        Path chunkDir = root.resolve("region");
+        Files.createDirectories(chunkDir);
+        Files.write(chunkDir.resolve("r.0.0.mca"), new byte[8192]);
+        Files.write(chunkDir.resolve("r.0.1.mca"), new byte[4096]);
 
         WorldStoreSnapshot snapshot = new AnvilWorldStoreScanner(root).capture();
         WorldStoreDimensionSnapshot overworld = snapshot.dimensions().get("minecraft:overworld");
@@ -31,6 +40,26 @@ class AnvilWorldStoreScannerTest {
         assertEquals(2L, overworld.testEntityCount());
         assertEquals(1L, overworld.testItemEntityCount());
         assertEquals(Map.of("fresh", 1L, "despawned", 1L), overworld.itemAgeBuckets());
+        assertEquals(2L, overworld.savedDataFileCount());
+        assertEquals(3282L, overworld.savedDataBytes());
+        assertEquals(2L, overworld.chunkFileCount());
+        assertEquals(12288L, overworld.chunkBytes());
+        assertEquals(snapshot.totalRegionBytes() + 3282L + 12288L, snapshot.totalPersistedBytes());
+    }
+
+    @Test
+    void recordsDimensionWhenOnlySavedDataStoreExists() throws Exception {
+        Path root = Files.createTempDirectory("heaphammer-world-store-data-only");
+        Path dataDir = root.resolve("data");
+        Files.createDirectories(dataDir);
+        Files.write(dataDir.resolve("raids.dat"), new byte[512]);
+
+        WorldStoreSnapshot snapshot = new AnvilWorldStoreScanner(root).capture();
+        WorldStoreDimensionSnapshot overworld = snapshot.dimensions().get("minecraft:overworld");
+        assertEquals(0L, overworld.regionFileCount());
+        assertEquals(512L, overworld.savedDataBytes());
+        assertEquals(512L, snapshot.diff(null).dimensions()
+                .get("minecraft:overworld").deltaSavedDataBytes());
     }
 
     private static byte[] regionWithEntities() throws IOException {
