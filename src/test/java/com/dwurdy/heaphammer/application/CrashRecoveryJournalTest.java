@@ -94,6 +94,69 @@ class CrashRecoveryJournalTest {
     }
 
     @Test
+    @DisplayName("Queued persist from a prior session must not resurrect a deleted journal")
+    void testQueuedWriteFromPriorSessionCannotResurrectJournal(@TempDir Path tempDir) throws Exception {
+        Path journalFile = tempDir.resolve("active_run.json");
+        CountDownLatch writeStarted = new CountDownLatch(1);
+        CountDownLatch allowWrite = new CountDownLatch(1);
+        CrashRecoveryJournal crashedSession = new CrashRecoveryJournal(journalFile) {
+            @Override
+            protected void writeJournal(String json) throws IOException {
+                writeStarted.countDown();
+                try {
+                    if (!allowWrite.await(5, TimeUnit.SECONDS)) {
+                        throw new IOException("Timed out waiting to release test journal write");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting to release test journal write", e);
+                }
+                super.writeJournal(json);
+            }
+        };
+        ExperimentPlan plan = new ExperimentPlan(
+                ExperimentId.of("hh-race-cross-session"),
+                System.currentTimeMillis(),
+                ExperimentSpec.builder().build(),
+                List.of(),
+                100,
+                5
+        );
+
+        crashedSession.recordStart(plan);
+        assertTrue(Files.exists(journalFile));
+
+        // An async persist is in flight (blocked inside writeJournal) and a
+        // second one is queued behind it on the session's executor.
+        crashedSession.recordEntitySpawned(UUID.randomUUID());
+        assertTrue(writeStarted.await(5, TimeUnit.SECONDS));
+        crashedSession.recordEntitySpawned(UUID.randomUUID());
+
+        // A new session recovers and deletes the journal while the old
+        // session's writes are still pending.
+        CrashRecoveryJournal recoverySession = new CrashRecoveryJournal(journalFile);
+        MockPlatformAdapter platform = new MockPlatformAdapter();
+        Thread recoverThread = new Thread(() -> recoverySession.recoverIfInterrupted(platform),
+                "hh-journal-recover-test");
+        recoverThread.start();
+        Thread.sleep(150);
+
+        allowWrite.countDown();
+        recoverThread.join(10_000);
+        assertFalse(recoverThread.isAlive(), "recovery must finish after the in-flight write drains");
+
+        // Give the old session's queued write a chance to run: it must not
+        // recreate the file the recovery session already deleted.
+        long deadline = System.currentTimeMillis() + 1_500;
+        while (System.currentTimeMillis() < deadline) {
+            assertFalse(Files.exists(journalFile),
+                    "stale queued write resurrected the journal after recovery deleted it");
+            Thread.sleep(25);
+        }
+        assertFalse(recoverySession.hasInterruptedRun());
+    }
+
+    @Test
     @DisplayName("CrashRecoveryJournal recovers orphaned entities and blocks after simulated crash")
     void testCrashRecovery(@TempDir Path tempDir) {
         Path journalFile = tempDir.resolve("active_run.json");
