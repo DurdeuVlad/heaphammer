@@ -50,4 +50,43 @@ class FlagParserTest {
         assertTrue(ex.getMessage().contains("config/heaphammer.json"));
         assertTrue(ex.getMessage().contains("/hh config reload"));
     }
+
+    @Test
+    @DisplayName("FlagParser parses 1.1 workload profiles, lifecycle actions, durations, and diagnostics")
+    void parsesRelease110Flags() {
+        ExperimentSpec spec = FlagParser.parseSpec(new String[]{
+                "--profile=persistent", "--logins-per-cycle=3", "--actions=join,respawn,quit",
+                "--duration=2m", "--interval=30s", "--diagnostics=histogram,world-store",
+                "--track-classes=java.lang.String,com.example.Test"
+        }, 0, 0, 0);
+
+        assertEquals(EntityWorkloadProfile.PERSISTENT, spec.entityProfile());
+        assertEquals(3, spec.loginsPerCycle());
+        assertEquals(java.util.List.of(PlayerAction.JOIN, PlayerAction.RESPAWN, PlayerAction.QUIT), spec.playerActions());
+        assertEquals(120L, spec.durationSeconds());
+        assertEquals(30L, spec.intervalSeconds());
+        assertEquals(java.util.List.of(DiagnosticCollector.HISTOGRAM, DiagnosticCollector.WORLD_STORE), spec.diagnosticCollectors());
+        assertEquals(java.util.List.of("java.lang.String", "com.example.Test"), spec.trackedClasses());
+    }
+
+    @Test
+    @DisplayName("FlagParser parses cohort mode and the lookat action")
+    void parsesCohortAndLookAt() {
+        ExperimentSpec spec = FlagParser.parseSpec(new String[]{
+                "--cohort=true", "--logins-per-cycle=4", "--actions=join,lookat,quit"
+        }, 0, 0, 0);
+
+        assertTrue(spec.playerCohort());
+        assertEquals(4, spec.loginsPerCycle());
+        assertEquals(java.util.List.of(PlayerAction.JOIN, PlayerAction.LOOKAT, PlayerAction.QUIT),
+                spec.playerActions());
+    }
+
+    @Test
+    @DisplayName("FlagParser rejects unknown player actions with the full valid-value list")
+    void rejectsUnknownPlayerAction() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> FlagParser.parseSpec(new String[]{"--actions=join,fly"}, 0, 0, 0));
+        assertTrue(ex.getMessage().contains("lookat"));
+    }
 }

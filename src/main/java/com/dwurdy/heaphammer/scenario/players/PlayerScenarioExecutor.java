@@ -32,6 +32,8 @@ public final class PlayerScenarioExecutor implements ScenarioExecutor {
     private int currentIteration;
     private int currentOperationIndex;
     private int settleTicksRemaining;
+    private int cohortHoldTicksRemaining;
+    private int cohortHoldAppliedIteration = -1;
     private boolean waitingForSettle;
     private boolean baselineRecorded;
 
@@ -81,6 +83,7 @@ public final class PlayerScenarioExecutor implements ScenarioExecutor {
         if (state.isTerminal() || state == ExperimentState.PAUSED) return;
 
         budget.startTick();
+        port.housekeepingTick();
         if (!baselineRecorded) {
             checkpointTrigger.accept(CheckpointPhase.BASELINE, 0);
             baselineRecorded = true;
@@ -106,9 +109,25 @@ public final class PlayerScenarioExecutor implements ScenarioExecutor {
         }
 
         List<ResolvedPlayerOperation> operations = plan.playerOperations();
+
+        // Cohort dwell: once every middle action for this iteration is done and
+        // only QUITs remain, keep the aimed cohort online for holdTicks so
+        // observation-style fixtures observe real concurrent state across tick
+        // boundaries instead of a same-tick join/look/quit burst.
+        if (cohortHoldTicksRemaining > 0) {
+            cohortHoldTicksRemaining--;
+            return;
+        }
+
         while (currentOperationIndex < operations.size() && !budget.isExceeded()) {
             ResolvedPlayerOperation operation = operations.get(currentOperationIndex);
             if (operation.iteration() != currentIteration) break;
+            if (plan.spec().playerCohort() && cohortHoldAppliedIteration != currentIteration
+                    && operation.action() == PlayerAction.QUIT && remainingOpsAreQuits(operations)) {
+                cohortHoldAppliedIteration = currentIteration;
+                cohortHoldTicksRemaining = plan.spec().holdTicks();
+                break;
+            }
             execute(operation);
             currentOperationIndex++;
             budget.recordOperation();
@@ -124,6 +143,15 @@ public final class PlayerScenarioExecutor implements ScenarioExecutor {
             stateMachine.transitionTo(ExperimentState.SETTLING,
                     "Settling player lifecycle after iteration " + currentIteration);
         }
+    }
+
+    private boolean remainingOpsAreQuits(List<ResolvedPlayerOperation> operations) {
+        for (int i = currentOperationIndex; i < operations.size(); i++) {
+            ResolvedPlayerOperation op = operations.get(i);
+            if (op.iteration() != currentIteration) return true;
+            if (op.action() != PlayerAction.QUIT) return false;
+        }
+        return true;
     }
 
     private void execute(ResolvedPlayerOperation operation) {

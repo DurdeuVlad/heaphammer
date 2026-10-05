@@ -90,6 +90,45 @@ Does active stress testing actually find bugs faster than letting a server run i
 
 *Conclusion: On an idle staging server, leaking mods remain invisible. HeapHammer forces dormant retention bugs to reveal themselves in under 20 seconds.*
 
+### Case 5: Targeted Player and Persistent-Entity Retention Fixtures
+
+The 1.1.0 diagnostic paths also include two narrowly scoped Fabric fixtures:
+
+- `testmod-leak-playersession` retains only HeapHammer-created `hh_test_` players after disconnect and attaches a uniquely named `PlayerSessionRecord` payload. This exercises authentic join/quit churn, weak-reference retention, class histogram attribution, and event counters.
+- `testmod-leak-persistententity` retains only HeapHammer-tagged persistent mobs after unload and attaches a `PersistentEntityRecord` payload. This exercises the persistent entity profile and can be paired with the world-store scanner on platforms that implement real entity unload/reload cycles.
+
+Both fixtures default to `OFF` and expose `clean`, `leak`, and `reset` modes. The clean mode is an essential control: it verifies that the diagnostic path does not report a leak merely because the workload created legitimate player or persistent-entity state. The fixture leak mode is intentionally allowed to hold Minecraft objects; that exception applies only to synthetic test mods, never to HeapHammer core.
+
+### Case 6: Cohort, Gaze, and Intrusive-Optimizer Archetypes
+
+The advanced fixture wave adds five targeted testmods modelled on real
+incidents catalogued in AllTheLeaks, NeoForge #1487, Fabric #3974, GTNH
+#16112, and Paper #14088:
+
+- `testmod-leak-clonecache` hooks the player clone boundary (respawn,
+  end-return). CLEAN re-keys its session record by the surviving UUID;
+  LEAK retains the pre-clone `ServerPlayer` with a 256 KB payload.
+- `testmod-leak-fakeplayerfactory` deploys a freshly constructed
+  `ServerPlayer` with a random UUID for every HeapHammer-tagged entity load —
+  the machinery-operator archetype whose advancement listeners pin the
+  operator forever in LEAK mode.
+- `testmod-leak-gazetrack` raycasts each test player's view every tick and
+  serializes any looked-at player's NBT, the MineChess/WAILA pattern. LEAK
+  keeps every observation; CLEAN keeps only the latest per observer:target.
+- `testmod-leak-cachelist` + `testmod-antag-optimizer` form the intrusive
+  pair: the victim keeps a lazily rebuilt chunk-metadata cache and logs a
+  bounded rebuild audit. Alone, even LEAK plateaus. The antagonist sweeps
+  the victim's cache every N ticks, turning each rebuild into unbounded
+  audit growth — the AllTheLeaks `ListenerList`-rebuild failure shape.
+
+Cohort mode (`--cohort=true`) keeps every login of an iteration online
+simultaneously: all JOINs run first, middle actions execute while the full
+cohort is present, then all QUITs. Members stand on a deterministic ring
+(3-block radius, auto-scaled for large cohorts so neighbor spacing stays
+above the fixtures' minimum-distance guard) and `lookat` aims each member
+at its ring-neighbor's eye position, which is what makes per-viewer
+serialization fixtures trigger at all.
+
 ---
 
 ## 4. Modpack Leak Triage Playbook

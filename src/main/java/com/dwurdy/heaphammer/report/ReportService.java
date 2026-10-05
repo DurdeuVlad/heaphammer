@@ -87,6 +87,7 @@ public class ReportService {
             command.append(" --logins-per-cycle=").append(spec.loginsPerCycle());
             command.append(" --actions=").append(spec.playerActions().stream()
                     .map(action -> action.name().toLowerCase(Locale.ROOT)).collect(java.util.stream.Collectors.joining(",")));
+            if (spec.playerCohort()) command.append(" --cohort=true");
         }
         if (spec.isSoak()) {
             command.append(" --duration=").append(spec.durationSeconds()).append("s")
