@@ -48,12 +48,24 @@ public class CrashRecoveryJournal {
         }
     }
 
+    // Cross-instance coordination for one journal file: every async write is
+    // enqueued with a global monotonic sequence, and lifecycle boundaries
+    // (recordStart / recordFinish on ANY session targeting the same path)
+    // publish a floor under the shared path lock. A queued write whose sequence
+    // predates the floor is stale and must be skipped, otherwise a persist from
+    // a previous session could recreate the journal after it was deleted.
+    private static final ConcurrentHashMap<Path, Object> JOURNAL_PATH_LOCKS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Path, Long> JOURNAL_FLOOR_SEQUENCE = new ConcurrentHashMap<>();
+    private static final AtomicLong PERSIST_SEQUENCE = new AtomicLong();
+
     private final Path journalPath;
     private final ExecutorService persistenceExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "heaphammer-recovery-journal");
         thread.setDaemon(true);
         return thread;
     });
+    private final Path lockKey;
+    private final Object pathLock;
     private final AtomicLong persistenceGeneration = new AtomicLong();
     private volatile JournalState currentState = null;
 
@@ -63,6 +75,8 @@ public class CrashRecoveryJournal {
 
     public CrashRecoveryJournal(Path journalPath) {
         this.journalPath = Objects.requireNonNull(journalPath, "journalPath must not be null");
+        this.lockKey = journalPath.toAbsolutePath().normalize();
+        this.pathLock = JOURNAL_PATH_LOCKS.computeIfAbsent(lockKey, key -> new Object());
     }
 
     public synchronized void recordStart(ExperimentPlan plan) {
@@ -128,10 +142,13 @@ public class CrashRecoveryJournal {
     public synchronized void recordFinish() {
         this.currentState = null;
         persistenceGeneration.incrementAndGet();
-        try {
-            Files.deleteIfExists(journalPath);
-        } catch (IOException e) {
-            LOGGER.warn("Failed to delete journal file {}: {}", journalPath, e.getMessage());
+        synchronized (pathLock) {
+            JOURNAL_FLOOR_SEQUENCE.put(lockKey, PERSIST_SEQUENCE.incrementAndGet());
+            try {
+                Files.deleteIfExists(journalPath);
+            } catch (IOException e) {
+                LOGGER.warn("Failed to delete journal file {}: {}", journalPath, e.getMessage());
+            }
         }
     }
 
@@ -197,15 +214,19 @@ public class CrashRecoveryJournal {
     private synchronized void persist() {
         if (currentState == null) return;
         long generation = persistenceGeneration.incrementAndGet();
+        long sequence = PERSIST_SEQUENCE.incrementAndGet();
         JournalState snapshot = copyState(currentState);
         persistenceExecutor.execute(() -> {
             try {
                 String json = GsonCodec.toJson(snapshot);
-                synchronized (CrashRecoveryJournal.this) {
-                    // Serialize the final generation check with recordFinish().
-                    // Otherwise a write that passed the check before finish could
-                    // recreate the journal after recordFinish() deleted it.
-                    if (generation == persistenceGeneration.get()) {
+                synchronized (pathLock) {
+                    // Serialize the staleness checks with lifecycle writes on the
+                    // same journal path. The generation bump drops writes this
+                    // instance superseded or finished; the floor sequence drops
+                    // writes enqueued before another session's lifecycle event
+                    // on the same file.
+                    if (generation == persistenceGeneration.get()
+                            && sequence > JOURNAL_FLOOR_SEQUENCE.getOrDefault(lockKey, 0L)) {
                         writeJournal(json);
                     }
                 }
@@ -222,10 +243,15 @@ public class CrashRecoveryJournal {
     private synchronized void persistInitial() {
         if (currentState == null) return;
         persistenceGeneration.incrementAndGet();
-        try {
-            FileStorage.writeStringAtomic(journalPath, GsonCodec.toJson(copyState(currentState)));
-        } catch (IOException e) {
-            LOGGER.warn("Failed to persist crash recovery journal: {}", e.getMessage());
+        synchronized (pathLock) {
+            // The new run owns the journal from here on: writes still queued by
+            // a previous session on this path must not overwrite fresh state.
+            JOURNAL_FLOOR_SEQUENCE.put(lockKey, PERSIST_SEQUENCE.incrementAndGet());
+            try {
+                FileStorage.writeStringAtomic(journalPath, GsonCodec.toJson(copyState(currentState)));
+            } catch (IOException e) {
+                LOGGER.warn("Failed to persist crash recovery journal: {}", e.getMessage());
+            }
         }
     }
 
