@@ -68,7 +68,20 @@ cd loaders/neoforge
 | 1.12.2 | `ver/1.12.2-forge` | — | — | ✅ root (RFG) | 17 |
 | 1.7.10 | `ver/1.7.10-forge` | — | — | ✅ root (RFG) | 17 |
 
-> Note on `master`'s `platform/neoforge` package: it is a pure-Java, reflection-decoupled **simulation** used by the unit suite. The production NeoForge wiring (`HeapHammerNeoForge` entrypoint, `DirectNeoForgePlatformAdapter`, `DirectNeoForgeTicketBridge`) lives in `loaders/neoforge/src` and is the only code path a NeoForge server ever executes.
+### Canonical LTS Targets Policy (Starting from v1.1.1)
+
+To eliminate mod repository clutter, notification fatigue, and focus QA strictly where community modpacks concentrate (>98% of ecosystem traffic), **HeapHammer release distribution from v1.1.1 onward is strictly scoped to the 6 canonical LTS Minecraft versions**:
+
+| MC Version | Role & Ecosystem Significance | Primary Loader | Nested Loaders |
+|---|---|---|---|
+| **1.21.1** | Current modern modding standard | Fabric | NeoForge |
+| **1.20.1** | Massive modern modpack LTS | Fabric | Forge |
+| **1.18.2** | Post-Caves & Cliffs LTS | Fabric | Forge |
+| **1.16.5** | Nether Update legacy LTS | Fabric | Forge |
+| **1.12.2** | Golden Age classic LTS | Forge | — |
+| **1.7.10** | Vintage classic LTS | Forge | — |
+
+*Note on intermediate/transitional branches (`1.21.4`, `1.20.6`, `1.20.4`, `1.19.4`, `1.19.2`, `1.17.1`, `1.15.2`, `1.14.4`)*: These version branches remain preserved in git history and branch sync, but are excluded from active automated CurseForge, Modrinth, and GitHub production releases to prevent release spam.
 
 ---
 
@@ -76,7 +89,7 @@ cd loaders/neoforge
 
 1. Write code on `master` → open PR → merge. `ci.yml` builds root + all `loaders/*/` builds with tests.
 2. Push to `master` triggers `sync-version-branches.yml`, which merges `master` into every `ver/*` branch, runs the root suite **plus every nested loader suite**, and either pushes or opens a `needs-version-adaptation` PR.
-3. Tag `v*.*.*` → `release.yml` checks out all 14 branch targets in parallel, runs `gradlew build` (tests included) for the root build and every nested loader build, stages `heaphammer-<mc>-<loader>-<ver>.jar` files, generates the release-notes table **from the staged files**, then publishes via `mc-publish` to GitHub Releases, Modrinth, and CurseForge.
+3. Tag `v*.*.*` → `release.yml` checks out the 6 canonical LTS branch targets in parallel, runs `gradlew build` (tests included) for the root build and every nested loader build, stages `heaphammer-<mc>-<loader>-<ver>.jar` files, generates the release-notes table **from the staged files**, then publishes via `mc-publish` to GitHub Releases, Modrinth, and CurseForge.
 
 If any version's tests fail, that matrix job fails and the publish job never runs.
 
