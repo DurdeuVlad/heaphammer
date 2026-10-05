@@ -127,10 +127,15 @@ jobs:
         if: matrix.advanced-fixtures == true
         run: |
           # Each selected modern Fabric branch carries version-adapted source
-          # for both advanced fixtures. Do not copy 1.21.1 sources across
+          # for all seven advanced fixtures. Do not copy 1.21.1 sources across
           # mappings; this gate makes missing branch adaptations explicit.
           test -d testmods/leak-playersession
           test -d testmods/leak-persistententity
+          test -d testmods/leak-clonecache
+          test -d testmods/leak-fakeplayerfactory
+          test -d testmods/leak-gazetrack
+          test -d testmods/leak-cachelist
+          test -d testmods/antag-optimizer
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
@@ -162,7 +167,7 @@ jobs:
         env:
           LOADER: ${{ matrix.loader }}
         run: |
-          ./gradlew build buildTestmods -Pmod_version=1.1.0 --no-daemon
+          ./gradlew build buildTestmods -Pmod_version=1.2.0 --no-daemon
 
       - name: Require modern Fabric advanced fixture jars
         if: matrix.advanced-fixtures == true
@@ -170,6 +175,11 @@ jobs:
           # The live harness stages and exercises both jars for these rows.
           test -f build/testmods/testmod-leak-playersession-1.0.0.jar
           test -f build/testmods/testmod-leak-persistententity-1.0.0.jar
+          test -f build/testmods/testmod-leak-clonecache-1.0.0.jar
+          test -f build/testmods/testmod-leak-fakeplayerfactory-1.0.0.jar
+          test -f build/testmods/testmod-leak-gazetrack-1.0.0.jar
+          test -f build/testmods/testmod-leak-cachelist-1.0.0.jar
+          test -f build/testmods/testmod-antag-optimizer-1.0.0.jar
 
       - name: Boot server and execute live matrix
         env:
@@ -182,7 +192,7 @@ jobs:
             --mc-version "$MC_VERSION" \
             --loader "$LOADER" \
             --leak-fixture "$LEAK_FIXTURE" \
-            --expected-mod-version 1.1.0
+            --expected-mod-version 1.2.0
 
       - name: Upload live-server evidence
         if: always()

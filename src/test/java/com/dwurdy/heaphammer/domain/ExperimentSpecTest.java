@@ -61,4 +61,62 @@ class ExperimentSpecTest {
         assertEquals(64, spec.radius());
         assertEquals(100, spec.iterations());
     }
+
+    @Test
+    @DisplayName("toBuilder round-trip preserves every field, including playerCohort")
+    void testToBuilderRoundTrip() {
+        ExperimentSpec original = ExperimentSpec.builder()
+                .scenarioId(ScenarioId.PLAYERS)
+                .seed(1234L)
+                .dimension("minecraft:the_nether")
+                .center(12, -34)
+                .radius(8)
+                .iterations(3)
+                .batchSize(5)
+                .strategy("LINEAR")
+                .warmupIterations(1)
+                .holdTicks(7)
+                .settleTicks(9)
+                .maxOperationsPerTick(4)
+                .maxMillisPerTick(10)
+                .explicitGc(true)
+                .coverage(0.5)
+                .includeMods(java.util.List.of("mod-a"))
+                .excludeMods(java.util.List.of("mod-b"))
+                .entityProfile(EntityWorkloadProfile.PERSISTENT)
+                .loginsPerCycle(4)
+                .playerActions(java.util.List.of(PlayerAction.JOIN, PlayerAction.LOOKAT, PlayerAction.QUIT))
+                .playerCohort(true)
+                .diagnosticCollectors(java.util.List.of(DiagnosticCollector.RETENTION))
+                .trackedClasses(java.util.List.of("com.example.Tracked"))
+                .build();
+
+        ExperimentSpec copy = original.toBuilder().build();
+        assertEquals(original.scenarioId(), copy.scenarioId());
+        assertEquals(original.seed(), copy.seed());
+        assertEquals(original.dimension(), copy.dimension());
+        assertEquals(original.centerX(), copy.centerX());
+        assertEquals(original.centerZ(), copy.centerZ());
+        assertEquals(original.radius(), copy.radius());
+        assertEquals(original.iterations(), copy.iterations());
+        assertEquals(original.batchSize(), copy.batchSize());
+        assertEquals(original.strategy(), copy.strategy());
+        assertEquals(original.warmupIterations(), copy.warmupIterations());
+        assertEquals(original.holdTicks(), copy.holdTicks());
+        assertEquals(original.settleTicks(), copy.settleTicks());
+        assertEquals(original.maxOperationsPerTick(), copy.maxOperationsPerTick());
+        assertEquals(original.maxMillisPerTick(), copy.maxMillisPerTick());
+        assertEquals(original.explicitGc(), copy.explicitGc());
+        assertEquals(original.coverage(), copy.coverage());
+        assertEquals(original.includeMods(), copy.includeMods());
+        assertEquals(original.excludeMods(), copy.excludeMods());
+        assertEquals(original.entityProfile(), copy.entityProfile());
+        assertEquals(original.loginsPerCycle(), copy.loginsPerCycle());
+        assertEquals(original.playerActions(), copy.playerActions());
+        assertEquals(original.playerCohort(), copy.playerCohort());
+        assertEquals(original.durationSeconds(), copy.durationSeconds());
+        assertEquals(original.intervalSeconds(), copy.intervalSeconds());
+        assertEquals(original.diagnosticCollectors(), copy.diagnosticCollectors());
+        assertEquals(original.trackedClasses(), copy.trackedClasses());
+    }
 }
