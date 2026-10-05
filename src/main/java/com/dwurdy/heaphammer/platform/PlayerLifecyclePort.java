@@ -16,4 +16,8 @@ public interface PlayerLifecyclePort {
     int activeTestPlayerCount();
 
     int cleanupTestPlayers();
+
+    /** Per-tick housekeeping hook; implementations may drain synthetic connection queues. */
+    default void housekeepingTick() {
+    }
 }

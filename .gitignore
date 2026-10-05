@@ -44,3 +44,9 @@ logs/
 .scratch/*.html
 .scratch/*.js
 .worktrees/
+
+# stray packaging artifacts at repo root
+/META-INF/
+
+# python tooling caches
+__pycache__/
