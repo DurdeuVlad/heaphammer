@@ -32,7 +32,7 @@ public class NeoForgePlatformAdapter implements PlatformAdapter {
         this.ticketManager = Objects.requireNonNull(ticketManager, "ticketManager must not be null");
         installedMods.put("minecraft", "1.21.1");
         installedMods.put("neoforge", "21.1.70");
-        installedMods.put("heaphammer", "1.1.0");
+        installedMods.put("heaphammer", "1.1.1");
     }
 
     @Override
@@ -64,7 +64,7 @@ public class NeoForgePlatformAdapter implements PlatformAdapter {
     @Override
     public EnvironmentFingerprint captureFingerprint() {
         return new EnvironmentFingerprint(
-                "1.1.0",
+                "1.1.1",
                 "1.21.1",
                 "neoforge-21.1.70",
                 System.getProperty("java.version", "21"),
